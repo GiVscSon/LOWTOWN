@@ -40,9 +40,9 @@ function snapshot() {
       t: performance.now(),
       game: {
         x: s.x, y: s.y,
-        speed: s.speed || 0,
-        maxSpeed: s.maxSpeed || 0,
-        distance: s.distance || 0,
+        speed: Number.isFinite(s.speed) ? s.speed : 0,
+        maxSpeed: Number.isFinite(s.maxSpeed) ? s.maxSpeed : 0,
+        distance: Number.isFinite(s.distance) ? s.distance : 0,
         collisions: s.collisions || 0,
         trafficHits: s.trafficHits || 0,
         stuck: s.stuck || 0,
@@ -72,6 +72,17 @@ let failure = null;
 let sampleTimer = null;
 let previousSample = null;
 
+function enrichSpeed(sample, previous) {
+  const own = Number(sample.game.speed);
+  const hasOwnSpeed = Number.isFinite(own) && own > 0;
+  if (hasOwnSpeed || !previous) return sample;
+  const dt = Math.max(0.001, (sample.t - previous.t) / 1000);
+  const dx = Number(sample.game.x) - Number(previous.game.x);
+  const dy = Number(sample.game.y) - Number(previous.game.y);
+  const derived = Math.hypot(dx, dy) / dt;
+  return { ...sample, game: { ...sample.game, speed: Number.isFinite(derived) ? derived : 0, speedSource: 'position-delta' } };
+}
+
 try {
   await waitForServer();
   await page.waitForFunction(() => Boolean(window.__LOWTOWN_TEST && window.__LOWTOWN_AI));
@@ -79,8 +90,9 @@ try {
   const started = Date.now();
   sampleTimer = setInterval(async () => {
     try {
-      const s = await snapshot();
-      if (!s) return;
+      const raw = await snapshot();
+      if (!raw) return;
+      const s = enrichSpeed(raw, previousSample);
       telemetry.push(s);
       const dt = previousSample ? Math.max(0, (s.t - previousSample.t) / 1000) : SAMPLE_MS / 1000;
       blackBox.sample(s, dt);
@@ -91,6 +103,7 @@ try {
   while (Date.now() - started < RUN_MS) await new Promise(r => setTimeout(r, 250));
   finalState = await snapshot();
   if (!finalState) throw new Error('LOWTOWN state unavailable after run.');
+  finalState = enrichSpeed(finalState, previousSample);
   if (previousSample && (!telemetry.length || telemetry[telemetry.length - 1].t < finalState.t)) {
     const dt = Math.max(0, (finalState.t - previousSample.t) / 1000);
     blackBox.sample(finalState, dt);
