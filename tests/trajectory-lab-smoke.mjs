@@ -27,7 +27,7 @@ assert.ok(Number.isFinite(normal.selected.score));
 
 const blockedSimulate = (car, horizon, steer, throttle, brake) => {
   const result = simulate(car, horizon, steer, throttle, brake);
-  if (steer > 0.8) result.safe = false;
+  if (steer > 0.3) result.safe = false;
   return result;
 };
 const blockedLab = createTrajectoryLab({ simulate: blockedSimulate, trafficRisk, blocked: () => false });
