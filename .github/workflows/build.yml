@@ -68,6 +68,8 @@ jobs:
         run: node tests/world-state-smoke.mjs
       - name: Test road topology first
         run: node tests/road-topology-smoke.mjs
+      - name: Test semantic city routing
+        run: node tests/city-semantics-smoke.mjs
       - name: Diagnose world connectivity
         run: node tests/world-connectivity-diagnostic.mjs
       - name: Stress-test world routing
