@@ -40,12 +40,12 @@ for(const vehicleId of VEHICLES){
     const transport=createTransportController(vehicleId,{x:160,y:640,a:0});
     const ai=createAIDriver({nodes,blocked,getTraffic:()=>traffic});
     ai.start(transport.state);
-    let collisions=0,nearMisses=0,replans0,recoveries0,maxSpeed=0,stuckFrames=0,prevX=transport.state.x,prevY=transport.state.y;
+    let collisions=0,nearMisses=0,replans0=0,recoveries0=0,maxSpeed=0,stuckFrames=0,prevX=transport.state.x,prevY=transport.state.y;
     for(let frame=0;frame<360;frame++){
       traffic=trafficFor(template,frame);
       if(template==='braking'&&frame===120)transport.state.vx*=.35;
       if(template==='recovery'&&frame===180){transport.state.x+=130;transport.state.y+=120;}
-      if(template==='stuck'&&frame>=140&&frame<190){transport.state.x=transport.state.x;transport.state.y=transport.state.y;transport.state.vx=transport.state.vy=0;}
+      if(template==='stuck'&&frame>=140&&frame<190){transport.state.vx=transport.state.vy=0;}
       if(template==='high_speed'&&frame<80)transport.state.vx=Math.min(resolveTransportPhysics(vehicleId).maxForwardSpeed*.9,transport.state.vx+3);
       const control=ai.update(transport.state,1/60);
       assert(control,'AI must return control');
@@ -61,8 +61,9 @@ for(const vehicleId of VEHICLES){
       if(t.collision||t.contact)collisions++;
       nearMisses=ai.state.nearMisses;
     }
-    replans0=ai.state.replans;recoveries=ai.state.recoveries;
-    metrics.push({vehicleId,template,frames:360,collisions,nearMisses,replans:replans0,recoveries,stuckFrames,maxSpeed:+maxSpeed.toFixed(3),decisions:ai.state.decisions,routeFailures:ai.state.routeFailures});
+    replans0=ai.state.replans;
+    recoveries0=ai.state.recoveries;
+    metrics.push({vehicleId,template,frames:360,collisions,nearMisses,replans:replans0,recoveries:recoveries0,stuckFrames,maxSpeed:+maxSpeed.toFixed(3),decisions:ai.state.decisions,routeFailures:ai.state.routeFailures});
     assert(ai.state.decisions>100,`${vehicleId}/${template}: insufficient decisions`);
     assert(ai.state.route.length>0,`${vehicleId}/${template}: route missing`);
     assert(ai.state.replans>0,`${vehicleId}/${template}: no replans`);
