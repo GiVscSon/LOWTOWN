@@ -37,7 +37,11 @@ async function boot(){
     const now=performance.now(),risk=Number(state.risk||0),ttc=Number(state.ttc),stuck=Number(state.stuck||0);
     const trajectory=stack.evaluate({candidates:ai.candidates||[],risk,ttc,stuck});
 
-    const need=now-lastDecision>2200||risk>1.15||(Number.isFinite(ttc)&&ttc<1.1)||stuck>1.4||!ai.goal;
+    const routeLength=Array.isArray(ai.route)?ai.route.length:0;
+    const routeHealthy=routeLength>2&&stuck<0.8&&risk<0.8&&(!Number.isFinite(ttc)||ttc>2.0);
+    const periodic=now-lastDecision>7000;
+    const emergency=risk>1.15||(Number.isFinite(ttc)&&ttc<1.1)||stuck>1.4||!ai.goal;
+    const need=!routeHealthy&&(periodic||emergency);
     if(!need||nodes.length<3)continue;
     const intent=risk>1.15||(Number.isFinite(ttc)&&ttc<1.1)?'ESCAPE_TRAFFIC':intents[lab.decisions%intents.length];
     const goal=freeWill.choose({x:state.x,y:state.y},{intent,lastGoalId:lab.lastGoal,traffic:{}});
@@ -45,7 +49,7 @@ async function boot(){
 
     const previous=ai.goal?.id;
     ai.goal=goal;ai.route=[];ai.routeTimer=999;
-    lab.decisions++;lab.forcedReplans++;lab.intent=intent;lab.reason=risk>1.15?'RISK_REPLAN':trajectory.decision?.reason||'SELF_CHOICE';lab.lastGoal=goal.id;
+    lab.decisions++;lab.forcedReplans++;lab.intent=intent;lab.reason=emergency?'EMERGENCY_REPLAN':trajectory.decision?.reason||'SELF_CHOICE';lab.lastGoal=goal.id;
     lab.history.push({
       t:Math.round((now-lab.startedAt)/1000),intent,from:previous,to:goal.id,
       risk:Number.isFinite(risk)?+risk.toFixed(2):0,ttc:Number.isFinite(ttc)?+ttc.toFixed(2):Infinity,
