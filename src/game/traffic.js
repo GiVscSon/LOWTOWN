@@ -3,11 +3,15 @@ import { createAIDriver } from './ai_driver.js';
 
 export function createTrafficSystem({nodes,blocked,seed=1337}){
  let state=seed>>>0;const cars=[],images={};Object.entries(VEHICLE_ASSETS).forEach(([k,src])=>{const i=new Image();i.src=src;images[k]=i});
+ const params=new URLSearchParams(location.search);let scenario=null;try{const raw=params.get('scenario');if(raw)scenario=JSON.parse(raw)}catch{}
+ const density=Number.isFinite(Number(scenario?.trafficDensity))?Math.max(0,Math.min(1,Number(scenario.trafficDensity))):null;
+ const leadSpeed=Number.isFinite(Number(scenario?.leadSpeed))?Math.max(25,Number(scenario.leadSpeed)):null;
  const rand=()=>{state=(state*1664525+1013904223)>>>0;return state/4294967296},dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y),pick=()=>nodes[(rand()*nodes.length)|0];
  const routeFrom=s=>{const r=[s];let c=s;const seen=new Set([c.id]);for(let i=0;i<18;i++){const q=c.links.filter(n=>!seen.has(n.id));if(!q.length)break;c=q[(rand()*q.length)|0];r.push(c);seen.add(c.id)}return r};
  const lane=(n,next,l)=>{if(!next)return{x:n.x,y:n.y};const dx=next.x-n.x,dy=next.y-n.y,len=Math.hypot(dx,dy)||1;return{x:n.x-dy/len*l,y:n.y+dx/len*l}};
  const types=[['sedan',105,165],['coupe',125,195],['taxi',115,175],['police',135,210],['van',85,135],['truck',70,115]];
- for(let i=0;i<26;i++){const n=pick(),t=types[(rand()*types.length)|0],nx=n.links[0];cars.push({x:n.x,y:n.y,a:nx?Math.atan2(nx.y-n.y,nx.x-n.x):rand()*6.28,v:t[1],targetSpeed:t[1]+rand()*(t[2]-t[1]),route:routeFrom(n),index:1,lane:(rand()<.5?-1:1)*22,type:t[0],stuck:0,brake:0,siren:0})}
+ const count=density===null?26:Math.max(8,Math.min(50,Math.round(8+density*42)));
+ for(let i=0;i<count;i++){const n=pick(),t=types[(rand()*types.length)|0],nx=n.links[0],base=t[1],top=t[2],scenarioSpeed=leadSpeed===null?base+rand()*(top-base):Math.max(25,leadSpeed*(.78+rand()*.44));cars.push({x:n.x,y:n.y,a:nx?Math.atan2(nx.y-n.y,nx.x-n.x):rand()*6.28,v:scenarioSpeed,targetSpeed:scenarioSpeed,route:routeFrom(n),index:1,lane:(rand()<.5?-1:1)*22,type:t[0],stuck:0,brake:0,siren:0})}
  const aiMode=new URLSearchParams(location.search).has('autotest');
  const ai=aiMode?createAIDriver({nodes,blocked,getTraffic:()=>cars}):null;
  if(ai)globalThis.__LOWTOWN_AI=ai.state;
@@ -32,5 +36,5 @@ export function createTrafficSystem({nodes,blocked,seed=1337}){
   if(ai&&player){if(!ai.state.enabled)ai.start(player);const control=ai.update(player,dt);applyAI(player,control,dt)}
  }
  function draw(ctx,iso){for(const c of cars){const p=iso(c.x,c.y),im=images[c.type];ctx.save();ctx.translate(p.x,p.y);ctx.rotate(-c.a-.15);if(im?.complete)ctx.drawImage(im,-30,-15,60,30);else{ctx.fillStyle='#555b61';ctx.fillRect(-20,-9,40,18)}if(c.type==='police'&&c.siren){ctx.fillStyle=Math.sin(performance.now()/90)>0?'#d4523a':'#e8b84a';ctx.fillRect(-5,-15,10,3)}ctx.restore()}}
- return{cars,update,draw,ai};
+ return{cars,update,draw,ai,scenario};
 }
