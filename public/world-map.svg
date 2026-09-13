@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+<rect width="1200" height="800" fill="#0b171b"/>
+<ellipse cx="480" cy="402" rx="283" ry="214" fill="#202326" stroke="#e09a3e" stroke-width="5"/>
+<ellipse cx="964" cy="332" rx="163" ry="185" fill="#25282a" stroke="#d4523a" stroke-width="5"/>
+<ellipse cx="600" cy="144" rx="231" ry="123" fill="#202820" stroke="#b7a66a" stroke-width="5"/>
+<g fill="none" stroke="#35383b" stroke-width="12" opacity=".95">
+<path d="M 0,512 L 86,512 L 172,512 L 258,512 L 344,512 L 430,512 L 516,512 L 602,512 L 688,512 L 774,512 L 860,512 L 946,512 L 1032,512 L 1118,512 L 1200,512"/>
+<path d="M 0,444 L 86,444 L 172,444 L 258,444 L 344,444 L 430,444 L 516,444 L 602,444 L 688,444 L 774,444 L 860,444 L 946,444 L 1032,444 L 1118,444 L 1200,444"/>
+<path d="M 0,376 L 86,376 L 172,376 L 258,376 L 344,376 L 430,376 L 516,376 L 602,376 L 688,376 L 774,376 L 860,376 L 946,376 L 1032,376 L 1118,376 L 1200,376"/>
+<path d="M 0,308 L 86,308 L 172,308 L 258,308 L 344,308 L 430,308 L 516,308 L 602,308 L 688,308 L 774,308 L 860,308 L 946,308 L 1032,308 L 1118,308 L 1200,308"/>
+<path d="M 0,240 L 86,240 L 172,240 L 258,240 L 344,240 L 430,240 L 516,240 L 602,240 L 688,240 L 774,240 L 860,240 L 946,240 L 1032,240 L 1118,240 L 1200,240"/>
+<path d="M 0,172 L 86,172 L 172,172 L 258,172 L 344,172 L 430,172 L 516,172 L 602,172 L 688,172 L 774,172 L 860,172 L 946,172 L 1032,172 L 1118,172 L 1200,172"/>
+<path d="M 430,800 L 430,720 L 430,640 L 430,560 L 430,480 L 430,400 L 430,320 L 430,240 L 430,160 L 430,80"/>
+<path d="M 516,800 L 516,720 L 516,640 L 516,560 L 516,480 L 516,400 L 516,320 L 516,240 L 516,160 L 516,80"/>
+<path d="M 602,800 L 602,720 L 602,640 L 602,560 L 602,480 L 602,400 L 602,320 L 602,240 L 602,160 L 602,80"/>
+<path d="M 688,800 L 688,720 L 688,640 L 688,560 L 688,480 L 688,400 L 688,320 L 688,240 L 688,160 L 688,80"/>
+<path d="M 774,800 L 774,720 L 774,640 L 774,560 L 774,480 L 774,400 L 774,320 L 774,240 L 774,160 L 774,80"/>
+<path d="M 860,800 L 860,720 L 860,640 L 860,560 L 860,480 L 860,400 L 860,320 L 860,240 L 860,160 L 860,80"/>
+<path d="M 946,800 L 946,720 L 946,640 L 946,560 L 946,480 L 946,400 L 946,320 L 946,240 L 946,160 L 946,80"/>
+</g>
+<g fill="#4a4c4f" opacity=".82">
+<rect x="376" y="522" width="64" height="38"/><rect x="462" y="524" width="56" height="34"/><rect x="548" y="520" width="72" height="42"/><rect x="634" y="526" width="64" height="36"/>
+<rect x="370" y="450" width="54" height="44"/><rect x="448" y="452" width="60" height="38"/><rect x="530" y="448" width="68" height="42"/><rect x="620" y="454" width="60" height="40"/>
+<rect x="380" y="374" width="48" height="44"/><rect x="454" y="370" width="62" height="48"/><rect x="538" y="376" width="70" height="42"/><rect x="630" y="370" width="60" height="46"/>
+<rect x="710" y="446" width="62" height="42"/><rect x="790" y="442" width="70" height="46"/><rect x="874" y="438" width="62" height="44"/><rect x="950" y="446" width="66" height="42"/>
+<rect x="1030" y="410" width="54" height="46"/><rect x="956" y="350" width="62" height="40"/><rect x="1032" y="330" width="54" height="44"/>
+</g>
+<path d="M 770,400 L 820,400" stroke="#6f604f" stroke-width="18"/>
+<path d="M 600,310 L 600,250" stroke="#6f604f" stroke-width="18"/>
+<g font-family="monospace" font-weight="700" text-anchor="middle">
+<text x="480" y="402" fill="#e09a3e" font-size="24">LOWTOWN</text>
+<text x="964" y="332" fill="#d4523a" font-size="21">IRON HARBOR</text>
+<text x="600" y="144" fill="#b7a66a" font-size="21">NORTH RIDGE</text>
+</g>
+<circle cx="1016" cy="402" r="8" fill="#e8b84a"/><text x="1028" y="390" fill="#e8b84a" font-family="monospace" font-size="13">MISSION</text>
+<text x="30" y="40" fill="#e8b84a" font-family="monospace" font-size="16">LOWTOWN // 3 ISLANDS // WORLD TEST MAP</text>
+</svg>
