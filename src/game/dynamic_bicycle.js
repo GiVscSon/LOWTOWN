@@ -62,3 +62,11 @@ export function stepDynamicBicycle(state,dt,physics={}){
   state.vy=fy*forward+ry*lateral;
   return {forwardSpeed:forward,lateralSpeed:lateral,yawRate:state.yawRate,slipAngle:Math.atan2(lateral,Math.max(1,Math.abs(forward))),frontForce:q.fyF,rearForce:q.fyR,frontLoad:q.frontLoad,rearLoad:q.rearLoad,lateralAccel:q.lateralAccel,yawAccel:q.yawAccel,model:'dynamic-bicycle'};
 }
+
+export function dynamicHandlingActive(speed,physics={},wasActive=false){
+  const center=Math.max(0,finite(physics.dynamicModelSpeed,180));
+  const width=Math.max(1,finite(physics.dynamicBlendSpeed,35));
+  const absSpeed=Math.abs(finite(speed));
+  if(wasActive)return absSpeed>Math.max(0,center-width);
+  return absSpeed>=center;
+}
