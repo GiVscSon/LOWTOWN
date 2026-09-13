@@ -17,6 +17,8 @@ jobs:
             test: tests/road-topology-smoke.mjs
           - name: world-stress
             test: tests/world-stress-smoke.mjs
+          - name: layout
+            test: tests/world-layout-smoke.mjs
           - name: transport
             test: tests/transport-smoke.mjs
           - name: islands
