@@ -24,18 +24,25 @@ function calibratedPhysics(base,calibration=null){
   };
 }
 
+function calibrationForVehicle(profile,id){
+  if(!profile||typeof profile!=='object')return null;
+  return profile.vehicles?.[id]||null;
+}
+
 export function createTransportController(vehicleId='sedan',initial={}){
   let currentId=getTransportProfile(vehicleId).id;
   const profile=()=>getTransportProfile(currentId);
   const state=createTransportState({type:profile().type,vehicleId:currentId,mass:profile().mass,...initial});
-  let calibration=null;
+  let calibrationProfile=null;
+  let calibrationByVehicle={};
   let physics=resolveTransportPhysics(currentId);
   state.mass=physics.mass;
   state.physics=physics;
   let lastInput={throttle:0,brake:0,steer:0,handbrake:false,climb:0,descend:0};
 
+  function activeCalibration(){return calibrationByVehicle[currentId]||calibrationForVehicle(calibrationProfile,currentId);}
   function rebuildPhysics(){
-    physics=calibratedPhysics(resolveTransportPhysics(currentId),calibration);
+    physics=calibratedPhysics(resolveTransportPhysics(currentId),activeCalibration());
     state.mass=physics.mass;
     state.physics=physics;
     return physics;
@@ -44,24 +51,56 @@ export function createTransportController(vehicleId='sedan',initial={}){
   function setVehicle(id){
     const next=getTransportProfile(id);
     currentId=next.id;
-    rebuildPhysics();
     state.vehicleId=currentId;
     state.type=next.type;
     state.surface=next.type===TRANSPORT_TYPES.CAR?'road':next.type===TRANSPORT_TYPES.BOAT?'water':'air';
+    rebuildPhysics();
     return next;
   }
 
-  function setCalibration(next=null){
-    calibration=next&&typeof next==='object'?{...next}:null;
+  function setCalibration(next=null,vehicleId=currentId){
+    const id=getTransportProfile(vehicleId).id;
+    if(next&&typeof next==='object'){
+      if(next.vehicles&&typeof next.vehicles==='object'){
+        calibrationProfile={...next,vehicles:{...next.vehicles}};
+        calibrationByVehicle={...calibrationByVehicle,...next.vehicles};
+      }else{
+        calibrationByVehicle={...calibrationByVehicle,[id]:{...next}};
+      }
+    }else if(next===null){
+      delete calibrationByVehicle[id];
+      if(calibrationProfile?.vehicles?.[id]){
+        const vehicles={...calibrationProfile.vehicles};
+        delete vehicles[id];
+        calibrationProfile={...calibrationProfile,vehicles};
+      }
+    }
     rebuildPhysics();
-    return calibration;
+    return activeCalibration();
   }
 
-  function clearCalibration(){
-    calibration=null;
+  function setCalibrationProfile(profile={}){
+    calibrationProfile=profile&&typeof profile==='object'?{...profile,vehicles:{...(profile.vehicles||{})}}:null;
+    calibrationByVehicle={...(calibrationProfile?.vehicles||{})};
+    rebuildPhysics();
+    return calibrationProfile;
+  }
+
+  function getCalibration(vehicleId=currentId){return calibrationByVehicle[vehicleId]||calibrationProfile?.vehicles?.[vehicleId]||null;}
+
+  function clearCalibration(vehicleId=currentId){
+    const id=getTransportProfile(vehicleId).id;
+    delete calibrationByVehicle[id];
+    if(calibrationProfile?.vehicles?.[id]){
+      const vehicles={...calibrationProfile.vehicles};
+      delete vehicles[id];
+      calibrationProfile={...calibrationProfile,vehicles};
+    }
     rebuildPhysics();
     return physics;
   }
+
+  function clearAllCalibration(){calibrationProfile=null;calibrationByVehicle={};rebuildPhysics();return physics;}
 
   function control(input={}){
     const type=state.type;
@@ -85,7 +124,7 @@ export function createTransportController(vehicleId='sedan',initial={}){
     telemetry.frameDistance=Math.hypot(dx,dy,dz);
     telemetry.vehicleId=currentId;
     telemetry.physics={type:physics.type,mass:physics.mass,maxSpeed:physics.maxForwardSpeed,engineForce:physics.engineForce,brakeForce:physics.brakeForce,steeringRate:physics.steeringRate,grip:physics.lateralGrip,turnRadius:physics.turnRadius,calibration:physics.calibration||null};
-    telemetry.calibration=calibration?{...calibration}:null;
+    telemetry.calibration=activeCalibration()?{...activeCalibration()}:null;
     state.telemetry=telemetry;
     return telemetry;
   }
@@ -93,8 +132,8 @@ export function createTransportController(vehicleId='sedan',initial={}){
   function snapshot(){
     const v=profile();
     const t=getTransportTypeProfile(v.type);
-    return {vehicleId:v.id,profile:v,typeProfile:t,state:{...state},physics:{...physics},calibration:calibration?{...calibration}:null,input:{...lastInput},telemetry:transportTelemetry(state,lastInput)};
+    return {vehicleId:v.id,profile:v,typeProfile:t,state:{...state},physics:{...physics},calibration:activeCalibration()?{...activeCalibration()}:null,calibrationProfile:calibrationProfile?{...calibrationProfile,vehicles:{...(calibrationProfile.vehicles||{})}}:null,input:{...lastInput},telemetry:transportTelemetry(state,lastInput)};
   }
 
-  return {get vehicleId(){return currentId;},get profile(){return profile();},get typeProfile(){return getTransportTypeProfile(state.type);},get state(){return state;},get physics(){return physics;},get calibration(){return calibration;},setVehicle,setCalibration,clearCalibration,control,step,snapshot};
+  return {get vehicleId(){return currentId;},get profile(){return profile();},get typeProfile(){return getTransportTypeProfile(state.type);},get state(){return state;},get physics(){return physics;},get calibration(){return activeCalibration();},setVehicle,setCalibration,setCalibrationProfile,getCalibration,clearCalibration,clearAllCalibration,control,step,snapshot};
 }
