@@ -1,24 +1,27 @@
 import { createFreeWillDriver } from './free_will_driver.js';
+import { createAIWorldModel } from './ai_world_model.js';
+import { createAutonomyStack } from './autonomy_stack.js';
 
-const enabled = new URLSearchParams(location.search).has('autonomy') || new URLSearchParams(location.search).has('autotest');
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const params=new URLSearchParams(location.search);
+const enabled=params.has('autonomy')||params.has('autotest');
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
-async function boot() {
-  if (!enabled) return;
-  while (!window.__LOWTOWN_AI || !window.__LOWTOWN_TEST) await sleep(50);
+async function boot(){
+  if(!enabled)return;
+  while(!window.__LOWTOWN_AI||!window.__LOWTOWN_TEST)await sleep(50);
 
-  const ai = window.__LOWTOWN_AI;
-  const lab = { enabled:true, startedAt:performance.now(), decisions:0, forcedReplans:0, intent:'EXPLORE', reason:'BOOT', lastGoal:null, memory:new Map(), failures:[], history:[] };
-  const nodes=[];
-  const seen=new Set();
+  const ai=window.__LOWTOWN_AI;
+  const worldModel=createAIWorldModel();
+  const stack=createAutonomyStack({worldModel});
+  const lab={enabled:true,startedAt:performance.now(),decisions:0,forcedReplans:0,intent:'EXPLORE',reason:'BOOT',lastGoal:null,memory:new Map(),failures:[],history:[],world:worldModel,status:stack.status()};
+  const nodes=[];const seen=new Set();
   const remember=n=>{
     if(!n||!Number.isFinite(n.x)||!Number.isFinite(n.y))return;
     const id=`${Math.round(n.x/160)}:${Math.round(n.y/160)}`;
     if(seen.has(id))return;
     seen.add(id);
     const node={x:n.x,y:n.y,id,links:[n]};
-    nodes.push(node);
-    lab.memory.set(id,{x:n.x,y:n.y,visits:0});
+    nodes.push(node);lab.memory.set(id,{x:n.x,y:n.y,visits:0});
   };
   const freeWill=createFreeWillDriver({nodes,blocked:()=>false});
   const intents=['EXPLORE','CRUISE','SEEK_NOVELTY','ESCAPE_TRAFFIC','INVESTIGATE'];
@@ -29,24 +32,48 @@ async function boot() {
     const state=window.__LOWTOWN_TEST.state();
     for(const n of ai.route||[])remember(n);
     if(ai.goal)remember(ai.goal);
+
+    stack.observe({x:state.x,y:state.y,speed:state.speed,risk:state.risk});
     const now=performance.now(),risk=Number(state.risk||0),ttc=Number(state.ttc),stuck=Number(state.stuck||0);
+    const trajectory=stack.evaluate({candidates:ai.candidates||[],risk,ttc,stuck});
+
     const need=now-lastDecision>2200||risk>1.15||(Number.isFinite(ttc)&&ttc<1.1)||stuck>1.4||!ai.goal;
     if(!need||nodes.length<3)continue;
     const intent=risk>1.15||(Number.isFinite(ttc)&&ttc<1.1)?'ESCAPE_TRAFFIC':intents[lab.decisions%intents.length];
-    const goal=freeWill.choose({x:state.x,y:state.y},{intent,lastGoalId:lab.lastGoal});
+    const goal=freeWill.choose({x:state.x,y:state.y},{intent,lastGoalId:lab.lastGoal,traffic:{}});
     if(!goal)continue;
+
     const previous=ai.goal?.id;
     ai.goal=goal;ai.route=[];ai.routeTimer=999;
-    lab.decisions++;lab.forcedReplans++;lab.intent=intent;lab.reason=risk>1.15?'RISK_REPLAN':'SELF_CHOICE';lab.lastGoal=goal.id;
-    lab.history.push({t:Math.round((now-lab.startedAt)/1000),intent,from:previous,to:goal.id,risk:Number.isFinite(risk)?+risk.toFixed(2):0,ttc:Number.isFinite(ttc)?+ttc.toFixed(2):Infinity});
-    if(lab.history.length>100)lab.history.shift();
+    lab.decisions++;lab.forcedReplans++;lab.intent=intent;lab.reason=risk>1.15?'RISK_REPLAN':trajectory.decision?.reason||'SELF_CHOICE';lab.lastGoal=goal.id;
+    lab.history.push({
+      t:Math.round((now-lab.startedAt)/1000),intent,from:previous,to:goal.id,
+      risk:Number.isFinite(risk)?+risk.toFixed(2):0,ttc:Number.isFinite(ttc)?+ttc.toFixed(2):Infinity,
+      action:trajectory.decision?.action||'UNKNOWN',confidence:trajectory.decision?.confidence||0
+    });
+    if(lab.history.length>120)lab.history.shift();
     lastDecision=now;
+
     const snapshot=`${Math.round(state.x)}:${Math.round(state.y)}:${state.collisions}:${state.trafficHits}`;
-    if(lastSnapshot&&snapshot===lastSnapshot){lab.failures.push({t:Math.round((now-lab.startedAt)/1000),type:'NO_STATE_CHANGE',intent});if(lab.failures.length>40)lab.failures.shift();}
+    if(lastSnapshot&&snapshot===lastSnapshot){
+      lab.failures.push({t:Math.round((now-lab.startedAt)/1000),type:'NO_STATE_CHANGE',intent});
+      if(lab.failures.length>40)lab.failures.shift();
+    }
     lastSnapshot=snapshot;
+    lab.status=stack.status();
   }
   window.__LOWTOWN_AUTONOMY_LAB=lab;
 }
 
 boot();
-window.__LOWTOWN_AUTONOMY_LAB_STATUS=()=>{const lab=window.__LOWTOWN_AUTONOMY_LAB;return lab?{enabled:lab.enabled,decisions:lab.decisions,replans:lab.forcedReplans,intent:lab.intent,reason:lab.reason,memory:lab.memory.size,history:lab.history.length,failures:lab.failures.length}:{enabled:false,decisions:0,replans:0,intent:'OFF',reason:'WAITING'};};
+window.__LOWTOWN_AUTONOMY_LAB_STATUS=()=>{
+  const lab=window.__LOWTOWN_AUTONOMY_LAB;
+  if(!lab)return{enabled:false,decisions:0,replans:0,intent:'OFF',reason:'WAITING'};
+  const s=lab.status||{};
+  return {
+    enabled:lab.enabled,decisions:lab.decisions,replans:lab.forcedReplans,intent:lab.intent,reason:lab.reason,
+    memory:lab.memory.size,history:lab.history.length,failures:lab.failures.length,
+    trajectoryDecisions:s.decisions||0,safeTrajectoryDecisions:s.safeDecisions||0,rejectedTrajectories:s.rejected||0,
+    worldCells:s.world?.cells||0,worldObservations:s.world?.observations||0
+  };
+};
