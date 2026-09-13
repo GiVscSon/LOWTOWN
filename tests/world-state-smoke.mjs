@@ -19,7 +19,7 @@ state.addHeat(50);
 assert.equal(state.snapshot().wanted,5);
 assert.equal(state.snapshot().heat,100);
 state.cool(10);
-assert.equal(state.snapshot().wanted,5);
+assert.equal(state.snapshot().wanted,4);
 
 state.discover('INDUSTRIAL');
 state.discover('INDUSTRIAL');
@@ -28,7 +28,7 @@ assert.deepEqual(state.snapshot().discovered,['INDUSTRIAL']);
 const restored=createWorldState(store);
 assert.equal(restored.snapshot().cash,600);
 assert.equal(restored.snapshot().completedJobs,1);
-assert.equal(restored.snapshot().wanted,5);
+assert.equal(restored.snapshot().wanted,4);
 assert.equal(restored.snapshot().discovered[0],'INDUSTRIAL');
 assert.equal(store.getItem(WORLD_STATE_STORAGE_KEY).startsWith('{'),true);
 
