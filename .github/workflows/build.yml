@@ -18,6 +18,8 @@ jobs:
       - run: npm run build
       - name: Test vehicle physics
         run: node tests/vehicle-physics-smoke.mjs
+      - name: Test unified transport physics
+        run: node tests/transport-physics-smoke.mjs
       - name: Test road topology first
         run: node tests/road-topology-smoke.mjs
       - name: Diagnose world connectivity
