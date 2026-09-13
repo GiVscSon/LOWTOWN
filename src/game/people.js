@@ -1,6 +1,9 @@
 import { PED_ASSETS } from './assets.js';
 import { sidewalkPoint, pedestrianRoute } from './city_semantics.js';
 
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const wrapAngle=a=>{while(a>Math.PI)a-=Math.PI*2;while(a<-Math.PI)a+=Math.PI*2;return a;};
+
 export function createPeopleSystem({ nodes, blocked, seed = 4242, city = false }) {
   let state = seed >>> 0;
   const people = [];
@@ -13,25 +16,31 @@ export function createPeopleSystem({ nodes, blocked, seed = 4242, city = false }
   const makeTarget = n => useSemantic && n?.roadId ? sidewalkPoint(n.roadId, n.index, rand() < .5 ? -1 : 1) : n;
   const makeRoute = (p, target) => useSemantic && target?.x != null ? pedestrianRoute({x:p.x,y:p.y},{x:target.x,y:target.y}) : [target];
   for (let i = 0; i < Math.min(48, activeNodes.length); i++) {
-    const n = pick(), target = makeTarget(pick());
-    people.push({ x:n.x+(rand()-.5)*28, y:n.y+(rand()-.5)*28, a:rand()*Math.PI*2, v:22+rand()*20, state:'walk', timer:rand()*4, tone:rand(), target, route:makeRoute({x:n.x,y:n.y},target), waypoint:0, panic:0 });
+    const n=pick(),target=makeTarget(pick());
+    people.push({x:n.x+(rand()-.5)*28,y:n.y+(rand()-.5)*28,a:rand()*Math.PI*2,v:22+rand()*20,state:'walk',timer:rand()*4,tone:rand(),target,route:makeRoute({x:n.x,y:n.y},target),waypoint:0,panic:0,turnVelocity:0});
   }
-  function chooseTarget(p){const target=makeTarget(pick());p.target=target;p.route=makeRoute(p,target);p.waypoint=0;p.timer=2+rand()*5;p.state=rand()<.18?'idle':'walk';}
+  function chooseTarget(p){const target=makeTarget(pick());p.target=target;p.route=makeRoute({x:p.x,y:p.y},target);p.waypoint=0;p.timer=2+rand()*5;p.state=rand()<.18?'idle':'walk';}
   function update(dt, player, danger = 0) {
+    const h=Math.min(Math.max(Number(dt)||0,0),.05);
     for (const p of people) {
-      p.timer -= dt; const pd = player ? Math.hypot(player.x-p.x,player.y-p.y) : Infinity;
-      if (danger > 0 && pd < 260) p.panic=Math.min(1,p.panic+dt*2.5); else p.panic=Math.max(0,p.panic-dt*.8);
-      if (p.timer<=0 || Math.hypot(p.target.x-p.x,p.target.y-p.y)<24 || (p.route.length && p.waypoint>=p.route.length)) chooseTarget(p);
+      p.timer-=h;
+      const pd=player?Math.hypot(player.x-p.x,player.y-p.y):Infinity;
+      if(danger>0&&pd<260)p.panic=Math.min(1,p.panic+h*2.5);else p.panic=Math.max(0,p.panic-h*.8);
+      if(p.timer<=0||Math.hypot(p.target.x-p.x,p.target.y-p.y)<24||(p.route.length&&p.waypoint>=p.route.length))chooseTarget(p);
       if(p.state==='idle'&&p.panic<.2)continue;
       let goal=p.route[p.waypoint]||p.target;
       if(goal&&Math.hypot(goal.x-p.x,goal.y-p.y)<20){p.waypoint++;goal=p.route[p.waypoint]||p.target;}
       let desired=goal?Math.atan2(goal.y-p.y,goal.x-p.x):p.a;
       if(p.panic>.2&&pd<260)desired=Math.atan2(p.y-player.y,p.x-player.x);
-      let d=desired-p.a; while(d>Math.PI)d-=Math.PI*2; while(d<-Math.PI)d+=Math.PI*2; p.a+=Math.max(-1,Math.min(1,d*3))*dt*3;
-      const v=p.v*(p.panic>.2?2.1:1),nx=p.x+Math.cos(p.a)*v*dt,ny=p.y+Math.sin(p.a)*v*dt;
-      if(!blocked(nx,ny)){p.x=nx;p.y=ny}else{p.a+=(rand()-.5)*2;p.timer=0;}
+      const d=wrapAngle(desired-p.a),turnAccel=16,turnDamping=7;
+      p.turnVelocity+=d*turnAccel*h-p.turnVelocity*turnDamping*h;
+      p.turnVelocity=clamp(p.turnVelocity,-5.5,5.5);
+      p.a=wrapAngle(p.a+p.turnVelocity*h);
+      const targetSpeed=p.v*(p.panic>.2?2.1:1),nx=p.x+Math.cos(p.a)*targetSpeed*h,ny=p.y+Math.sin(p.a)*targetSpeed*h;
+      if(!blocked(nx,ny)){p.x=nx;p.y=ny;p.stuck=0;}else{p.turnVelocity+=(rand()-.5)*2;p.timer=0;p.stuck=(p.stuck||0)+h;}
+      if(p.stuck>1){chooseTarget(p);p.stuck=0;}
     }
   }
-  function draw(ctx, iso, player) { for(const p of people){const q=iso(p.x,p.y),near=player&&Math.hypot(player.x-p.x,player.y-p.y)<260,image=sprites[p.panic>.2?'runner':'civilian'];ctx.save();ctx.translate(q.x,q.y);ctx.rotate(-p.a);if(image.complete)ctx.drawImage(image,-12,-16,24,18);else{ctx.fillStyle='#596068';ctx.fillRect(-3,-7,6,11);}if(p.panic>.2&&near){ctx.fillStyle='#e8b84a';ctx.font='9px monospace';ctx.textAlign='center';ctx.fillText('RUN!',0,-20)}ctx.restore();} }
+  function draw(ctx, iso, player) { for(const p of people){const q=iso(p.x,p.y),near=player&&Math.hypot(player.x-p.x,player.y-p.y)<260,image=sprites[p.panic>.2?'runner':'civilian'];ctx.save();ctx.translate(q.x,q.y);const f=iso(p.x+Math.cos(p.a)*8,p.y+Math.sin(p.a)*8);ctx.rotate(Math.atan2(f.y-q.y,f.x-q.x));if(image.complete)ctx.drawImage(image,-12,-16,24,18);else{ctx.fillStyle='#596068';ctx.fillRect(-3,-7,6,11);}if(p.panic>.2&&near){ctx.fillStyle='#e8b84a';ctx.font='9px monospace';ctx.textAlign='center';ctx.fillText('RUN!',0,-20)}ctx.restore();} }
   return { people, update, draw };
 }
