@@ -22,7 +22,8 @@
     "test:transport-contact-trace": "node tests/transport-contact-trace-smoke.mjs",
     "test:gameplay-content": "node tests/gameplay-content-smoke.mjs",
     "test:gameplay-loop": "node tests/gameplay-loop-smoke.mjs",
-    "test:player-drive": "node tests/player-drive-acceptance.mjs"
+    "test:player-drive": "node tests/player-drive-acceptance.mjs",
+    "test:transport-world-sweep": "node tests/transport-world-sweep-smoke.mjs"
   },
   "devDependencies": {
     "vite": "^7.1.5"
