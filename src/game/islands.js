@@ -6,7 +6,7 @@ export const ISLANDS = [
     ferry: { x: 640, y: 160 }, airfield: { x: 120, y: 640 }
   },
   {
-    id: 'IRON_HARBOR', name: 'IRON HARBOR', biome: 'INDUSTRIAL_COAST', center: { x: 1700, y: -100 }, rx: 760, ry: 900,
+    id: 'IRON_HARBOR', name: 'IRON HARBOR', biome: 'INDUSTRIAL_COAST', center: { x: 1700, y: -100 }, rx: 760, ry: 1000,
     colors: { land: '#25282a', shore: '#6b716f', accent: '#d4523a' },
     districts: ['docks', 'warehouses', 'shipyard'],
     ferry: { x: 1120, y: 160 }, airfield: { x: 1150, y: 260 }
