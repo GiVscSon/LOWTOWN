@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import { createPhysicsDiagnostics, diagnosePhysicsSample } from '../src/game/physics_diagnostics.js';
+
+const physics={mass:1500,engineForce:450,brakeForce:780,steeringRate:1.9,maxForwardSpeed:435};
+const box=createPhysicsDiagnostics();
+const a={vehicleId:'sedan',vehicleType:'CAR',forwardSpeed:0,heading:0,physics,input:{throttle:0,brake:0,steer:0}};
+const b={vehicleId:'sedan',vehicleType:'CAR',forwardSpeed:.3,heading:.019,physics,input:{throttle:1,brake:0,steer:.5}};
+const d=diagnosePhysicsSample(a,b,1);
+assert.equal(d.vehicleId,'sedan');
+assert.equal(d.mass,1500);
+assert.ok(Number.isFinite(d.actualAcceleration));
+assert.ok(Number.isFinite(d.expectedYawRate));
+box.sample(a,b,1);
+const c={vehicleId:'truck',vehicleType:'CAR',forwardSpeed:2,heading:.02,physics:{...physics,mass:3000,maxForwardSpeed:300},input:{throttle:1,brake:0,steer:.2}};
+box.sample(b,c,1);
+const report=box.report();
+assert.equal(report.samples,2);
+assert.ok(report.vehicles.sedan);
+assert.ok(report.vehicles.truck);
+assert.equal(report.vehicles.sedan.samples,1);
+assert.equal(report.vehicles.truck.samples,1);
+assert.ok(Number.isFinite(report.meanAccelerationError));
+assert.ok(Number.isFinite(report.meanSteeringError));
+console.log('PHYSICS DIAGNOSTICS SMOKE: PASS');
