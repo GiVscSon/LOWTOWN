@@ -1,7 +1,8 @@
 import { ISLANDS, isLand } from './islands.js';
 
 const FERRY_ROUTES = [
-  { id:'LOWTOWN_IRON_FERRY', from:'LOWTOWN', to:'IRON_HARBOR', a:{x:700,y:-300}, b:{x:1000,y:-300}, speed:105 }
+  // Land docks at the shoreline, with the actual crossing staying in water.
+  { id:'LOWTOWN_IRON_FERRY', from:'LOWTOWN', to:'IRON_HARBOR', a:{x:750,y:-300}, b:{x:960,y:-300}, speed:105 }
 ];
 const AIR_ROUTES = [
   { id:'LOWTOWN_NORTH_AIR', from:'LOWTOWN', to:'NORTH_RIDGE', a:{x:120,y:640}, b:{x:300,y:1360}, speed:420 },
