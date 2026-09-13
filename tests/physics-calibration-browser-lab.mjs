@@ -5,6 +5,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { generateScenarios } from '../src/game/scenario_generator.js';
 import { diagnosePhysicsSample } from '../src/game/physics_diagnostics.js';
 import { calibrateSamples } from '../src/game/physics_calibration.js';
+import { acceptCalibration } from '../src/game/calibration_acceptance.js';
 
 const VEHICLES=['sedan','coupe','truck','police'];
 const COUNT=Number(process.env.LOWTOWN_CALIBRATION_SCENARIOS||8);
@@ -12,78 +13,14 @@ const RUN_MS=Number(process.env.LOWTOWN_CALIBRATION_RUN_MS||6000);
 const SAMPLE_MS=100;
 const SEED=Number(process.env.LOWTOWN_CALIBRATION_SEED||20260913);
 const ARTIFACT_DIR='physics-calibration-artifacts';
-
 assert(Number.isInteger(COUNT)&&COUNT>0&&COUNT<=40);
 await mkdir(ARTIFACT_DIR,{recursive:true});
 const server=spawn('npx',['vite','--host','127.0.0.1','--port','4173'],{stdio:'inherit',shell:true});
 const browser=await chromium.launch({headless:true});
-
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-async function openScenario(page,scenario,vehicleId){
-  const encoded=encodeURIComponent(JSON.stringify({...scenario,vehicleId}));
-  const url=`http://127.0.0.1:4173/?autotest&scenario=${encoded}`;
-  for(let i=0;i<60;i++){
-    try{await page.goto(url,{waitUntil:'domcontentloaded',timeout:1000});return;}
-    catch(e){if(i===59)throw e;await sleep(250);}
-  }
-}
-async function snapshot(page){
-  return page.evaluate(()=>{
-    const test=window.__LOWTOWN_TEST,ai=window.__LOWTOWN_AI,transport=window.__LOWTOWN_TRANSPORT;
-    if(!test||!ai||!transport)return null;
-    const s=test.state(),a=ai.state||ai,t=transport.state,te=t?.telemetry||{};
-    return {t:performance.now(),vehicleId:transport.vehicleId,game:{x:s.x,y:s.y,speed:s.speed,distance:s.distance},ai:{control:a.control||null,targetSpeed:a.targetSpeed||0,decisions:a.decisions||0},transport:{x:t.x,y:t.y,z:t.z,vx:t.vx,vy:t.vy,vz:t.vz,heading:t.a,yawRate:t.yawRate,telemetry:te,physics:transport.physics}};
-  });
-}
-function samplePair(previous,current){
-  if(!previous||!current)return null;
-  const dt=Math.max(.001,(current.t-previous.t)/1000);
-  const p=current.transport.physics||{};
-  const prev={vehicleId:previous.vehicleId,vehicleType:p.type,forwardSpeed:previous.transport.telemetry.forwardSpeed??(previous.transport.vx*Math.cos(previous.transport.heading)+previous.transport.vy*Math.sin(previous.transport.heading)),heading:previous.transport.heading,physics:p,input:previous.ai.control||{}};
-  const now={vehicleId:current.vehicleId,vehicleType:p.type,forwardSpeed:current.transport.telemetry.forwardSpeed??(current.transport.vx*Math.cos(current.transport.heading)+current.transport.vy*Math.sin(current.transport.heading)),heading:current.transport.heading,physics:p,input:current.ai.control||{}};
-  return diagnosePhysicsSample(prev,now,dt);
-}
-function groupedProfile(samples){
-  return calibrateSamples(samples,{minSamples:30});
-}
-async function runPass(page,scenarios,pass,calibrationByVehicle={}){
-  const all=[];const rows=[];
-  for(const vehicleId of VEHICLES){
-    for(const scenario of scenarios){
-      await openScenario(page,scenario,vehicleId);
-      await page.waitForFunction(()=>Boolean(window.__LOWTOWN_TEST&&window.__LOWTOWN_AI&&window.__LOWTOWN_TRANSPORT));
-      if(pass==='after'&&calibrationByVehicle[vehicleId]){
-        await page.evaluate(profile=>window.__LOWTOWN_TRANSPORT.setCalibration(profile),calibrationByVehicle[vehicleId]);
-      }
-      let previous=null;const started=Date.now();let count=0;
-      while(Date.now()-started<RUN_MS){
-        const current=await snapshot(page);
-        if(current){const d=samplePair(previous,current);if(d){all.push(d);count++;}previous=current;}
-        await sleep(SAMPLE_MS);
-      }
-      rows.push({vehicleId,scenario:scenario.template,pass,samples:count});
-    }
-  }
-  return {samples:all,rows};
-}
-
-try{
-  const page=await browser.newPage({viewport:{width:1280,height:800}});
-  const scenarios=generateScenarios({seed:SEED,count:COUNT});
-  const before=await runPass(page,scenarios,'before');
-  const profile=groupedProfile(before.samples);
-  assert(Object.keys(profile.vehicles).length>0);
-  const calibrationByVehicle={};
-  for(const id of VEHICLES)if(profile.vehicles[id]?.ready)calibrationByVehicle[id]=profile.vehicles[id];
-  const after=await runPass(page,scenarios,'after',calibrationByVehicle);
-  const mean=list=>list.length?list.reduce((s,v)=>s+Math.abs(Number(v.accelerationError)||0),0)/list.length:Infinity;
-  const beforeMean=mean(before.samples),afterMean=mean(after.samples);
-  const accepted=Number.isFinite(afterMean)&&afterMean<beforeMean;
-  const report={version:2,status:accepted?'ACCEPT':'REJECT',seed:SEED,scenarioCount:COUNT,runMs:RUN_MS,before:{samples:before.samples.length,meanAbsAccelerationError:beforeMean},after:{samples:after.samples.length,meanAbsAccelerationError:afterMean},accepted,profile,vehicles:calibrationByVehicle};
-  await writeFile(`${ARTIFACT_DIR}/calibration-report.json`,JSON.stringify(report,null,2));
-  await writeFile(`${ARTIFACT_DIR}/before-samples.json`,JSON.stringify(before.samples,null,2));
-  await writeFile(`${ARTIFACT_DIR}/after-samples.json`,JSON.stringify(after.samples,null,2));
-  assert(before.samples.length>0&&after.samples.length>0);
-  console.log('LOWTOWN REAL BROWSER PHYSICS CALIBRATION LAB:',accepted?'ACCEPTED':'REJECTED');
-  console.log(JSON.stringify({beforeMeanAbsAccelerationError:+beforeMean.toFixed(5),afterMeanAbsAccelerationError:+afterMean.toFixed(5),accepted,vehicles:Object.keys(calibrationByVehicle)},null,2));
-}finally{await browser.close();server.kill('SIGTERM');}
+async function openScenario(page,scenario,vehicleId){const encoded=encodeURIComponent(JSON.stringify({...scenario,vehicleId}));const url=`http://127.0.0.1:4173/?autotest&scenario=${encoded}`;for(let i=0;i<60;i++){try{await page.goto(url,{waitUntil:'domcontentloaded',timeout:1000});return;}catch(e){if(i===59)throw e;await sleep(250);}}}
+async function snapshot(page){return page.evaluate(()=>{const test=window.__LOWTOWN_TEST,ai=window.__LOWTOWN_AI,transport=window.__LOWTOWN_TRANSPORT;if(!test||!ai||!transport)return null;const s=test.state(),a=ai.state||ai,t=transport.state,te=t?.telemetry||{};return {t:performance.now(),vehicleId:transport.vehicleId,game:{x:s.x,y:s.y,speed:s.speed,distance:s.distance},ai:{control:a.control||null,targetSpeed:a.targetSpeed||0,decisions:a.decisions||0},transport:{x:t.x,y:t.y,z:t.z,vx:t.vx,vy:t.vy,vz:t.vz,heading:t.a,yawRate:t.yawRate,telemetry:te,physics:transport.physics}};});}
+function samplePair(previous,current){if(!previous||!current)return null;const dt=Math.max(.001,(current.t-previous.t)/1000),p=current.transport.physics||{};const prev={vehicleId:previous.vehicleId,vehicleType:p.type,forwardSpeed:previous.transport.telemetry.forwardSpeed??(previous.transport.vx*Math.cos(previous.transport.heading)+previous.transport.vy*Math.sin(previous.transport.heading)),heading:previous.transport.heading,physics:p,input:previous.ai.control||{}};const now={vehicleId:current.vehicleId,vehicleType:p.type,forwardSpeed:current.transport.telemetry.forwardSpeed??(current.transport.vx*Math.cos(current.transport.heading)+current.transport.vy*Math.sin(current.transport.heading)),heading:current.transport.heading,physics:p,input:current.ai.control||{}};return diagnosePhysicsSample(prev,now,dt);}
+function groupedProfile(samples){return calibrateSamples(samples,{minSamples:30});}
+async function runPass(page,scenarios,pass,calibrationByVehicle={}){const all=[];const rows=[];for(const vehicleId of VEHICLES)for(const scenario of scenarios){await openScenario(page,scenario,vehicleId);await page.waitForFunction(()=>Boolean(window.__LOWTOWN_TEST&&window.__LOWTOWN_AI&&window.__LOWTOWN_TRANSPORT));if(pass==='after'&&calibrationByVehicle[vehicleId])await page.evaluate(profile=>window.__LOWTOWN_TRANSPORT.setCalibration(profile),calibrationByVehicle[vehicleId]);let previous=null;const started=Date.now();let count=0;while(Date.now()-started<RUN_MS){const current=await snapshot(page);if(current){const d=samplePair(previous,current);if(d){all.push(d);count++;}previous=current;}await sleep(SAMPLE_MS);}rows.push({vehicleId,scenario:scenario.template,pass,samples:count});}return {samples:all,rows};}
+try{const page=await browser.newPage({viewport:{width:1280,height:800}});const scenarios=generateScenarios({seed:SEED,count:COUNT});const before=await runPass(page,scenarios,'before');const profile=groupedProfile(before.samples);assert(Object.keys(profile.vehicles).length>0);const calibrationByVehicle={};for(const id of VEHICLES)if(profile.vehicles[id]?.ready)calibrationByVehicle[id]=profile.vehicles[id];const after=await runPass(page,scenarios,'after',calibrationByVehicle);const acceptance=acceptCalibration(before.samples,after.samples);const report={version:3,status:acceptance.accepted?'ACCEPT':'REJECT',seed:SEED,scenarioCount:COUNT,runMs:RUN_MS,before:acceptance.before,after:acceptance.after,accepted:acceptance.accepted,reasons:acceptance.reasons,profile,vehicles:calibrationByVehicle};await writeFile(`${ARTIFACT_DIR}/calibration-report.json`,JSON.stringify(report,null,2));await writeFile(`${ARTIFACT_DIR}/before-samples.json`,JSON.stringify(before.samples,null,2));await writeFile(`${ARTIFACT_DIR}/after-samples.json`,JSON.stringify(after.samples,null,2));assert(before.samples.length>0&&after.samples.length>0);console.log('LOWTOWN REAL BROWSER PHYSICS CALIBRATION LAB:',acceptance.accepted?'ACCEPTED':'REJECTED');console.log(JSON.stringify({before:acceptance.before,after:acceptance.after,accepted:acceptance.accepted,reasons:acceptance.reasons,vehicles:Object.keys(calibrationByVehicle)},null,2));}finally{await browser.close();server.kill('SIGTERM');}
