@@ -24,6 +24,8 @@ jobs:
         run: node tests/transport-profiles-smoke.mjs
       - name: Test separated transport physics
         run: node tests/transport-separated-physics-smoke.mjs
+      - name: Test direct AI transport integration
+        run: node tests/ai-transport-integration-smoke.mjs
       - name: Test persistent world state
         run: node tests/world-state-smoke.mjs
       - name: Test road topology first
