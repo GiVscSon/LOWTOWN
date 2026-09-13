@@ -6,38 +6,41 @@ import { applyActuatorDelay } from './vehicle_safety.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const finite=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
+const DEFAULT_RESPONSE=Object.freeze({steer:12,throttle:8,brake:16,climb:8,descend:8});
 
-function stepClone(state,dt,input,physics,actuatorState=null,actuatorResponse=null){
-  const s={...state};
-  if(state.telemetry)s.telemetry={...state.telemetry};
-  let applied=input||{};
-  if(actuatorState&&actuatorResponse){
-    const next=applyActuatorDelay(input,actuatorState,dt,actuatorResponse);
-    s.actuatorState={...next};
-    applied=next;
-  }
-  if(s.type===TRANSPORT_TYPES.CAR)stepCarPhysics(s,dt,applied,physics);
-  else if(s.type===TRANSPORT_TYPES.BOAT)stepBoatPhysics(s,dt,applied,physics);
-  else if(s.type===TRANSPORT_TYPES.PLANE)stepPlanePhysics(s,dt,applied,physics);
-  else throw new Error(`Unsupported transport type: ${s.type}`);
-  return s;
+function physicsStep(state,dt,input,physics){
+  if(state.type===TRANSPORT_TYPES.CAR)return stepCarPhysics(state,dt,input,physics);
+  if(state.type===TRANSPORT_TYPES.BOAT)return stepBoatPhysics(state,dt,input,physics);
+  if(state.type===TRANSPORT_TYPES.PLANE)return stepPlanePhysics(state,dt,input,physics);
+  throw new Error(`Unsupported transport type: ${state.type}`);
 }
 
 export function predictVehicle(state,seconds,input={},physics=state.physics,options={}){
-  const safeSeconds=clamp(finite(seconds),0,10),safeDt=1/120;
-  const steps=Math.max(1,Math.ceil(safeSeconds/safeDt)),dt=safeSeconds/steps;
-  let current={...state};
-  const points=[];
+  const safeSeconds=clamp(finite(seconds),0,10),physicsDt=1/120;
+  const controlDt=Math.max(physicsDt,finite(options.controlDt,1/60));
   const useActuator=options.useActuatorDelay!==false&&!!state.actuatorState;
-  let actuatorState=useActuator?{...state.actuatorState}:null;
-  const actuatorResponse=useActuator?{steer:12,throttle:8,brake:16,climb:8,descend:8,...(options.actuatorResponse||{})}:null;
-  let collision=false,collisionT=safeSeconds;
-  const blocked=typeof options.blocked==='function'?options.blocked:null;
-  for(let i=0;i<steps;i++){
-    current=stepClone(current,dt,input,physics,actuatorState,actuatorResponse);
-    if(current.actuatorState)actuatorState={...current.actuatorState};
-    if(blocked&&blocked(current.x,current.y)){collision=true;collisionT=(i+1)*dt;break;}
-    if(i%Math.max(1,Math.floor(steps/24))===0)points.push({x:current.x,y:current.y,z:current.z,a:current.a,vx:current.vx,vy:current.vy,vz:current.vz});
+  const response=useActuator?{...DEFAULT_RESPONSE,...(options.actuatorResponse||{})}:null;
+  let current={...state,telemetry:state.telemetry?{...state.telemetry}:state.telemetry};
+  let actuator=useActuator?{...state.actuatorState}:null;
+  const points=[];const blocked=typeof options.blocked==='function'?options.blocked:null;
+  let collision=false,collisionT=safeSeconds,elapsed=0,controlElapsed=0,stepIndex=0,minWall=Infinity;
+  const sampleEvery=Math.max(1,Math.floor(Math.max(physicsDt,safeSeconds/24)/physicsDt));
+  while(elapsed<safeSeconds-1e-9){
+    const frame=Math.min(controlDt,safeSeconds-elapsed);
+    if(useActuator){actuator=applyActuatorDelay(input,actuator,frame,response);current.actuatorState={...actuator};}
+    let frameElapsed=0;
+    while(frameElapsed<frame-1e-9){
+      const h=Math.min(physicsDt,frame-frameElapsed);
+      physicsStep(current,h,useActuator?actuator:input,physics);
+      elapsed+=h;frameElapsed+=h;stepIndex++;
+      if(blocked&&blocked(current.x,current.y)){collision=true;collisionT=elapsed;break;}
+      if(stepIndex%sampleEvery===0)points.push({x:current.x,y:current.y,z:current.z,a:current.a,vx:current.vx,vy:current.vy,vz:current.vz});
+    }
+    if(collision)break;
+    controlElapsed+=frame;
   }
-  return {safe:!collision,collisionT,x:current.x,y:current.y,z:current.z,a:current.a,vx:current.vx,vy:current.vy,vz:current.vz,speed:Math.hypot(current.vx,current.vy,current.vz),points};
+  const speed=Math.hypot(current.vx,current.vy,current.vz),forward=current.vx*Math.cos(current.a)+current.vy*Math.sin(current.a),lateral=-current.vx*Math.sin(current.a)+current.vy*Math.cos(current.a),slip=Math.atan2(lateral,Math.max(1,Math.abs(forward)));
+  const horizonUncertainty=clamp(safeSeconds*.035,0,.35),slipUncertainty=clamp(Math.abs(slip)/1.05*.22,0,.22),actuatorUncertainty=useActuator?clamp(Math.abs((actuator?.throttle||0)-(input.throttle||0))*.08+Math.abs((actuator?.steer||0)-(input.steer||0))*.12,0,.2):0;
+  const uncertainty=clamp(horizonUncertainty+slipUncertainty+actuatorUncertainty+(collision?.08:0),0,.7);
+  return {safe:!collision,collisionT,x:current.x,y:current.y,z:current.z,a:current.a,vx:current.vx,vy:current.vy,vz:current.vz,speed,points,minWall,slipAngle:slip,uncertainty,confidence:1-uncertainty,actuator:actuator?{...actuator}:null};
 }
