@@ -16,6 +16,8 @@ jobs:
           node-version: 20
       - run: npm install
       - run: npm run build
+      - name: Test standalone character physics
+        run: node tests/character-physics-smoke.mjs
       - name: Test vehicle physics
         run: node tests/vehicle-physics-smoke.mjs
       - name: Test unified transport physics
