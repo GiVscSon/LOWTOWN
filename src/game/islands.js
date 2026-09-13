@@ -1,0 +1,45 @@
+export const ISLANDS = [
+  {
+    id: 'LOWTOWN', name: 'LOWTOWN', biome: 'URBAN', center: { x: -560, y: -180 }, rx: 1320, ry: 1040,
+    colors: { land: '#202326', shore: '#7b6650', accent: '#e09a3e' },
+    districts: ['downtown', 'residential', 'old industrial']
+  },
+  {
+    id: 'IRON_HARBOR', name: 'IRON HARBOR', biome: 'INDUSTRIAL_COAST', center: { x: 1520, y: -100 }, rx: 900, ry: 900,
+    colors: { land: '#25282a', shore: '#6b716f', accent: '#d4523a' },
+    districts: ['docks', 'warehouses', 'shipyard']
+  },
+  {
+    id: 'NORTH_RIDGE', name: 'NORTH RIDGE', biome: 'FOREST_HIGHLAND', center: { x: 0, y: 1510 }, rx: 1080, ry: 780,
+    colors: { land: '#202820', shore: '#6e765d', accent: '#b7a66a' },
+    districts: ['pine road', 'hill town', 'reservoir']
+  }
+];
+
+export const BRIDGES = [
+  { id: 'EAST_BRIDGE', a: { x: 700, y: -20 }, b: { x: 760, y: -20 }, width: 150 },
+  { id: 'NORTH_BRIDGE', a: { x: 0, y: 720 }, b: { x: 0, y: 840 }, width: 150 }
+];
+
+const ellipse = (x, y, island) => {
+  const dx = (x - island.center.x) / island.rx;
+  const dy = (y - island.center.y) / island.ry;
+  return dx * dx + dy * dy <= 1;
+};
+const bridgeHit = (x, y, bridge) => {
+  const vx = bridge.b.x - bridge.a.x, vy = bridge.b.y - bridge.a.y;
+  const len2 = vx * vx + vy * vy || 1;
+  const t = Math.max(0, Math.min(1, ((x - bridge.a.x) * vx + (y - bridge.a.y) * vy) / len2));
+  const px = bridge.a.x + vx * t, py = bridge.a.y + vy * t;
+  return Math.hypot(x - px, y - py) <= bridge.width;
+};
+
+export function islandAt(x, y) {
+  return ISLANDS.find(island => ellipse(x, y, island)) || null;
+}
+export function isLand(x, y) {
+  return !!islandAt(x, y) || BRIDGES.some(bridge => bridgeHit(x, y, bridge));
+}
+export function biomeAt(x, y) {
+  return islandAt(x, y)?.biome || (BRIDGES.some(bridge => bridgeHit(x, y, bridge)) ? 'BRIDGE' : 'WATER');
+}
