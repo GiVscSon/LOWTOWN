@@ -15,14 +15,14 @@ const citizen=createAICitizen({
 
 for(let i=0;i<60;i++)citizen.update(1/60);
 assert(citizen.actor.state.steps>0,'citizen must walk using character physics before using transport');
-const walkingX=citizen.actor.state.x;
 assert(citizen.snapshot().transport===null,'walking citizen must not require a transport');
 
 citizen.enterVehicle();
 assert(made===1,'citizen must acquire a transport only when choosing transport');
 assert(citizen.snapshot().actor.mode==='DRIVING','citizen must enter transport explicitly');
+const transportStartX=citizen.snapshot().transport.state.x;
 for(let i=0;i<60;i++)citizen.update(1/60);
-assert(citizen.snapshot().transport.state.x>walkingX,'transport must move independently of character physics');
+assert(citizen.snapshot().transport.state.x>transportStartX,'transport must move independently of character physics');
 
 citizen.exitVehicle('TEST_EXIT');
 assert(citizen.snapshot().actor.mode==='ON_FOOT','citizen must return to independent on-foot mode');
