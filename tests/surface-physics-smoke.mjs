@@ -11,7 +11,7 @@ function run(surface,steer=0,brake=0){
     const t=stepCarPhysics(state,1/60,{surface,steer,brake},p);
     maxSlip=Math.max(maxSlip,Math.abs(t.slipAngle));
   }
-  return {speed:Math.hypot(state.vx,state.vy),distance:state.distance,maxSlip,telemetry:state.telemetry};
+  return {speed:Math.hypot(state.vx,state.vy),distance:state.distance,maxSlip};
 }
 
 const dry=run('dry',.45);
@@ -19,7 +19,10 @@ const wet=run('wet',.45);
 const dirt=run('dirt',.45);
 assert(wet.maxSlip>dry.maxSlip,'wet surface must reduce lateral grip');
 assert(dirt.maxSlip>dry.maxSlip,'dirt surface must reduce lateral grip');
-assert(run('wet',0,1).speed<run('dry',0,1).speed,'wet surface must reduce braking effectiveness');
-assert(run('dirt',0,1).speed<run('dry',0,1).speed,'dirt surface must reduce braking effectiveness');
+const dryBrake=run('dry',0,1).speed;
+const wetBrake=run('wet',0,1).speed;
+const dirtBrake=run('dirt',0,1).speed;
+assert(wetBrake>dryBrake,'wet surface must reduce braking effectiveness');
+assert(dirtBrake>dryBrake,'dirt surface must reduce braking effectiveness');
 for(const sample of [dry,wet,dirt])assert(Number.isFinite(sample.speed)&&Number.isFinite(sample.distance),'surface result must remain finite');
-console.log('PASS SURFACE PHYSICS',JSON.stringify({dry:{speed:dry.speed,slip:dry.maxSlip},wet:{speed:wet.speed,slip:wet.maxSlip},dirt:{speed:dirt.speed,slip:dirt.maxSlip}}));
+console.log('PASS SURFACE PHYSICS',JSON.stringify({dry:{speed:dry.speed,slip:dry.maxSlip},wet:{speed:wet.speed,slip:wet.maxSlip},dirt:{speed:dirt.speed,slip:dirt.maxSlip},braking:{dry:dryBrake,wet:wetBrake,dirt:dirtBrake}}));
