@@ -3,13 +3,13 @@ export const ISLANDS = [
     id: 'LOWTOWN', name: 'LOWTOWN', biome: 'URBAN', center: { x: -560, y: -180 }, rx: 1320, ry: 1040,
     colors: { land: '#202326', shore: '#7b6650', accent: '#e09a3e' },
     districts: ['downtown', 'residential', 'old industrial'],
-    ferry: { x: 640, y: 0 }, airfield: { x: 120, y: 640 }
+    ferry: { x: 640, y: 160 }, airfield: { x: 120, y: 640 }
   },
   {
     id: 'IRON_HARBOR', name: 'IRON HARBOR', biome: 'INDUSTRIAL_COAST', center: { x: 1700, y: -100 }, rx: 760, ry: 900,
     colors: { land: '#25282a', shore: '#6b716f', accent: '#d4523a' },
     districts: ['docks', 'warehouses', 'shipyard'],
-    ferry: { x: 1120, y: 0 }, airfield: { x: 1150, y: 260 }
+    ferry: { x: 1120, y: 160 }, airfield: { x: 1150, y: 260 }
   },
   {
     id: 'NORTH_RIDGE', name: 'NORTH RIDGE', biome: 'FOREST_HIGHLAND', center: { x: 0, y: 1800 }, rx: 1080, ry: 600,
@@ -20,9 +20,9 @@ export const ISLANDS = [
 ];
 
 export const BRIDGES = [
-  // Both endpoints are on the 160-unit road grid and clear of buildings.
   { id: 'EAST_BRIDGE', a: { x: 640, y: 160 }, b: { x: 1120, y: 160 }, width: 70 },
-  { id: 'NORTH_BRIDGE', a: { x: 0, y: 800 }, b: { x: 0, y: 1200 }, width: 90 }
+  // Starts on actual LOWTOWN land, then crosses water and reaches NORTH RIDGE.
+  { id: 'NORTH_BRIDGE', a: { x: -320, y: 800 }, b: { x: 0, y: 1200 }, width: 90 }
 ];
 
 const ellipse = (x, y, island) => {
