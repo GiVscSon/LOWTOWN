@@ -28,6 +28,8 @@ jobs:
         run: node tests/ai-transport-integration-smoke.mjs
       - name: Test transport AI closed-loop stress
         run: node tests/transport-ai-closed-loop-stress.mjs
+      - name: Test physics diagnostics
+        run: node tests/physics-diagnostics-smoke.mjs
       - name: Test persistent world state
         run: node tests/world-state-smoke.mjs
       - name: Test road topology first
