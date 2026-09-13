@@ -32,7 +32,6 @@ function snapshot() {
     const ai = window.__LOWTOWN_AI;
     if (!test || !ai) return null;
     const s = test.state();
-    // __LOWTOWN_AI is currently the state object itself. It also contains a string field named "state".
     const a = ai && typeof ai.state === 'object' ? ai.state : ai;
     const p = a.prediction || {};
     const sensor = a.sensor || {};
@@ -40,10 +39,15 @@ function snapshot() {
     return {
       t: performance.now(),
       game: {
-        x: s.x, y: s.y, vx: s.vx, vy: s.vy, heading: s.a,
-        speed: Math.hypot(s.vx || 0, s.vy || 0),
-        maxSpeed: s.maxSpeed, distance: s.distance, collisions: s.collisions,
-        trafficHits: s.trafficHits, stuck: s.stuck, trafficCars: s.trafficCars, pedestrians: s.pedestrians
+        x: s.x, y: s.y,
+        speed: s.speed || 0,
+        maxSpeed: s.maxSpeed || 0,
+        distance: s.distance || 0,
+        collisions: s.collisions || 0,
+        trafficHits: s.trafficHits || 0,
+        stuck: s.stuck || 0,
+        trafficCars: s.trafficCars || 0,
+        pedestrians: s.pedestrians || 0
       },
       ai: {
         enabled: a.enabled, mode: a.mode, tactical: a.tactical, node: a.node,
