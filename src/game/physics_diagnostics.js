@@ -1,21 +1,31 @@
 const finite=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-export function diagnosePhysicsSample(previous,current,dt=0){
-  const a=previous||{},b=current||{},p=b.physics||a.physics||{},input=b.input||b.control||{},telemetry=b.telemetry||{};
-  const h=Math.max(.001,finite(dt,.001));
+function predictLongitudinal(previous,current,p,input,dt){
   const mass=Math.max(1,finite(p.mass,1));
-  const engineForce=finite(p.engineForce);
-  const brakeForce=finite(p.brakeForce);
+  const speed=Math.max(0,Math.abs(finite(previous.forwardSpeed,finite(previous.speed))));
   const throttle=clamp(finite(input.throttle),-1,1);
   const brake=clamp(finite(input.brake),0,1);
-  const expectedDrive=throttle*engineForce/mass;
-  const expectedBrake=brake*brakeForce/mass;
+  const drive=throttle*(throttle>=0?finite(p.engineForce):Math.abs(finite(p.reverseForce)))/mass;
+  const brakeDecel=brake*finite(p.brakeForce)/mass;
+  const rolling=finite(p.rollingResistance)*speed;
+  const dragBase=clamp(finite(p.drag,1),0,1);
+  const handbrake=!!input.handbrake;
+  const drag=handbrake?clamp(finite(p.handbrakeDrag,dragBase),0,1):dragBase;
+  const aero=1/(1+finite(p.aeroDrag)*speed*speed*Math.max(.001,dt));
+  const dragDecel=speed>0?speed*(1-Math.pow(drag,Math.max(.001,dt)*60)*aero)/Math.max(.001,dt):0;
+  return {drive,brakeDecel,rollingDecel:rolling,dragDecel,longitudinalExpected:drive-Math.sign(finite(previous.forwardSpeed,1))*(brakeDecel+rolling+dragDecel)};
+}
+
+export function diagnosePhysicsSample(previous,current,dt=0){
+  const a=previous||{},b=current||{},p=b.physics||a.physics||{},input=b.input||b.control||b.controls||{},telemetry=b.telemetry||{};
+  const h=Math.max(.001,finite(dt,.001));
+  const mass=Math.max(1,finite(p.mass,1));
+  const longitudinal=p.type==='CAR'||b.vehicleType==='CAR'||!p.type?predictLongitudinal(a,b,p,input,h):{drive:finite(input.throttle)*finite(p.engineForce)/mass,brakeDecel:finite(input.brake)*finite(p.brakeForce)/mass,rollingDecel:0,dragDecel:0,longitudinalExpected:finite(input.throttle)*finite(p.engineForce)/mass-finite(input.brake)*finite(p.brakeForce)/mass};
   const prevSpeed=finite(a.forwardSpeed,finite(a.speed));
   const currSpeed=finite(b.forwardSpeed,finite(b.speed));
   const actualAcceleration=(currSpeed-prevSpeed)/h;
-  const longitudinalExpected=expectedDrive-(currSpeed>=0?1:-1)*expectedBrake;
-  const accelerationError=actualAcceleration-longitudinalExpected;
+  const accelerationError=actualAcceleration-longitudinal.longitudinalExpected;
   const steeringRate=finite(p.steeringRate);
   const prevHeading=finite(a.heading,finite(a.a));
   const currHeading=finite(b.heading,finite(b.a));
@@ -23,12 +33,13 @@ export function diagnosePhysicsSample(previous,current,dt=0){
   while(dHeading>Math.PI)dHeading-=Math.PI*2;
   while(dHeading<-Math.PI)dHeading+=Math.PI*2;
   const actualYawRate=dHeading/h;
-  const expectedYawRate=finite(input.steer)*steeringRate*clamp(Math.abs(currSpeed)/55,0,1)*(currSpeed>=0?1:-1);
+  const speedAuthority=clamp(Math.abs(currSpeed)/Math.max(1,finite(p.steeringAuthoritySpeed,55)),0,1);
+  const expectedYawRate=finite(input.steer)*steeringRate*speedAuthority*(currSpeed>=0?1:-1);
   const steeringError=actualYawRate-expectedYawRate;
   const targetSpeed=finite(b.targetSpeed,finite(b.ai?.targetSpeed,NaN));
   const maxSpeed=finite(p.maxSpeed,finite(p.maxForwardSpeed,NaN));
   const speedLimitViolation=Number.isFinite(targetSpeed)&&Number.isFinite(maxSpeed)?targetSpeed>maxSpeed+.001:false;
-  return {vehicleId:b.vehicleId||a.vehicleId||null,vehicleType:b.vehicleType||a.vehicleType||null,mass,expectedDrive,expectedBrake,longitudinalExpected,actualAcceleration,accelerationError,steeringRate,expectedYawRate,actualYawRate,steeringError,targetSpeed,maxSpeed,speedLimitViolation};
+  return {vehicleId:b.vehicleId||a.vehicleId||null,vehicleType:b.vehicleType||a.vehicleType||null,mass,expectedDrive:longitudinal.drive,expectedBrake:longitudinal.brakeDecel,expectedRollingResistance:longitudinal.rollingDecel,expectedDrag:longitudinal.dragDecel,longitudinalExpected:longitudinal.longitudinalExpected,actualAcceleration,accelerationError,steeringRate,expectedYawRate,actualYawRate,steeringError,targetSpeed,maxSpeed,speedLimitViolation,telemetryAvailable:Object.keys(telemetry).length>0};
 }
 
 export function createPhysicsDiagnostics({capacity=600}={}){
