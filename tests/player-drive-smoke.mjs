@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import { createTransportController } from '../src/game/transport_controller.js';
+const car=createTransportController('sedan',{x:0,y:0,a:0});
+const start={x:car.state.x,y:car.state.y,a:car.state.a};
+for(let i=0;i<60;i++)car.step(1/60,{throttle:1,brake:0,steer:0});
+assert.ok(car.state.x>start.x+10,'player throttle must move the car forward');
+assert.ok(Math.hypot(car.state.vx,car.state.vy)>20,'player car must build meaningful speed');
+const beforeTurn=car.state.a;
+for(let i=0;i<60;i++)car.step(1/60,{throttle:1,brake:0,steer:1});
+assert.ok(car.state.a>beforeTurn+.05,'steering must change heading while moving');
+assert.ok(Math.hypot(car.state.vx,car.state.vy)>10,'steering must not kill forward motion');
+const beforeBrake=Math.hypot(car.state.vx,car.state.vy);
+for(let i=0;i<60;i++)car.step(1/60,{throttle:0,brake:1,steer:0});
+assert.ok(Math.hypot(car.state.vx,car.state.vy)<beforeBrake,'brake must slow the car');
+assert.ok(Number.isFinite(car.state.x)&&Number.isFinite(car.state.y)&&Number.isFinite(car.state.a));
+console.log('PLAYER DRIVE: PASS THROTTLE -> FORWARD MOTION -> STEERING -> BRAKING');
