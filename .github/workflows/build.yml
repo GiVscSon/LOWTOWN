@@ -42,6 +42,8 @@ jobs:
         run: node tests/ai-expansion-smoke.mjs
       - name: Run scenario generator smoke test
         run: node tests/scenario-generator-smoke.mjs
+      - name: Run trajectory lab smoke test
+        run: node tests/trajectory-lab-smoke.mjs
       - name: Run scenario benchmark smoke test
         run: node tests/benchmark-smoke.mjs
       - name: Install browser test runner
