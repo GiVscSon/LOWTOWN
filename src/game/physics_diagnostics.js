@@ -42,12 +42,12 @@ export function diagnosePhysicsSample(previous,current,dt=0){
   const speedAuthority=clamp(Math.abs(currSpeed)/Math.max(1,finite(p.steeringAuthoritySpeed,55)),0,1);
   const expectedYawRate=finite(input.steer)*steeringRate*speedAuthority*(currSpeed>=0?1:-1);
   const steeringError=actualYawRate-expectedYawRate;
-  const steeringScale=Math.abs(expectedYawRate)>.03?actualYawRate/expectedYawRate:NaN;
+  const steeringScale=Math.abs(expectedYawRate)>1e-6?actualYawRate/expectedYawRate:1;
   const turnRadius=Math.abs(actualYawRate)>.001?Math.abs(currSpeed/actualYawRate):Infinity;
   const targetSpeed=finite(b.targetSpeed,finite(b.ai?.targetSpeed,NaN));
   const maxSpeed=finite(p.maxSpeed,finite(p.maxForwardSpeed,NaN));
   const speedLimitViolation=Number.isFinite(targetSpeed)&&Number.isFinite(maxSpeed)?targetSpeed>maxSpeed+.001:false;
-  return {vehicleId:b.vehicleId||a.vehicleId||null,vehicleType:b.vehicleType||a.vehicleType||null,mass,expectedDrive:longitudinal.drive,expectedBrake:longitudinal.brakeDecel,expectedRollingResistance:longitudinal.rollingDecel,expectedDrag:longitudinal.dragDecel,longitudinalExpected:longitudinal.longitudinalExpected,actualAcceleration,accelerationError,inferredDrive,inferredBrake,driveScale:Number.isFinite(driveScale)?driveScale:NaN,brakeScale:Number.isFinite(brakeScale)?brakeScale:NaN,steeringRate,expectedYawRate,actualYawRate,steeringError,steeringScale:Number.isFinite(steeringScale)?steeringScale:NaN,turnRadius,targetSpeed,maxSpeed,speedLimitViolation,telemetryAvailable:Object.keys(telemetry).length>0};
+  return {vehicleId:b.vehicleId||a.vehicleId||null,vehicleType:b.vehicleType||a.vehicleType||null,mass,expectedDrive:longitudinal.drive,expectedBrake:longitudinal.brakeDecel,expectedRollingResistance:longitudinal.rollingDecel,expectedDrag:longitudinal.dragDecel,longitudinalExpected:longitudinal.longitudinalExpected,actualAcceleration,accelerationError,inferredDrive,inferredBrake,driveScale:Number.isFinite(driveScale)?driveScale:1,brakeScale:Number.isFinite(brakeScale)?brakeScale:1,steeringRate,expectedYawRate,actualYawRate,steeringError,steeringScale:Number.isFinite(steeringScale)?steeringScale:1,turnRadius,targetSpeed,maxSpeed,speedLimitViolation,telemetryAvailable:Object.keys(telemetry).length>0};
 }
 
 export function createPhysicsDiagnostics({capacity=600}={}){
@@ -58,11 +58,11 @@ export function createPhysicsDiagnostics({capacity=600}={}){
     summary.samples++;summary.accelerationErrorAbs+=Math.abs(d.accelerationError);summary.accelerationErrorSigned+=d.accelerationError;summary.steeringErrorAbs+=Math.abs(d.steeringError);summary.steeringErrorSigned+=d.steeringError;
     if(Number.isFinite(d.driveScale)&&d.expectedDrive>.05)summary.driveScales.push(d.driveScale);
     if(Number.isFinite(d.brakeScale)&&d.expectedBrake>.05)summary.brakeScales.push(d.brakeScale);
-    if(Number.isFinite(d.steeringScale)&&Math.abs(d.expectedYawRate)>.03)summary.steeringScales.push(d.steeringScale);
+    if(Number.isFinite(d.steeringScale)&&Math.abs(d.expectedYawRate)>1e-6)summary.steeringScales.push(d.steeringScale);
     summary.maxAccelerationError=Math.max(summary.maxAccelerationError,Math.abs(d.accelerationError));summary.maxSteeringError=Math.max(summary.maxSteeringError,Math.abs(d.steeringError));if(d.speedLimitViolation)summary.speedLimitViolations++;
     const id=d.vehicleId||'unknown';const v=summary.vehicles[id]||(summary.vehicles[id]={samples:0,accelerationErrorAbs:0,accelerationErrorSigned:0,steeringErrorAbs:0,steeringErrorSigned:0,driveScales:[],brakeScales:[],steeringScales:[],maxAccelerationError:0,maxSteeringError:0,speedLimitViolations:0});
     v.samples++;v.accelerationErrorAbs+=Math.abs(d.accelerationError);v.accelerationErrorSigned+=d.accelerationError;v.steeringErrorAbs+=Math.abs(d.steeringError);v.steeringErrorSigned+=d.steeringError;
-    if(Number.isFinite(d.driveScale)&&d.expectedDrive>.05)v.driveScales.push(d.driveScale);if(Number.isFinite(d.brakeScale)&&d.expectedBrake>.05)v.brakeScales.push(d.brakeScale);if(Number.isFinite(d.steeringScale)&&Math.abs(d.expectedYawRate)>.03)v.steeringScales.push(d.steeringScale);
+    if(Number.isFinite(d.driveScale)&&d.expectedDrive>.05)v.driveScales.push(d.driveScale);if(Number.isFinite(d.brakeScale)&&d.expectedBrake>.05)v.brakeScales.push(d.brakeScale);if(Number.isFinite(d.steeringScale)&&Math.abs(d.expectedYawRate)>1e-6)v.steeringScales.push(d.steeringScale);
     v.maxAccelerationError=Math.max(v.maxAccelerationError,Math.abs(d.accelerationError));v.maxSteeringError=Math.max(v.maxSteeringError,Math.abs(d.steeringError));if(d.speedLimitViolation)v.speedLimitViolations++;
     return d;
   }
