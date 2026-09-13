@@ -5,20 +5,20 @@ export const ISLANDS = [
     districts: ['downtown', 'residential', 'old industrial']
   },
   {
-    id: 'IRON_HARBOR', name: 'IRON HARBOR', biome: 'INDUSTRIAL_COAST', center: { x: 1520, y: -100 }, rx: 900, ry: 900,
+    id: 'IRON_HARBOR', name: 'IRON HARBOR', biome: 'INDUSTRIAL_COAST', center: { x: 1700, y: -100 }, rx: 720, ry: 900,
     colors: { land: '#25282a', shore: '#6b716f', accent: '#d4523a' },
     districts: ['docks', 'warehouses', 'shipyard']
   },
   {
-    id: 'NORTH_RIDGE', name: 'NORTH RIDGE', biome: 'FOREST_HIGHLAND', center: { x: 0, y: 1510 }, rx: 1080, ry: 780,
+    id: 'NORTH_RIDGE', name: 'NORTH RIDGE', biome: 'FOREST_HIGHLAND', center: { x: 0, y: 1800 }, rx: 1080, ry: 600,
     colors: { land: '#202820', shore: '#6e765d', accent: '#b7a66a' },
     districts: ['pine road', 'hill town', 'reservoir']
   }
 ];
 
 export const BRIDGES = [
-  { id: 'EAST_BRIDGE', a: { x: 700, y: -20 }, b: { x: 760, y: -20 }, width: 150 },
-  { id: 'NORTH_BRIDGE', a: { x: 0, y: 720 }, b: { x: 0, y: 840 }, width: 150 }
+  { id: 'EAST_BRIDGE', a: { x: 760, y: -20 }, b: { x: 980, y: -20 }, width: 72 },
+  { id: 'NORTH_BRIDGE', a: { x: 0, y: 860 }, b: { x: 0, y: 1200 }, width: 72 }
 ];
 
 const ellipse = (x, y, island) => {
