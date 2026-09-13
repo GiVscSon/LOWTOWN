@@ -19,16 +19,17 @@ export function axleLoads({mass=1500,gravity=9.81,wheelbase=2.7,frontWeight=.52,
 
 export function drivetrainDistribution(drivetrain='RWD',loads={front:0,rear:0}){
   const type=resolveDrivetrain(drivetrain);
-  if(type===DRIVETRAINS.FWD)return {type,front:.5,rear:0,drivenLoad:Math.max(0,finite(loads.front))};
+  if(type===DRIVETRAINS.FWD)return {type,front:1,rear:0,drivenLoad:Math.max(0,finite(loads.front))};
   if(type===DRIVETRAINS.AWD)return {type,front:.5,rear:.5,drivenLoad:Math.max(0,finite(loads.front))+Math.max(0,finite(loads.rear))};
-  return {type,front:0,rear:.5,drivenLoad:Math.max(0,finite(loads.rear))};
+  return {type,front:0,rear:1,drivenLoad:Math.max(0,finite(loads.rear))};
 }
 
 export function limitDriveForce(requestedForce,{drivetrain='RWD',mass=1500,friction=1,gravity=9.81,loads}={}){
   const m=Math.max(1,finite(mass,1500));
   const axle=loads||axleLoads({mass:m,gravity,longitudinalAcceleration:0});
   const d=drivetrainDistribution(drivetrain,axle);
-  const capacity=Math.max(0,finite(friction,1))*Math.max(0.1,finite(gravity,9.81))*d.drivenLoad;
-  const force=clamp(finite(requestedForce),-capacity,capacity);
-  return {force,capacity,drivetrain:d.type,frontLoad:axle.front,rearLoad:axle.rear,frontShare:d.front,rearShare:d.rear,limited:Math.abs(force)<Math.abs(finite(requestedForce))};
+  const capacity=Math.max(0,finite(friction,1))*d.drivenLoad;
+  const requested=finite(requestedForce);
+  const force=clamp(requested,-capacity,capacity);
+  return {force,capacity,drivetrain:d.type,frontLoad:axle.front,rearLoad:axle.rear,frontShare:d.front,rearShare:d.rear,limited:Math.abs(force)<Math.abs(requested)};
 }
