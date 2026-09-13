@@ -38,6 +38,8 @@ jobs:
         run: node tests/transport-contact-trace-smoke.mjs
       - name: Test AI character vehicle closed loop
         run: node tests/ai-character-vehicle-smoke.mjs
+      - name: Test real AI character closed loop
+        run: node tests/ai-character-real-closed-loop-smoke.mjs
       - name: Test transport AI closed-loop stress
         run: node tests/transport-ai-closed-loop-stress.mjs
       - name: Test transport AI closed-loop matrix
