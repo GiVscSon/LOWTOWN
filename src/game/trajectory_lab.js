@@ -1,4 +1,5 @@
 import { predictVehicle } from './physics_prediction.js';
+import { collisionSafety } from './vehicle_safety.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const wrap = a => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
@@ -20,19 +21,12 @@ export function createTrajectoryLab({ simulate, trafficRisk, blocked = () => fal
     const probe = Math.min(80, Math.max(20, result.speed * .25));
     if (Number.isFinite(result.x) && Number.isFinite(result.y)) {
       const a = result.a || car.a || 0;
-      const probes = [0, .3, -.3];
-      for (const offset of probes) {
+      for (const offset of [0, .3, -.3]) {
         const hit = blocked(result.x + Math.cos(a + offset) * probe, result.y + Math.sin(a + offset) * probe);
         minWall = Math.min(minWall, hit ? probe : 999);
       }
     }
-    return {
-      ...result,
-      points: result.points || [],
-      minWall,
-      collisionT: result.collisionT,
-      safe: result.safe
-    };
+    return { ...result, points: result.points || [], minWall, collisionT: result.collisionT, safe: result.safe };
   }
 
   function maneuverClass({ headingError = 0, curvature = 0 } = {}) {
@@ -75,6 +69,7 @@ export function createTrajectoryLab({ simulate, trafficRisk, blocked = () => fal
     const candidates = buildCandidates({ headingError, baseSteer, speed, curvature });
     const target = options.target || null;
     const className = maneuverClass({ headingError, curvature });
+    const brakingAcceleration = Math.max(1, Number(car?.physics?.brakingAcceleration) || Number(car?.physics?.brakeForce || 0) / Math.max(1, Number(car?.physics?.mass) || 1));
 
     const evaluated = candidates.map(candidate => {
       const result = predict(car, candidate);
@@ -83,13 +78,24 @@ export function createTrajectoryLab({ simulate, trafficRisk, blocked = () => fal
       const alignment = target ? Math.abs(wrap(Math.atan2(target.y - result.y, target.x - result.x) - (car.a || 0))) : Math.abs(headingError);
       const wallPenalty = Number.isFinite(result.minWall) ? Math.max(0, 70 - result.minWall) * 5 : 0;
       const collisionPenalty = result.safe ? 0 : 100000 + (candidate.horizon - result.collisionT) * 8000;
+      let safetyPenalty = 0;
+      let safetyUnsafe = false;
+      for (const hazard of hazards.slice(0, 6)) {
+        if (hazard.longitudinal <= 0) continue;
+        const gap = Math.max(0, hazard.longitudinal - 28);
+        const safety = collisionSafety({ gap, speed: result.speed, relativeSpeed: Math.max(0, hazard.closing || 0), brakingAcceleration, reactionTime: .25, margin: 12 });
+        if (!safety.safe) {
+          safetyUnsafe = true;
+          safetyPenalty += Math.min(5000, (safety.requiredGap - safety.gap) * 35);
+        }
+      }
       const turnBonus = className === 'TURN_AROUND' && candidate.maneuver === 'TURN_AROUND' ? 120 : 0;
       const directionBonus = className === 'TURN_AROUND' ? (candidate.steer * headingError > 0 ? 190 : candidate.steer === 0 ? 30 : -70) : 0;
       const lowSpeedTurnBonus = className === 'TURN_AROUND' && speed < 75 && candidate.throttle > 0.55 && candidate.steer * headingError > 0 ? 150 : 0;
       const stopBonus = className === 'TURN_AROUND' && candidate.id === 'FULL_BRAKE' && speed > 180 ? 80 : 0;
       const progress = target ? -targetDistance * 0.75 : result.speed * 0.12;
-      const score = progress + turnBonus + directionBonus + lowSpeedTurnBonus + stopBonus - wallPenalty - risk.risk * 5 - collisionPenalty - alignment * 12 - Math.abs(candidate.steer) * 8;
-      return { ...candidate, safe: !!result.safe, x: result.x, y: result.y, speed: result.speed, minWall: result.minWall, collisionT: result.collisionT, trafficRisk: risk.risk, ttc: risk.minTtc, targetDistance, alignment, score };
+      const score = progress + turnBonus + directionBonus + lowSpeedTurnBonus + stopBonus - wallPenalty - risk.risk * 5 - safetyPenalty - collisionPenalty - alignment * 12 - Math.abs(candidate.steer) * 8;
+      return { ...candidate, safe: !!result.safe && !safetyUnsafe, physicsSafe: !!result.safe, safetySafe: !safetyUnsafe, x: result.x, y: result.y, speed: result.speed, minWall: result.minWall, collisionT: result.collisionT, trafficRisk: risk.risk, ttc: risk.minTtc, targetDistance, alignment, safetyPenalty, score };
     });
 
     const safe = evaluated.filter(c => c.safe && Number.isFinite(c.score));
