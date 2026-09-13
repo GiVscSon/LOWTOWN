@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {createMobileDriveBridge} from '../src/game/mobile_drive_bridge.js';
+let ai=false,reset=false;
+const bridge=createMobileDriveBridge({onAIToggle:()=>{ai=!ai;return ai;},onReset:()=>{reset=true;}});
+bridge.setInput({throttle:1,steer:-.7,brake:0});
+assert.deepEqual(bridge.read(),{throttle:1,steer:-.7,brake:0,handbrake:false});
+bridge.setInput({throttle:-1,steer:1,brake:0,handbrake:true});
+assert.deepEqual(bridge.read(),{throttle:-1,steer:1,brake:0,handbrake:true});
+bridge.setInput({throttle:3,steer:-3,brake:2});
+assert.deepEqual(bridge.read(),{throttle:1,steer:-1,brake:1,handbrake:true});
+assert.equal(bridge.toggleAI(),true);
+assert.equal(ai,true);
+bridge.reset();
+assert.equal(reset,true);
+console.log('MOBILE DRIVE BRIDGE: PASS ANALOG INPUT CLAMP + AI TOGGLE + RESET');
