@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import { createCorridorGuardian } from '../src/game/corridor_guardian.js';
+const g=createCorridorGuardian();
+const normal=g.apply({steer:.2,throttle:1,brake:0},{crossTrack:30});
+assert.equal(normal.steer,.2);
+const guard=g.apply({steer:.1,throttle:1,brake:0},{crossTrack:90});
+assert.ok(guard.steer<0&&guard.throttle<1);
+const recovery=g.apply({steer:.1,throttle:1,brake:0},{crossTrack:130});
+assert.ok(recovery.steer<-.7&&recovery.throttle<=.34&&recovery.brake>=.12);
+const restored=g.apply({steer:-.1,throttle:.5,brake:0},{crossTrack:40});
+assert.equal(restored.steer,-.1);
+assert.ok(g.state.events>=2);
+console.log('CORRIDOR GUARDIAN SMOKE: PASS');
