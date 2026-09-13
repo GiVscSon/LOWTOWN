@@ -1,6 +1,7 @@
 import { createTransportState, transportStep, transportTelemetry } from './transport_physics.js';
 import { TRANSPORT_TYPES } from './transport_constants.js';
 import { getTransportProfile, getTransportTypeProfile, resolveTransportPhysics } from './transport_profiles.js';
+import { applyActuatorDelay } from './vehicle_safety.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const finite=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
@@ -14,126 +15,31 @@ function calibratedPhysics(base,calibration=null){
   const steeringScale=scale(calibration.steeringScale);
   const dragScale=scale(calibration.dragScale);
   const turnRadiusScale=scale(calibration.turnRadiusScale);
-  return {...base,
-    engineForce:base.engineForce*(1+(accelerationScale-1)*confidence),
-    brakeForce:base.brakeForce*(1+(brakingScale-1)*confidence),
-    steeringRate:base.steeringRate*(1+(steeringScale-1)*confidence),
-    drag:base.drag*(1+(dragScale-1)*confidence),
-    turnRadius:base.turnRadius*(1+(turnRadiusScale-1)*confidence),
-    calibration:{accelerationScale,brakingScale,steeringScale,dragScale,turnRadiusScale,confidence}
-  };
+  return {...base,engineForce:base.engineForce*(1+(accelerationScale-1)*confidence),brakeForce:base.brakeForce*(1+(brakingScale-1)*confidence),steeringRate:base.steeringRate*(1+(steeringScale-1)*confidence),drag:base.drag*(1+(dragScale-1)*confidence),turnRadius:base.turnRadius*(1+(turnRadiusScale-1)*confidence),calibration:{accelerationScale,brakingScale,steeringScale,dragScale,turnRadiusScale,confidence}};
 }
-
-function calibrationForVehicle(profile,id){
-  if(!profile||typeof profile!=='object')return null;
-  return profile.vehicles?.[id]||null;
-}
+function calibrationForVehicle(profile,id){return profile&&typeof profile==='object'?profile.vehicles?.[id]||null:null;}
 
 export function createTransportController(vehicleId='sedan',initial={}){
   let currentId=getTransportProfile(vehicleId).id;
   const profile=()=>getTransportProfile(currentId);
   const state=createTransportState({type:profile().type,vehicleId:currentId,mass:profile().mass,...initial});
-  let calibrationProfile=null;
-  let calibrationByVehicle={};
-  let physics=resolveTransportPhysics(currentId);
-  state.mass=physics.mass;
-  state.physics=physics;
+  let calibrationProfile=null,calibrationByVehicle={};
+  let physics=resolveTransportPhysics(currentId); state.mass=physics.mass; state.physics=physics;
   let lastInput={throttle:0,brake:0,steer:0,handbrake:false,climb:0,descend:0};
-
+  let actuator={throttle:0,brake:0,steer:0,climb:0,descend:0};
+  let actuatorResponse={steer:12,throttle:8,brake:16,climb:8,descend:8};
   function activeCalibration(){return calibrationByVehicle[currentId]||calibrationForVehicle(calibrationProfile,currentId);}
-  function rebuildPhysics(){
-    physics=calibratedPhysics(resolveTransportPhysics(currentId),activeCalibration());
-    state.mass=physics.mass;
-    state.physics=physics;
-    return physics;
-  }
-
-  function setVehicle(id){
-    const next=getTransportProfile(id);
-    currentId=next.id;
-    state.vehicleId=currentId;
-    state.type=next.type;
-    state.surface=next.type===TRANSPORT_TYPES.CAR?'road':next.type===TRANSPORT_TYPES.BOAT?'water':'air';
-    rebuildPhysics();
-    return next;
-  }
-
-  function setCalibration(next=null,vehicleId=currentId){
-    const id=getTransportProfile(vehicleId).id;
-    if(next&&typeof next==='object'){
-      if(next.vehicles&&typeof next.vehicles==='object'){
-        calibrationProfile={...next,vehicles:{...next.vehicles}};
-        calibrationByVehicle={...calibrationByVehicle,...next.vehicles};
-      }else{
-        calibrationByVehicle={...calibrationByVehicle,[id]:{...next}};
-      }
-    }else if(next===null){
-      delete calibrationByVehicle[id];
-      if(calibrationProfile?.vehicles?.[id]){
-        const vehicles={...calibrationProfile.vehicles};
-        delete vehicles[id];
-        calibrationProfile={...calibrationProfile,vehicles};
-      }
-    }
-    rebuildPhysics();
-    return activeCalibration();
-  }
-
-  function setCalibrationProfile(profile={}){
-    calibrationProfile=profile&&typeof profile==='object'?{...profile,vehicles:{...(profile.vehicles||{})}}:null;
-    calibrationByVehicle={...(calibrationProfile?.vehicles||{})};
-    rebuildPhysics();
-    return calibrationProfile;
-  }
-
+  function rebuildPhysics(){physics=calibratedPhysics(resolveTransportPhysics(currentId),activeCalibration());state.mass=physics.mass;state.physics=physics;return physics;}
+  function setVehicle(id){const next=getTransportProfile(id);currentId=next.id;state.vehicleId=currentId;state.type=next.type;state.surface=next.type===TRANSPORT_TYPES.CAR?'road':next.type===TRANSPORT_TYPES.BOAT?'water':'air';resetActuators();rebuildPhysics();return next;}
+  function setCalibration(next=null,vehicleId=currentId){const id=getTransportProfile(vehicleId).id;if(next&&typeof next==='object'){if(next.vehicles&&typeof next.vehicles==='object'){calibrationProfile={...next,vehicles:{...next.vehicles}};calibrationByVehicle={...calibrationByVehicle,...next.vehicles};}else calibrationByVehicle={...calibrationByVehicle,[id]:{...next}};}else if(next===null){delete calibrationByVehicle[id];if(calibrationProfile?.vehicles?.[id]){const vehicles={...calibrationProfile.vehicles};delete vehicles[id];calibrationProfile={...calibrationProfile,vehicles};}}rebuildPhysics();return activeCalibration();}
+  function setCalibrationProfile(p={}){calibrationProfile=p&&typeof p==='object'?{...p,vehicles:{...(p.vehicles||{})}}:null;calibrationByVehicle={...(calibrationProfile?.vehicles||{})};rebuildPhysics();return calibrationProfile;}
   function getCalibration(vehicleId=currentId){return calibrationByVehicle[vehicleId]||calibrationProfile?.vehicles?.[vehicleId]||null;}
-
-  function clearCalibration(vehicleId=currentId){
-    const id=getTransportProfile(vehicleId).id;
-    delete calibrationByVehicle[id];
-    if(calibrationProfile?.vehicles?.[id]){
-      const vehicles={...calibrationProfile.vehicles};
-      delete vehicles[id];
-      calibrationProfile={...calibrationProfile,vehicles};
-    }
-    rebuildPhysics();
-    return physics;
-  }
-
+  function clearCalibration(vehicleId=currentId){const id=getTransportProfile(vehicleId).id;delete calibrationByVehicle[id];if(calibrationProfile?.vehicles?.[id]){const vehicles={...calibrationProfile.vehicles};delete vehicles[id];calibrationProfile={...calibrationProfile,vehicles};}rebuildPhysics();return physics;}
   function clearAllCalibration(){calibrationProfile=null;calibrationByVehicle={};rebuildPhysics();return physics;}
-
-  function control(input={}){
-    const type=state.type;
-    lastInput={
-      throttle:clamp(Number(input.throttle)||0,-1,1),
-      brake:clamp(Number(input.brake)||0,0,1),
-      steer:clamp(Number(input.steer)||0,-1,1),
-      handbrake:type===TRANSPORT_TYPES.CAR&&!!input.handbrake,
-      climb:type===TRANSPORT_TYPES.PLANE?clamp(Number(input.climb)||0,-1,1):0,
-      descend:type===TRANSPORT_TYPES.PLANE?clamp(Number(input.descend)||0,0,1):0
-    };
-    if(type===TRANSPORT_TYPES.PLANE)lastInput.throttle=Math.max(0,lastInput.throttle);
-    return lastInput;
-  }
-
-  function step(dt,input=lastInput){
-    control(input);
-    const old={x:state.x,y:state.y,z:state.z};
-    const telemetry=transportStep(state,dt,lastInput);
-    const dx=state.x-old.x,dy=state.y-old.y,dz=state.z-old.z;
-    telemetry.frameDistance=Math.hypot(dx,dy,dz);
-    telemetry.vehicleId=currentId;
-    telemetry.physics={type:physics.type,mass:physics.mass,maxSpeed:physics.maxForwardSpeed,engineForce:physics.engineForce,brakeForce:physics.brakeForce,steeringRate:physics.steeringRate,grip:physics.lateralGrip,turnRadius:physics.turnRadius,calibration:physics.calibration||null};
-    telemetry.calibration=activeCalibration()?{...activeCalibration()}:null;
-    state.telemetry=telemetry;
-    return telemetry;
-  }
-
-  function snapshot(){
-    const v=profile();
-    const t=getTransportTypeProfile(v.type);
-    return {vehicleId:v.id,profile:v,typeProfile:t,state:{...state},physics:{...physics},calibration:activeCalibration()?{...activeCalibration()}:null,calibrationProfile:calibrationProfile?{...calibrationProfile,vehicles:{...(calibrationProfile.vehicles||{})}}:null,input:{...lastInput},telemetry:transportTelemetry(state,lastInput)};
-  }
-
-  return {get vehicleId(){return currentId;},get profile(){return profile();},get typeProfile(){return getTransportTypeProfile(state.type);},get state(){return state;},get physics(){return physics;},get calibration(){return activeCalibration();},setVehicle,setCalibration,setCalibrationProfile,getCalibration,clearCalibration,clearAllCalibration,control,step,snapshot};
+  function setActuatorResponse(next={}){actuatorResponse={...actuatorResponse,...Object.fromEntries(Object.entries(next).filter(([,v])=>Number.isFinite(Number(v))&&Number(v)>=0))};return {...actuatorResponse};}
+  function resetActuators(){actuator={throttle:0,brake:0,steer:0,climb:0,descend:0};return {...actuator};}
+  function control(input={}){const type=state.type;const target={throttle:clamp(Number(input.throttle)||0,-1,1),brake:clamp(Number(input.brake)||0,0,1),steer:clamp(Number(input.steer)||0,-1,1),handbrake:type===TRANSPORT_TYPES.CAR&&!!input.handbrake,climb:type===TRANSPORT_TYPES.PLANE?clamp(Number(input.climb)||0,-1,1):0,descend:type===TRANSPORT_TYPES.PLANE?clamp(Number(input.descend)||0,0,1):0};if(type===TRANSPORT_TYPES.PLANE)target.throttle=Math.max(0,target.throttle);const next=applyActuatorDelay(target,actuator,1/60,actuatorResponse);actuator={throttle:next.throttle,brake:next.brake,steer:next.steer,climb:next.climb,descend:next.descend};lastInput={...next,handbrake:target.handbrake};return lastInput;}
+  function step(dt,input=lastInput){const safeDt=clamp(finite(dt),0,.1);control(input);const old={x:state.x,y:state.y,z:state.z};const telemetry=transportStep(state,safeDt,lastInput);const dx=state.x-old.x,dy=state.y-old.y,dz=state.z-old.z;telemetry.frameDistance=Math.hypot(dx,dy,dz);telemetry.vehicleId=currentId;telemetry.physics={type:physics.type,mass:physics.mass,maxSpeed:physics.maxForwardSpeed,engineForce:physics.engineForce,brakeForce:physics.brakeForce,steeringRate:physics.steeringRate,grip:physics.lateralGrip,turnRadius:physics.turnRadius,calibration:physics.calibration||null};telemetry.calibration=activeCalibration()?{...activeCalibration()}:null;telemetry.actuator={target:{...input},applied:{...lastInput},response:{...actuatorResponse}};state.telemetry=telemetry;return telemetry;}
+  function snapshot(){const v=profile(),t=getTransportTypeProfile(v.type);return {vehicleId:v.id,profile:v,typeProfile:t,state:{...state},physics:{...physics},calibration:activeCalibration()?{...activeCalibration()}:null,calibrationProfile:calibrationProfile?{...calibrationProfile,vehicles:{...(calibrationProfile.vehicles||{})}}:null,input:{...lastInput},actuator:{...actuator},actuatorResponse:{...actuatorResponse},telemetry:transportTelemetry(state,lastInput,physics)};}
+  return {get vehicleId(){return currentId;},get profile(){return profile();},get typeProfile(){return getTransportTypeProfile(state.type);},get state(){return state;},get physics(){return physics;},get calibration(){return activeCalibration();},setVehicle,setCalibration,setCalibrationProfile,getCalibration,clearCalibration,clearAllCalibration,setActuatorResponse,resetActuators,control,step,snapshot};
 }
