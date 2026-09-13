@@ -17,11 +17,12 @@ export function createTrajectoryLab({ simulate, trafficRisk, blocked = () => fal
     const sign = headingError >= 0 ? 1 : -1;
     const turnSpeed = clamp(speed, 0, 120);
     if (turn === 'TURN_AROUND') {
+      const lowSpeedTurn = speed < 75;
       return [
-        { id: 'TURN_LEFT', steer: sign * 1, throttle: 0.35, brake: 0.45, horizon: 1.0, maneuver: 'TURN_AROUND' },
-        { id: 'TURN_RIGHT', steer: -sign * 1, throttle: 0.35, brake: 0.45, horizon: 1.0, maneuver: 'TURN_AROUND' },
-        { id: 'BRAKE_TURN', steer: sign * 0.8, throttle: 0.18, brake: 0.85, horizon: 1.0, maneuver: 'TURN_AROUND' },
-        { id: 'COAST_ALIGN', steer: sign * 0.55, throttle: 0.18, brake: 0.25, horizon: 1.2, maneuver: 'TURN_AROUND' },
+        { id: 'TURN_LEFT', steer: sign * 1, throttle: lowSpeedTurn ? 0.9 : 0.35, brake: 0, horizon: lowSpeedTurn ? 0.85 : 1.0, maneuver: 'TURN_AROUND' },
+        { id: 'TURN_RIGHT', steer: -sign * 1, throttle: lowSpeedTurn ? 0.9 : 0.35, brake: 0, horizon: lowSpeedTurn ? 0.85 : 1.0, maneuver: 'TURN_AROUND' },
+        { id: 'BRAKE_TURN', steer: sign * 0.8, throttle: lowSpeedTurn ? 0.72 : 0.18, brake: lowSpeedTurn ? 0 : 0.85, horizon: 1.0, maneuver: 'TURN_AROUND' },
+        { id: 'COAST_ALIGN', steer: sign * 0.55, throttle: lowSpeedTurn ? 0.62 : 0.18, brake: lowSpeedTurn ? 0 : 0.25, horizon: 1.2, maneuver: 'TURN_AROUND' },
         { id: 'FULL_BRAKE', steer: 0, throttle: 0, brake: 1, horizon: 0.8, maneuver: 'STOP' }
       ];
     }
@@ -53,9 +54,10 @@ export function createTrajectoryLab({ simulate, trafficRisk, blocked = () => fal
       const collisionPenalty = result.safe ? 0 : 100000 + (candidate.horizon - result.collisionT) * 8000;
       const turnBonus = className === 'TURN_AROUND' && candidate.maneuver === 'TURN_AROUND' ? 120 : 0;
       const directionBonus = className === 'TURN_AROUND' ? (candidate.steer * headingError > 0 ? 190 : candidate.steer === 0 ? 30 : -70) : 0;
+      const lowSpeedTurnBonus = className === 'TURN_AROUND' && speed < 75 && candidate.throttle > 0.55 && candidate.steer * headingError > 0 ? 150 : 0;
       const stopBonus = className === 'TURN_AROUND' && candidate.id === 'FULL_BRAKE' && speed > 180 ? 80 : 0;
       const progress = target ? -targetDistance * 0.75 : result.speed * 0.12;
-      const score = progress + turnBonus + directionBonus + stopBonus - wallPenalty - risk.risk * 5 - collisionPenalty - alignment * 12 - Math.abs(candidate.steer) * 8;
+      const score = progress + turnBonus + directionBonus + lowSpeedTurnBonus + stopBonus - wallPenalty - risk.risk * 5 - collisionPenalty - alignment * 12 - Math.abs(candidate.steer) * 8;
       return {
         ...candidate,
         safe: !!result.safe,
@@ -80,7 +82,7 @@ export function createTrajectoryLab({ simulate, trafficRisk, blocked = () => fal
     let reason = 'BEST_SAFE_TRAJECTORY';
     let cause = 'NORMAL_MOTION';
     if (className === 'TURN_AROUND') {
-      reason = selected?.id === 'FULL_BRAKE' ? 'CONTROLLED_STOP_BEFORE_TURN' : 'CONTROLLED_TURN_AROUND';
+      reason = selected?.id === 'FULL_BRAKE' ? 'CONTROLLED_STOP_BEFORE_TURN' : (speed < 75 ? 'LOW_SPEED_TURN_AUTHORITY' : 'CONTROLLED_TURN_AROUND');
       cause = `HEADING_ERROR_${Math.abs(headingError).toFixed(2)}_RAD`;
     } else if (rejectedUnsafe > 0) {
       reason = 'UNSAFE_TRAJECTORIES_REJECTED';
