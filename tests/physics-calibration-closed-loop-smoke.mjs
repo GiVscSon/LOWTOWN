@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import { calibrateSamples, applyPhysicsCalibration } from '../src/game/physics_calibration.js';
+
+const samples=[];
+for(let i=0;i<60;i++)samples.push({vehicleId:'sedan',accelerationError:4+(i%3)*.1,steeringError:.5+(i%2)*.02});
+for(let i=0;i<60;i++)samples.push({vehicleId:'truck',accelerationError:-8+(i%4)*.1,steeringError:-1+(i%2)*.02});
+const profile=calibrateSamples(samples);
+assert.equal(profile.vehicles.sedan.ready,true);
+assert.equal(profile.vehicles.truck.ready,true);
+assert.ok(profile.vehicles.sedan.accelerationBias>0);
+assert.ok(profile.vehicles.truck.accelerationBias<0);
+assert.ok(profile.vehicles.sedan.confidence>=.99);
+const before={vehicleId:'sedan',throttle:1,steer:.8};
+const after=applyPhysicsCalibration(before,profile);
+assert.equal(after.calibrationApplied,true);
+assert.ok(Math.abs(after.throttle-before.throttle)<.2);
+assert.ok(Math.abs(after.steer-before.steer)<.2);
+const low=calibrateSamples([{vehicleId:'sedan',accelerationError:40,steeringError:9}],{minSamples:30});
+assert.equal(applyPhysicsCalibration(before,low).calibrationApplied,false);
+console.log('PHYSICS CALIBRATION CLOSED LOOP SMOKE: PASS');
