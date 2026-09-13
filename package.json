@@ -10,7 +10,8 @@
     "test:physics-diagnostics": "node tests/physics-diagnostics-smoke.mjs",
     "test:physics-calibration": "node tests/physics-calibration-smoke.mjs",
     "test:physics-calibration-closed-loop": "node tests/physics-calibration-closed-loop-smoke.mjs",
-    "test:calibration-lab": "node tests/calibration-lab.mjs"
+    "test:calibration-lab": "node tests/calibration-lab.mjs",
+    "test:transport-calibration": "node tests/transport-calibration-integration-smoke.mjs"
   },
   "devDependencies": {
     "vite": "^7.1.5"
