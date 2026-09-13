@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:physics-diagnostics": "node tests/physics-diagnostics-smoke.mjs"
   },
   "devDependencies": {
     "vite": "^7.1.5"
