@@ -18,6 +18,8 @@ jobs:
       - run: npm run build
       - name: Test road topology first
         run: node tests/road-topology-smoke.mjs
+      - name: Diagnose world connectivity
+        run: node tests/world-connectivity-diagnostic.mjs
       - name: Stress-test world routing
         run: node tests/world-stress-smoke.mjs
       - name: Test ferry and island transport
