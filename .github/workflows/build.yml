@@ -22,3 +22,11 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run autonomous driving smoke test
         run: node tests/autopilot-smoke.mjs
+      - name: Upload autonomous AI telemetry
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lowtown-ai-telemetry
+          path: ai-run-artifacts/
+          if-no-files-found: ignore
+          retention-days: 14
