@@ -22,11 +22,11 @@ export function applySurfacePhysics(physics={},surface='dry'){
     lateralGrip:Math.max(.01,finite(physics.lateralGrip,1)*s.grip),
     handbrakeGrip:Math.max(.01,finite(physics.handbrakeGrip,1)*s.grip),
     handbrakeSlipGrip:Math.max(.01,finite(physics.handbrakeSlipGrip,1)*s.grip),
-    brakeForce:Math.max(0,finite(physics.brakeForce)*s.brake),
+    brakeForce:Math.max(0,finite(physics.brakeForce,0)*s.brake),
     friction:Math.max(.05,finite(physics.friction,1)*s.grip),
     drag:Math.max(.001,finite(physics.drag,1)*s.drag),
     handbrakeDrag:Math.max(.001,finite(physics.handbrakeDrag,1)*s.drag),
-    engineForce:Math.max(0,finite(physics.engineForce)*s.power),
+    engineForce:Math.max(0,finite(physics.engineForce,0)*s.power),
     surfaceGrip:s.grip,
     surfaceBrake:s.brake
   };
