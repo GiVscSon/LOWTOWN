@@ -60,11 +60,21 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run autonomous driving smoke test
         run: node tests/autopilot-smoke.mjs
+      - name: Run real closed-loop 20-scenario lab
+        run: LOWTOWN_SCENARIOS=20 LOWTOWN_SCENARIO_RUN_MS=12000 node tests/closed-loop-scenario-lab.mjs
       - name: Upload autonomous AI telemetry
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: lowtown-ai-telemetry
           path: ai-run-artifacts/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload closed-loop scenario lab
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lowtown-scenario-lab
+          path: scenario-lab-artifacts/
           if-no-files-found: ignore
           retention-days: 14
