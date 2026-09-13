@@ -6,7 +6,8 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
 export function createAICitizen({ai,transportFactory,nodes=[],blocked=()=>{},x=0,y=0,a=0,walkSpeed=32,searchRadius=420,decisionInterval=3}={}){
   if(!ai||typeof transportFactory!=='function')throw new Error('AI citizen requires ai and transportFactory');
-  const state={mode:'WANDER',target:null,vehicleId:null,decisionTime:0,vehicleSearches:0,walkTargets:0,entries:0,exits:0};
+  const walkDecisionDelay=Math.max(0,finite(decisionInterval,3));
+  const state={mode:'WANDER',target:null,vehicleId:null,decisionTime:walkDecisionDelay,vehicleSearches:0,walkTargets:0,entries:0,exits:0};
   const actor=createAICharacterDriver({ai,x,y,a,walkSpeed,blocked});
   let transport=null;
   let cursor=0;
@@ -25,7 +26,7 @@ export function createAICitizen({ai,transportFactory,nodes=[],blocked=()=>{},x=0
     if(actor.onFoot){
       if(!state.target||dist(actor.state,state.target)<5){state.target=randomWalkTarget();if(state.target){actor.setWalkTarget(state.target);state.walkTargets++;}}
       if(state.decisionTime<=0){
-        state.decisionTime=decisionInterval;
+        state.decisionTime=walkDecisionDelay;
         if(chooseTransport()){actor.enter();state.entries++;state.mode='DRIVING';}
       }
     }
