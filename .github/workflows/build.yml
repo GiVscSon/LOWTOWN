@@ -30,6 +30,8 @@ jobs:
         run: node tests/navigation-brain-smoke.mjs
       - name: Run free-will driver smoke test
         run: node tests/free-will-driver-smoke.mjs
+      - name: Run autonomy stack smoke test
+        run: node tests/autonomy-stack-smoke.mjs
       - name: Run city director smoke test
         run: node tests/city-director-smoke.mjs
       - name: Run AI safety layer smoke test
