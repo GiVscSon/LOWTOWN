@@ -18,7 +18,8 @@
     "test:calibration-acceptance": "node tests/calibration-acceptance-smoke.mjs",
     "test:physics-prediction": "node tests/physics-prediction-smoke.mjs",
     "test:trajectory-kernel-safety": "node tests/trajectory-kernel-safety-smoke.mjs",
-    "test:dynamic-bicycle": "node tests/dynamic-bicycle-smoke.mjs"
+    "test:dynamic-bicycle": "node tests/dynamic-bicycle-smoke.mjs",
+    "test:transport-contact-trace": "node tests/transport-contact-trace-smoke.mjs"
   },
   "devDependencies": {
     "vite": "^7.1.5"
