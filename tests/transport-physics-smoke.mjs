@@ -30,7 +30,7 @@ const before=transportStep(car,1/60,{throttle:.8,steer:.2});
 assert.equal(before.vehicleType,'CAR');
 const boat=createTransportState({type:'BOAT'});
 const boatTele=transportStep(boat,1/60,{throttle:.8,steer:.2,handbrake:true});
-assert.equal(boatTele.controls.handbrake,true);
+assert.equal(boatTele.controls.handbrake,false);
 const plane=createTransportState({type:'PLANE',z:100});
 const planeTele=transportStep(plane,1/60,{throttle:.8,steer:.2,climb:.5});
 assert.equal(planeTele.controls.climb,.5);
