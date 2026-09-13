@@ -18,9 +18,23 @@ const nodes = [];
 for (let y = -LIMIT; y <= LIMIT; y += GRID) for (let x = -LIMIT; x <= LIMIT; x += GRID) if (!blocked(x, y)) nodes.push({ x, y });
 const byKey = new Map(nodes.map(n => [key(n.x, n.y), n]));
 const adj = new Map(nodes.map(n => [key(n.x, n.y), []]));
+const link = (a, b) => {
+  if (!a || !b || a === b) return;
+  const aa = adj.get(key(a.x, a.y)), bb = adj.get(key(b.x, b.y));
+  if (aa && !aa.includes(b)) aa.push(b);
+  if (bb && !bb.includes(a)) bb.push(a);
+};
 for (const n of nodes) for (const [dx, dy] of [[GRID,0],[-GRID,0],[0,GRID],[0,-GRID]]) {
   const m = byKey.get(key(n.x + dx, n.y + dy));
-  if (m && corridor(n, m)) adj.get(key(n.x, n.y)).push(m);
+  if (m && corridor(n, m)) link(n, m);
+}
+// Physical bridges must also exist as graph edges. The previous test only
+// modelled four-neighbour grid edges, so diagonal NORTH_BRIDGE crossings were
+// physically valid but invisible to the routing graph.
+for (const bridge of BRIDGES) {
+  const a = byKey.get(key(bridge.a.x, bridge.a.y));
+  const b = byKey.get(key(bridge.b.x, bridge.b.y));
+  if (a && b && corridor(bridge.a, bridge.b)) link(a, b);
 }
 function nearest(p) {
   return nodes.reduce((best, n) => !best || Math.hypot(n.x-p.x,n.y-p.y) < best.d ? { n, d: Math.hypot(n.x-p.x,n.y-p.y) } : best, null)?.n;
@@ -46,6 +60,6 @@ for (let i=0;i<ISLANDS.length;i++) for (let j=0;j<ISLANDS.length;j++) for(let a=
   const A=ISLANDS[i], B=ISLANDS[j];
   candidates.push({x:A.center.x + (a-2)*A.rx*0.28, y:A.center.y + (b-2)*A.ry*0.22}, {x:B.center.x + (b-2)*B.rx*0.28, y:B.center.y + (a-2)*B.ry*0.22});
 }
-for (let i=0;i<candidates.length;i+=2) { tested++; if(!reachable(candidates[i], candidates[i+1])) failures.push([candidates[i],candidates[i+1]]); }
+for (let i=0;i<candidates.length;i+=2) { tested++; if(!reachable(candidates[i],candidates[i+1])) failures.push([candidates[i],candidates[i+1]]); }
 assert.equal(failures.length, 0, `random route failures: ${failures.length}/${tested}`);
 console.log('WORLD_STRESS_OK', JSON.stringify({nodes:nodes.length, routePairs:tested, islands:ISLANDS.map(i=>i.id), bridges:BRIDGES.map(b=>b.id)}));
