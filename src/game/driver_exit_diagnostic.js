@@ -4,7 +4,7 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export const DRIVER_EXIT_STATES=Object.freeze({DRIVING:'DRIVING',STALLED:'STALLED',EXITING:'EXITING',ON_FOOT:'ON_FOOT'});
 
 export function createDriverExitDiagnostic(options={}){
-  const stallSeconds=Math.max(.5,finite(options.stallSeconds,2.5));
+  const stallSeconds=Math.max(.1,finite(options.stallSeconds,2.5));
   const minThrottle=Math.max(.1,finite(options.minThrottle,.75));
   const minSpeed=Math.max(0,finite(options.minSpeed,1));
   const state={phase:DRIVER_EXIT_STATES.DRIVING,stallTime:0,exitReason:null,driverX:finite(options.driverX,0),driverY:finite(options.driverY,0),driverA:finite(options.driverA,0),vehicleX:finite(options.vehicleX,0),vehicleY:finite(options.vehicleY,0),vehicleSpeed:0,commandThrottle:0,appliedThrottle:0,engineAcceleration:0,frameDistance:0,physicsHealthy:null};
