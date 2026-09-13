@@ -1,0 +1,44 @@
+import { getTypePhysics, normalizeTypeInput } from './transport_type_physics.js';
+import { TRANSPORT_TYPES } from './transport_physics.js';
+
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const finite=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
+
+export function stepBoatPhysics(state,dt,input,physics){
+  const p=physics||{};
+  const safeDt=clamp(finite(dt),0,0.1);
+  const c=normalizeTypeInput(input,TRANSPORT_TYPES.BOAT);
+  const fx=Math.cos(state.a),fy=Math.sin(state.a),rx=-fy,ry=fx;
+  const forward=state.vx*fx+state.vy*fy;
+  const lateral=state.vx*rx+state.vy*ry;
+  const speed=Math.hypot(state.vx,state.vy);
+  const drive=c.throttle>=0?p.engineForce:Math.abs(p.reverseForce||0);
+  const water=1+finite(p.waterResistance,1)*0.018*speed;
+  state.vx+=fx*c.throttle*drive*safeDt/water;
+  state.vy+=fy*c.throttle*drive*safeDt/water;
+  if(c.brake){const amount=Math.min(Math.abs(forward),Math.abs(p.brakeForce||0)*c.brake*safeDt);state.vx-=fx*Math.sign(forward||1)*amount;state.vy-=fy*Math.sign(forward||1)*amount;}
+  const desiredLateral=Math.sin(c.steer*0.7)*Math.abs(forward);
+  const lateralForce=clamp((lateral-desiredLateral)*(p.slipAngleGrip||1),-Math.max(4,speed),Math.max(4,speed));
+  const correction=Math.min(1,(p.lateralGrip||1)*safeDt);
+  state.vx-=rx*lateralForce*correction;state.vy-=ry*lateralForce*correction;
+  const resistance=(p.rollingResistance||0)*speed*safeDt;
+  if(speed>1){state.vx-=state.vx/speed*resistance;state.vy-=state.vy/speed*resistance;}
+  const drag=1/(1+water*0.012*safeDt*60);
+  state.vx*=drag;state.vy*=drag;
+  const currentForward=state.vx*Math.cos(state.a)+state.vy*Math.sin(state.a);
+  const authority=clamp(Math.abs(currentForward)/(p.steeringAuthoritySpeed||1),0,1);
+  const desiredYaw=c.steer*(p.steeringRate||0)*authority*(currentForward>=0?1:-1);
+  state.yawRate+=(desiredYaw-state.yawRate)*(p.yawInertia||1)*safeDt;
+  state.yawRate-=state.yawRate*(p.yawDamping||0)*safeDt;
+  state.a+=state.yawRate*safeDt;
+  const nfx=Math.cos(state.a),nfy=Math.sin(state.a),limited=state.vx*nfx+state.vy*nfy;
+  if(limited>p.maxForwardSpeed){const e=limited-p.maxForwardSpeed;state.vx-=nfx*e;state.vy-=nfy*e;}
+  if(limited<-(p.maxReverseSpeed||0)){const e=limited+p.maxReverseSpeed;state.vx-=nfx*e;state.vy-=nfy*e;}
+  state.x+=state.vx*safeDt;state.y+=state.vy*safeDt;
+  return boatTelemetry(state,c,p);
+}
+
+export function boatTelemetry(state,input={},physics={}){
+  const fx=Math.cos(state.a),fy=Math.sin(state.a);const forward=state.vx*fx+state.vy*fy;const lateral=-state.vx*Math.sin(state.a)+state.vy*Math.cos(state.a);const speed=Math.hypot(state.vx,state.vy);const slip=Math.atan2(lateral,Math.max(1,Math.abs(forward)));
+  return {type:TRANSPORT_TYPES.BOAT,x:state.x,y:state.y,heading:state.a,velocity:speed,forwardSpeed:forward,lateralSpeed:lateral,verticalSpeed:0,acceleration:Math.abs(finite(input.throttle))*finite(physics.engineForce),yawRate:state.yawRate,slipAngle:slip,traction:clamp(1-Math.abs(slip)/1.8,0,1),surface:'water',drift:false,controls:{...input}};
+}
