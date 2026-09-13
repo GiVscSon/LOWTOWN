@@ -18,7 +18,7 @@ for(const n of nodes){
 const blocked=()=>false;
 const transport=createTransportController('sedan',{x:0,y:0,a:0});
 const ai=createAIDriver({nodes,blocked,getTraffic:()=>[]});
-const actor=createAICharacterDriver({ai,transport,stallSeconds:1.2});
+const actor=createAICharacterDriver({ai,transport,blocked});
 
 assert.equal(actor.state.mode,AI_CHARACTER_MODES.ON_FOOT);
 assert.equal(actor.enter().mode,AI_CHARACTER_MODES.DRIVING);
@@ -32,9 +32,12 @@ assert(Number.isFinite(ai.state.prediction.confidence),'AI prediction confidence
 assert(Number.isFinite(transport.state.vx)&&Number.isFinite(transport.state.vy),'vehicle velocity must remain finite');
 
 const before=actor.state.steps;
+const footStart={x:actor.state.x,y:actor.state.y};
 actor.exit('TEST_EXIT');
 assert.equal(actor.state.mode,AI_CHARACTER_MODES.ON_FOOT);
-actor.update(1);
+actor.setWalkTarget({x:footStart.x+80,y:footStart.y});
+for(let i=0;i<60;i++)actor.update(1/60);
 assert(actor.state.steps>before,'AI character must continue independently on foot after vehicle exit');
+assert(actor.state.x>footStart.x,'on-foot character must move using character physics, not transport physics');
 
-console.log('AI CHARACTER REAL CLOSED LOOP: PASS AI -> TRANSPORT -> MOTION -> EXIT -> ON FOOT');
+console.log('AI CHARACTER REAL CLOSED LOOP: PASS AI -> TRANSPORT -> MOTION -> EXIT -> INDEPENDENT ON FOOT');
