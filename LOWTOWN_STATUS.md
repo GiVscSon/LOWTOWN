@@ -16,3 +16,8 @@
 ## Next gameplay layer
 
 Expand autonomous exploration memory and district diversity, then use black-box findings to tune driving policy. Continue with richer traffic interactions, police, mission chains and persistent world state.
+
+## CI
+
+- Layout fix is on `main`.
+- This status-only commit exists solely to retrigger the full CI validation after the world layout correction.
