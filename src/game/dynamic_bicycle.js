@@ -5,7 +5,7 @@ const smoothstep=(x)=>{const t=clamp(x,0,1);return t*t*(3-2*t);};
 export function dynamicBlendWeight(speed,physics={}){
   const center=Math.max(0,finite(physics.dynamicModelSpeed,180));
   const width=Math.max(1,finite(physics.dynamicBlendSpeed,35));
-  return smoothstep((Math.abs(speed)-(center-width))/(2*width));
+  return smoothstep((Math.abs(speed)-(center-width))/width);
 }
 
 export function dynamicBicycleForces(state,physics={}){
