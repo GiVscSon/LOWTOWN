@@ -26,6 +26,12 @@ jobs:
         run: node tests/transport-separated-physics-smoke.mjs
       - name: Test direct AI transport integration
         run: node tests/ai-transport-integration-smoke.mjs
+      - name: Test physics prediction kernel
+        run: node tests/physics-prediction-smoke.mjs
+      - name: Test vehicle safety and actuator dynamics
+        run: node tests/vehicle-safety-smoke.mjs
+      - name: Test calibration acceptance gate
+        run: node tests/calibration-acceptance-smoke.mjs
       - name: Test transport AI closed-loop stress
         run: node tests/transport-ai-closed-loop-stress.mjs
       - name: Test transport AI closed-loop matrix
