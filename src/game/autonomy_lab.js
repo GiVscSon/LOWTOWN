@@ -11,6 +11,18 @@ async function boot(){
   while(!window.__LOWTOWN_AI||!window.__LOWTOWN_TEST)await sleep(50);
 
   const ai=window.__LOWTOWN_AI;
+  const startTest=window.__LOWTOWN_TEST;
+  // The driver has a randomized safety start. For automated experiments, reject
+  // starts that are already pressed against an island edge and sample again.
+  for(let attempt=0;attempt<8;attempt++){
+    const s=startTest.state();
+    const sensors=s.sensor||{};
+    const edge=Math.min(Number(sensors.front||999),Number(sensors.frontRight||999),Number(sensors.right||999));
+    if(edge>115&&Math.abs(Number(s.x||0))<1500&&Number(s.y||0)<1900)break;
+    startTest.reset();
+    await sleep(80);
+  }
+
   const worldModel=createAIWorldModel();
   const stack=createAutonomyStack({worldModel});
   const lab={enabled:true,startedAt:performance.now(),decisions:0,forcedReplans:0,intent:'EXPLORE',reason:'BOOT',lastGoal:null,memory:new Map(),failures:[],history:[],world:worldModel,status:stack.status()};
@@ -29,7 +41,7 @@ async function boot(){
 
   while(lab.enabled){
     await sleep(120);
-    const state=window.__LOWTOWN_TEST.state();
+    const state=startTest.state();
     for(const n of ai.route||[])remember(n);
     if(ai.goal)remember(ai.goal);
 
