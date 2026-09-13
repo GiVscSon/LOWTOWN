@@ -1,6 +1,6 @@
 const finite=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-const robustMean=(values,fallback=1)=>{const a=values.filter(Number.isFinite).sort((x,y)=>x-y);if(!a.length)return fallback;const trim=a.length>=8?Math.floor(a.length*.1):0;const b=a.slice(trim,a.length-trim||a.length);return b.reduce((s,v)=>s+v,0)/Math.max(1,b.length);};
+const robustMean=(values,fallback=0)=>{const a=values.filter(Number.isFinite).sort((x,y)=>x-y);if(!a.length)return fallback;const trim=a.length>=8?Math.floor(a.length*.1):0;const b=a.slice(trim,a.length-trim||a.length);return b.reduce((s,v)=>s+v,0)/Math.max(1,b.length);};
 const scaleFromRatios=(values,fallback=1)=>{const usable=values.filter(v=>Number.isFinite(v)&&v>.05&&v<4);return clamp(robustMean(usable.length?usable:[fallback],fallback),.75,1.25);};
 
 export function buildPhysicsErrorProfile(report={}){
