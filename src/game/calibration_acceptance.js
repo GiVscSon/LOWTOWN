@@ -16,8 +16,12 @@ export function calibrationMetrics(samples=[]){
 export function acceptCalibration(beforeSamples=[],afterSamples=[],options={}){
   const before=calibrationMetrics(beforeSamples),after=calibrationMetrics(afterSamples);
   const tolerance=Math.max(0,finite(options.tolerance,.03));
-  const notWorse=(a,b)=>Number.isFinite(a)&&Number.isFinite(b)&&b<=a*(1+tolerance);
-  const accelerationImproved=after.acceleration<before.acceleration;
+  const notWorse=(a,b)=>{
+    if(Number.isFinite(a)&&Number.isFinite(b)) return b<=a*(1+tolerance);
+    if(!Number.isFinite(a)&&Number.isFinite(b)) return true;
+    return !Number.isFinite(a)&&!Number.isFinite(b);
+  };
+  const accelerationImproved=Number.isFinite(before.acceleration)&&Number.isFinite(after.acceleration)&&after.acceleration<before.acceleration;
   const accepted=accelerationImproved&&
     notWorse(before.steering,after.steering)&&
     notWorse(before.braking,after.braking)&&
