@@ -42,6 +42,8 @@ jobs:
         run: node tests/ai-expansion-smoke.mjs
       - name: Run scenario generator smoke test
         run: node tests/scenario-generator-smoke.mjs
+      - name: Run corridor guardian smoke test
+        run: node tests/corridor-guardian-smoke.mjs
       - name: Run scenario feedback smoke test
         run: node tests/scenario-feedback-smoke.mjs
       - name: Run trajectory lab smoke test
