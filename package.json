@@ -13,7 +13,9 @@
     "test:calibration-lab": "node tests/calibration-lab.mjs",
     "test:physics-calibration-browser": "node tests/physics-calibration-browser-lab.mjs",
     "test:transport-calibration-switch": "node tests/transport-calibration-switch-smoke.mjs",
-    "test:transport-ai-closed-loop-matrix": "node tests/transport-ai-closed-loop-matrix.mjs"
+    "test:transport-ai-closed-loop-matrix": "node tests/transport-ai-closed-loop-matrix.mjs",
+    "test:vehicle-safety": "node tests/vehicle-safety-smoke.mjs",
+    "test:calibration-acceptance": "node tests/calibration-acceptance-smoke.mjs"
   },
   "devDependencies": {
     "vite": "^7.1.5"
