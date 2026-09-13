@@ -37,7 +37,7 @@ function run(vehicleId,index){
   const physics=resolveTransportPhysics(vehicleId);
   ai.start(transport.state);
 
-  let finiteFrames=0, maxSpeed=0, minTtc=Infinity;
+  let finiteFrames=0, maxSpeed=0, minTtc=Infinity, throttleFrames=0;
   for(let frame=0;frame<360;frame++){
     for(const o of traffic){
       o.x+=Math.cos(o.a)*o.v/60;
@@ -66,20 +66,25 @@ function run(vehicleId,index){
     assert.equal(s.physics,transport.physics,`${vehicleId}: live physics reference lost`);
     assert.equal(s.mass,physics.mass,`${vehicleId}: mass desynchronised`);
     assert.ok(ai.state.targetSpeed<=physics.maxForwardSpeed+1e-6,`${vehicleId}: target speed exceeds profile`);
+    if(control.throttle>.05)throttleFrames++;
     maxSpeed=Math.max(maxSpeed,t.velocity);
     minTtc=Math.min(minTtc,Number.isFinite(ai.state.prediction?.ttc)?ai.state.prediction.ttc:Infinity);
     finiteFrames++;
   }
 
   assert.equal(finiteFrames,360);
+  assert.ok(throttleFrames>30,`${vehicleId}: AI never applied meaningful throttle`);
+  assert.ok(maxSpeed>.5,`${vehicleId}: vehicle did not move; max speed=${maxSpeed}`);
+  assert.ok(transport.state.distance>.5,`${vehicleId}: transport distance did not increase`);
+  assert.ok(ai.state.distance>.5,`${vehicleId}: AI distance did not increase`);
   assert.ok(ai.state.decisions>100,`${vehicleId}: insufficient AI decisions`);
   assert.ok(ai.state.route.length>0,`${vehicleId}: route lost permanently`);
   assert.ok(ai.state.replans>0,`${vehicleId}: no route replanning observed`);
-  return {vehicleId,frames:finiteFrames,decisions:ai.state.decisions,replans:ai.state.replans,recoveries:ai.state.recoveries,maxSpeed:+maxSpeed.toFixed(2),minTtc:minTtc===Infinity?null:+minTtc.toFixed(3),distance:+transport.state.distance.toFixed(2)};
+  return {vehicleId,frames:finiteFrames,decisions:ai.state.decisions,replans:ai.state.replans,recoveries:ai.state.recoveries,maxSpeed:+maxSpeed.toFixed(2),minTtc:minTtc===Infinity?null:+minTtc.toFixed(3),distance:+transport.state.distance.toFixed(2),aiDistance:+ai.state.distance.toFixed(2),throttleFrames};
 }
 
 const results=['sedan','coupe','truck','police'].map((id,i)=>run(id,i));
 assert.equal(results.length,4);
 assert.ok(results.every(r=>r.frames===360));
-console.log('TRANSPORT AI CLOSED-LOOP STRESS: PASS');
+console.log('TRANSPORT AI CLOSED-LOOP STRESS: PASS REAL MOTION');
 console.log(JSON.stringify(results,null,2));
