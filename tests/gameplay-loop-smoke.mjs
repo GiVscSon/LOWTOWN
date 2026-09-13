@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import { createGameplayLoop, GAMEPLAY_PHASES } from '../src/game/gameplay_loop.js';
+let activeEvent=null,missionStage=0;
+const mission={state:()=>({id:'DROP',reward:250,started:missionStage>0,complete:false,target:{x:100,y:0},route:['A','B']}),update:p=>{if(p.x>=100&&missionStage===0){missionStage=2;return true}return false},next:()=>{missionStage=0},reset:()=>{missionStage=0}};
+const loop=createGameplayLoop({missions:mission,events:{state:()=>activeEvent},traffic:{cars:[1,2]},people:{people:[1,2,3]},player:{state:{x:0,y:0}}});
+assert.equal(loop.state().phase,GAMEPLAY_PHASES.FREE_ROAM);
+activeEvent={id:'CHASE'};let s=loop.update(1);assert.ok(s.heat>0,'police chase must raise heat');
+activeEvent=null;s=loop.update(1);assert.ok(s.heat>=0&&s.heat<=100);
+loop.advance();assert.equal(loop.state().phase,GAMEPLAY_PHASES.MISSION);
+mission.update=()=>true;s=loop.update(1/60);assert.equal(s.money,250);assert.equal(s.completed,1);assert.equal(s.phase,GAMEPLAY_PHASES.COMPLETE);
+loop.advance();assert.equal(loop.state().phase,GAMEPLAY_PHASES.MISSION);
+loop.reset();assert.equal(loop.state().money,0);assert.equal(loop.state().phase,GAMEPLAY_PHASES.FREE_ROAM);assert.equal(loop.state().trafficCount,2);assert.equal(loop.state().peopleCount,3);
+console.log('GAMEPLAY LOOP: PASS EVENT -> HEAT -> MISSION -> REWARD -> NEXT ACTIVITY');
