@@ -1,0 +1,20 @@
+import { strict as assert } from 'node:assert';
+import { createBlackBox } from '../src/game/black_box.js';
+
+const box=createBlackBox({capacity:32,eventCapacity:32});
+box.start();
+box.sample({game:{x:0,y:0,speed:260,maxSpeed:320,distance:10,collisions:0,trafficHits:0},ai:{mode:'CRUISE',control:{throttle:1,brake:0,steer:0},decisions:5,prediction:{risk:0,ttc:4}}},.1);
+box.sample({game:{x:20,y:0,speed:250,maxSpeed:320,distance:30,collisions:1,trafficHits:0},ai:{mode:'BRAKE',control:{throttle:0,brake:.9,steer:.8},decisions:8,prediction:{risk:1,ttc:.7}}},.1);
+box.sample({game:{x:32,y:0,speed:240,maxSpeed:320,distance:42,collisions:1,trafficHits:1},ai:{mode:'RECOVER',control:{throttle:0,brake:.2,steer:-.8},decisions:10,recoveries:1,prediction:{risk:.9,ttc:.9}}},.1);
+const report=box.report();
+assert.ok(report.events.some(e=>e.type==='BUILDING_COLLISION'));
+assert.ok(report.events.some(e=>e.type==='TRAFFIC_CONTACT'));
+assert.ok(report.events.some(e=>e.type==='NEAR_MISS'));
+assert.ok(report.events.some(e=>e.type==='RECOVERY'));
+assert.ok(report.summary.predictionWarnings>0);
+assert.ok(report.summary.hardBrakes>0);
+assert.ok(report.summary.steeringSpikes>0);
+assert.ok(report.findings.some(f=>f.code==='WALL_CONTACT'));
+assert.ok(report.findings.some(f=>f.code==='TRAFFIC_CONTACT'));
+assert.ok(report.findings.some(f=>f.code==='RECOVERY_LOAD')===false || report.findings.some(f=>f.code==='RECOVERY_LOAD'));
+console.log('BLACK BOX DIAGNOSTICS SMOKE: PASS');
