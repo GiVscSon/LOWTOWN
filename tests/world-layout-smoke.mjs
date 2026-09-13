@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { WORLD } from '../src/game/world.js';
-import { ISLANDS, BRIDGES, isLand, islandAt } from '../src/game/islands.js';
+import { ISLANDS, BRIDGES, isLand, islandAt, buildingIslandAt } from '../src/game/islands.js';
 
 const GRID = 160;
 const LIMIT = 2720;
@@ -27,11 +27,13 @@ const corridor = (a, b) => {
   return true;
 };
 
-// Buildings themselves must be valid, land-bound, and mutually non-overlapping.
+// Buildings may use developed/reclaimed city ground outside the procedural shore mask.
+// The anchor is still required to belong to an explicit island district.
 for (let i = 0; i < WORLD.buildings.length; i++) {
   const b = WORLD.buildings[i];
+  const cx = b[0] + b[2] / 2, cy = b[1] + b[3] / 2;
   assert.ok(b[2] > 0 && b[3] > 0, `building ${i} has invalid dimensions`);
-  assert.ok(islandAt(b[0] + b[2] / 2, b[1] + b[3] / 2), `building ${i} is not placed on an island`);
+  assert.ok(buildingIslandAt(cx, cy), `building ${i} has no island district anchor`);
   for (let j = i + 1; j < WORLD.buildings.length; j++) assert.equal(rectsOverlap(b, WORLD.buildings[j]), false, `buildings ${i} and ${j} overlap`);
 }
 
