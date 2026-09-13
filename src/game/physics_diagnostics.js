@@ -1,7 +1,7 @@
 const finite=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-function predictLongitudinal(previous,current,p,input,dt){
+function predictLongitudinal(previous,p,input,dt){
   const mass=Math.max(1,finite(p.mass,1));
   const speed=Math.max(0,Math.abs(finite(previous.forwardSpeed,finite(previous.speed))));
   const throttle=clamp(finite(input.throttle),-1,1);
@@ -10,22 +10,28 @@ function predictLongitudinal(previous,current,p,input,dt){
   const brakeDecel=brake*finite(p.brakeForce)/mass;
   const rolling=finite(p.rollingResistance)*speed;
   const dragBase=clamp(finite(p.drag,1),0,1);
-  const handbrake=!!input.handbrake;
-  const drag=handbrake?clamp(finite(p.handbrakeDrag,dragBase),0,1):dragBase;
+  const drag=input.handbrake?clamp(finite(p.handbrakeDrag,dragBase),0,1):dragBase;
   const aero=1/(1+finite(p.aeroDrag)*speed*speed*Math.max(.001,dt));
   const dragDecel=speed>0?speed*(1-Math.pow(drag,Math.max(.001,dt)*60)*aero)/Math.max(.001,dt):0;
-  return {drive,brakeDecel,rollingDecel:rolling,dragDecel,longitudinalExpected:drive-Math.sign(finite(previous.forwardSpeed,1))*(brakeDecel+rolling+dragDecel)};
+  const direction=Math.sign(finite(previous.forwardSpeed,1))||1;
+  return {drive,brakeDecel,rollingDecel:rolling,dragDecel,longitudinalExpected:drive-direction*(brakeDecel+rolling+dragDecel)};
 }
 
 export function diagnosePhysicsSample(previous,current,dt=0){
   const a=previous||{},b=current||{},p=b.physics||a.physics||{},input=b.input||b.control||b.controls||{},telemetry=b.telemetry||{};
   const h=Math.max(.001,finite(dt,.001));
   const mass=Math.max(1,finite(p.mass,1));
-  const longitudinal=p.type==='CAR'||b.vehicleType==='CAR'||!p.type?predictLongitudinal(a,b,p,input,h):{drive:finite(input.throttle)*finite(p.engineForce)/mass,brakeDecel:finite(input.brake)*finite(p.brakeForce)/mass,rollingDecel:0,dragDecel:0,longitudinalExpected:finite(input.throttle)*finite(p.engineForce)/mass-finite(input.brake)*finite(p.brakeForce)/mass};
+  const isCar=p.type==='CAR'||b.vehicleType==='CAR'||!p.type;
+  const longitudinal=isCar?predictLongitudinal(a,p,input,h):{drive:finite(input.throttle)*finite(p.engineForce)/mass,brakeDecel:finite(input.brake)*finite(p.brakeForce)/mass,rollingDecel:0,dragDecel:0,longitudinalExpected:finite(input.throttle)*finite(p.engineForce)/mass-finite(input.brake)*finite(p.brakeForce)/mass};
   const prevSpeed=finite(a.forwardSpeed,finite(a.speed));
   const currSpeed=finite(b.forwardSpeed,finite(b.speed));
   const actualAcceleration=(currSpeed-prevSpeed)/h;
   const accelerationError=actualAcceleration-longitudinal.longitudinalExpected;
+  const direction=Math.sign(prevSpeed)||Math.sign(currSpeed)||1;
+  const inferredDrive=Math.max(0,actualAcceleration+direction*(longitudinal.rollingDecel+longitudinal.dragDecel+longitudinal.brakeDecel));
+  const inferredBrake=Math.max(0,direction*(longitudinal.drive-longitudinal.rollingDecel-longitudinal.dragDecel-actualAcceleration));
+  const driveScale=Math.abs(longitudinal.drive)>.05?inferredDrive/Math.abs(longitudinal.drive):NaN;
+  const brakeScale=longitudinal.brakeDecel>.05?inferredBrake/longitudinal.brakeDecel:NaN;
   const steeringRate=finite(p.steeringRate);
   const prevHeading=finite(a.heading,finite(a.a));
   const currHeading=finite(b.heading,finite(b.a));
@@ -36,22 +42,31 @@ export function diagnosePhysicsSample(previous,current,dt=0){
   const speedAuthority=clamp(Math.abs(currSpeed)/Math.max(1,finite(p.steeringAuthoritySpeed,55)),0,1);
   const expectedYawRate=finite(input.steer)*steeringRate*speedAuthority*(currSpeed>=0?1:-1);
   const steeringError=actualYawRate-expectedYawRate;
+  const steeringScale=Math.abs(expectedYawRate)>.03?actualYawRate/expectedYawRate:NaN;
+  const turnRadius=Math.abs(actualYawRate)>.001?Math.abs(currSpeed/actualYawRate):Infinity;
   const targetSpeed=finite(b.targetSpeed,finite(b.ai?.targetSpeed,NaN));
   const maxSpeed=finite(p.maxSpeed,finite(p.maxForwardSpeed,NaN));
   const speedLimitViolation=Number.isFinite(targetSpeed)&&Number.isFinite(maxSpeed)?targetSpeed>maxSpeed+.001:false;
-  return {vehicleId:b.vehicleId||a.vehicleId||null,vehicleType:b.vehicleType||a.vehicleType||null,mass,expectedDrive:longitudinal.drive,expectedBrake:longitudinal.brakeDecel,expectedRollingResistance:longitudinal.rollingDecel,expectedDrag:longitudinal.dragDecel,longitudinalExpected:longitudinal.longitudinalExpected,actualAcceleration,accelerationError,steeringRate,expectedYawRate,actualYawRate,steeringError,targetSpeed,maxSpeed,speedLimitViolation,telemetryAvailable:Object.keys(telemetry).length>0};
+  return {vehicleId:b.vehicleId||a.vehicleId||null,vehicleType:b.vehicleType||a.vehicleType||null,mass,expectedDrive:longitudinal.drive,expectedBrake:longitudinal.brakeDecel,expectedRollingResistance:longitudinal.rollingDecel,expectedDrag:longitudinal.dragDecel,longitudinalExpected:longitudinal.longitudinalExpected,actualAcceleration,accelerationError,inferredDrive,inferredBrake,driveScale:Number.isFinite(driveScale)?driveScale:NaN,brakeScale:Number.isFinite(brakeScale)?brakeScale:NaN,steeringRate,expectedYawRate,actualYawRate,steeringError,steeringScale:Number.isFinite(steeringScale)?steeringScale:NaN,turnRadius,targetSpeed,maxSpeed,speedLimitViolation,telemetryAvailable:Object.keys(telemetry).length>0};
 }
 
 export function createPhysicsDiagnostics({capacity=600}={}){
   const samples=[];
-  const summary={samples:0,accelerationErrorAbs:0,steeringErrorAbs:0,maxAccelerationError:0,maxSteeringError:0,speedLimitViolations:0,vehicles:{}};
+  const summary={samples:0,accelerationErrorAbs:0,accelerationErrorSigned:0,steeringErrorAbs:0,steeringErrorSigned:0,driveScales:[],brakeScales:[],steeringScales:[],maxAccelerationError:0,maxSteeringError:0,speedLimitViolations:0,vehicles:{}};
   function sample(previous,current,dt){
     const d=diagnosePhysicsSample(previous,current,dt);samples.push(d);if(samples.length>capacity)samples.splice(0,samples.length-capacity);
-    summary.samples++;summary.accelerationErrorAbs+=Math.abs(d.accelerationError);summary.steeringErrorAbs+=Math.abs(d.steeringError);summary.maxAccelerationError=Math.max(summary.maxAccelerationError,Math.abs(d.accelerationError));summary.maxSteeringError=Math.max(summary.maxSteeringError,Math.abs(d.steeringError));if(d.speedLimitViolation)summary.speedLimitViolations++;
-    const id=d.vehicleId||'unknown';const v=summary.vehicles[id]||(summary.vehicles[id]={samples:0,accelerationErrorAbs:0,steeringErrorAbs:0,maxAccelerationError:0,maxSteeringError:0,speedLimitViolations:0});v.samples++;v.accelerationErrorAbs+=Math.abs(d.accelerationError);v.steeringErrorAbs+=Math.abs(d.steeringError);v.maxAccelerationError=Math.max(v.maxAccelerationError,Math.abs(d.accelerationError));v.maxSteeringError=Math.max(v.maxSteeringError,Math.abs(d.steeringError));if(d.speedLimitViolation)v.speedLimitViolations++;
+    summary.samples++;summary.accelerationErrorAbs+=Math.abs(d.accelerationError);summary.accelerationErrorSigned+=d.accelerationError;summary.steeringErrorAbs+=Math.abs(d.steeringError);summary.steeringErrorSigned+=d.steeringError;
+    if(Number.isFinite(d.driveScale)&&d.expectedDrive>.05)summary.driveScales.push(d.driveScale);
+    if(Number.isFinite(d.brakeScale)&&d.expectedBrake>.05)summary.brakeScales.push(d.brakeScale);
+    if(Number.isFinite(d.steeringScale)&&Math.abs(d.expectedYawRate)>.03)summary.steeringScales.push(d.steeringScale);
+    summary.maxAccelerationError=Math.max(summary.maxAccelerationError,Math.abs(d.accelerationError));summary.maxSteeringError=Math.max(summary.maxSteeringError,Math.abs(d.steeringError));if(d.speedLimitViolation)summary.speedLimitViolations++;
+    const id=d.vehicleId||'unknown';const v=summary.vehicles[id]||(summary.vehicles[id]={samples:0,accelerationErrorAbs:0,accelerationErrorSigned:0,steeringErrorAbs:0,steeringErrorSigned:0,driveScales:[],brakeScales:[],steeringScales:[],maxAccelerationError:0,maxSteeringError:0,speedLimitViolations:0});
+    v.samples++;v.accelerationErrorAbs+=Math.abs(d.accelerationError);v.accelerationErrorSigned+=d.accelerationError;v.steeringErrorAbs+=Math.abs(d.steeringError);v.steeringErrorSigned+=d.steeringError;
+    if(Number.isFinite(d.driveScale)&&d.expectedDrive>.05)v.driveScales.push(d.driveScale);if(Number.isFinite(d.brakeScale)&&d.expectedBrake>.05)v.brakeScales.push(d.brakeScale);if(Number.isFinite(d.steeringScale)&&Math.abs(d.expectedYawRate)>.03)v.steeringScales.push(d.steeringScale);
+    v.maxAccelerationError=Math.max(v.maxAccelerationError,Math.abs(d.accelerationError));v.maxSteeringError=Math.max(v.maxSteeringError,Math.abs(d.steeringError));if(d.speedLimitViolation)v.speedLimitViolations++;
     return d;
   }
-  function report(){const s=summary,vehicles={};for(const [id,v] of Object.entries(s.vehicles))vehicles[id]={...v,meanAccelerationError:v.samples?+(v.accelerationErrorAbs/v.samples).toFixed(5):0,meanSteeringError:v.samples?+(v.steeringErrorAbs/v.samples).toFixed(5):0};return {version:1,samples:s.samples,meanAccelerationError:s.samples?+(s.accelerationErrorAbs/s.samples).toFixed(5):0,meanSteeringError:s.samples?+(s.steeringErrorAbs/s.samples).toFixed(5):0,maxAccelerationError:+s.maxAccelerationError.toFixed(5),maxSteeringError:+s.maxSteeringError.toFixed(5),speedLimitViolations:s.speedLimitViolations,vehicles,recent:samples.slice(-120)};}
-  function reset(){samples.length=0;Object.assign(summary,{samples:0,accelerationErrorAbs:0,steeringErrorAbs:0,maxAccelerationError:0,maxSteeringError:0,speedLimitViolations:0,vehicles:{}});}
+  function report(){const s=summary,mean=a=>a.length?a.reduce((x,v)=>x+v,0)/a.length:1,vehicles={};for(const [id,v] of Object.entries(s.vehicles))vehicles[id]={...v,meanAccelerationError:v.samples?+(v.accelerationErrorSigned/v.samples).toFixed(5):0,meanAccelerationAbs:v.samples?+(v.accelerationErrorAbs/v.samples).toFixed(5):0,meanSteeringError:v.samples?+(v.steeringErrorSigned/v.samples).toFixed(5):0,meanSteeringAbs:v.samples?+(v.steeringErrorAbs/v.samples).toFixed(5):0,driveScale:mean(v.driveScales),brakeScale:mean(v.brakeScales),steeringScale:mean(v.steeringScales)};return {version:2,samples:s.samples,meanAccelerationError:s.samples?+(s.accelerationErrorSigned/s.samples).toFixed(5):0,meanAccelerationAbs:s.samples?+(s.accelerationErrorAbs/s.samples).toFixed(5):0,meanSteeringError:s.samples?+(s.steeringErrorSigned/s.samples).toFixed(5):0,meanSteeringAbs:s.samples?+(s.steeringErrorAbs/s.samples).toFixed(5):0,driveScale:mean(s.driveScales),brakeScale:mean(s.brakeScales),steeringScale:mean(s.steeringScales),maxAccelerationError:+s.maxAccelerationError.toFixed(5),maxSteeringError:+s.maxSteeringError.toFixed(5),speedLimitViolations:s.speedLimitViolations,vehicles,recent:samples.slice(-120)};}
+  function reset(){samples.length=0;Object.assign(summary,{samples:0,accelerationErrorAbs:0,accelerationErrorSigned:0,steeringErrorAbs:0,steeringErrorSigned:0,driveScales:[],brakeScales:[],steeringScales:[],maxAccelerationError:0,maxSteeringError:0,speedLimitViolations:0,vehicles:{}});}
   return {sample,report,reset,state:summary};
 }
