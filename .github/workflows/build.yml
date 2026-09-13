@@ -40,6 +40,8 @@ jobs:
         run: node tests/ai-character-vehicle-smoke.mjs
       - name: Test real AI character closed loop
         run: node tests/ai-character-real-closed-loop-smoke.mjs
+      - name: Test autonomous AI citizen
+        run: node tests/ai-citizen-smoke.mjs
       - name: Test transport AI closed-loop stress
         run: node tests/transport-ai-closed-loop-stress.mjs
       - name: Test transport AI closed-loop matrix
