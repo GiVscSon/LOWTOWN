@@ -38,6 +38,14 @@ jobs:
         run: node tests/dynamic-bicycle-smoke.mjs
       - name: Test transport contact chain
         run: node tests/transport-contact-trace-smoke.mjs
+      - name: Test surface physics
+        run: node tests/surface-physics-smoke.mjs
+      - name: Test axle balance and drivetrain traction
+        run: node tests/axle-balance-smoke.mjs
+      - name: Test collision physics
+        run: node tests/collision-physics-smoke.mjs
+      - name: Test differentiated vehicle handling
+        run: node tests/handling-character-smoke.mjs
       - name: Test AI character vehicle closed loop
         run: node tests/ai-character-vehicle-smoke.mjs
       - name: Test real AI character closed loop
