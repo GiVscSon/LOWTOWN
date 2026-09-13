@@ -5,9 +5,9 @@ const FERRY_ROUTES = [
   { id:'LOWTOWN_IRON_FERRY', from:'LOWTOWN', to:'IRON_HARBOR', a:{x:750,y:-300}, b:{x:975,y:-300}, speed:105 }
 ];
 const AIR_ROUTES = [
-  { id:'LOWTOWN_NORTH_AIR', from:'LOWTOWN', to:'NORTH_RIDGE', a:{x:120,y:640}, b:{x:300,y:1520}, speed:420 },
+  { id:'LOWTOWN_NORTH_AIR', from:'LOWTOWN', to:'NORTH_RIDGE', a:{x:120,y:640}, b:{x:300,y:1360}, speed:420 },
   { id:'LOWTOWN_IRON_AIR', from:'LOWTOWN', to:'IRON_HARBOR', a:{x:120,y:640}, b:{x:1150,y:260}, speed:420 },
-  { id:'IRON_NORTH_AIR', from:'IRON_HARBOR', to:'NORTH_RIDGE', a:{x:1850,y:420}, b:{x:300,y:1520}, speed:420 }
+  { id:'IRON_NORTH_AIR', from:'IRON_HARBOR', to:'NORTH_RIDGE', a:{x:1850,y:420}, b:{x:300,y:1360}, speed:420 }
 ];
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const islandById=id=>ISLANDS.find(i=>i.id===id)||null;
