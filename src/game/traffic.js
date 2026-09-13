@@ -10,6 +10,7 @@ export function createTrafficSystem({nodes,blocked,seed=1337}){
  for(let i=0;i<26;i++){const n=pick(),t=types[(rand()*types.length)|0],nx=n.links[0];cars.push({x:n.x,y:n.y,a:nx?Math.atan2(nx.y-n.y,nx.x-n.x):rand()*6.28,v:t[1],targetSpeed:t[1]+rand()*(t[2]-t[1]),route:routeFrom(n),index:1,lane:(rand()<.5?-1:1)*22,type:t[0],stuck:0,brake:0,siren:0})}
  const aiMode=new URLSearchParams(location.search).has('autotest');
  const ai=aiMode?createAIDriver({nodes,blocked,getTraffic:()=>cars}):null;
+ if(ai)globalThis.__LOWTOWN_AI=ai.state;
  function applyAI(player,control,dt){
   if(!control)return;
   const c=player,sub=Math.max(1,Math.ceil(dt/(1/120))),h=dt/sub;
