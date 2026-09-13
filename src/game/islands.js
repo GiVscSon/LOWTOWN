@@ -21,8 +21,8 @@ export const ISLANDS = [
 
 export const BRIDGES = [
   { id: 'EAST_BRIDGE', a: { x: 640, y: 160 }, b: { x: 1120, y: 160 }, width: 70 },
-  // Starts on actual LOWTOWN land, then crosses water and reaches NORTH RIDGE.
-  { id: 'NORTH_BRIDGE', a: { x: -320, y: 800 }, b: { x: 0, y: 1200 }, width: 90 }
+  // Grid-aligned endpoint keeps the bridge connected to the road graph.
+  { id: 'NORTH_BRIDGE', a: { x: -320, y: 800 }, b: { x: 0, y: 1120 }, width: 90 }
 ];
 
 const ellipse = (x, y, island) => {
