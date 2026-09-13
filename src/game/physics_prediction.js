@@ -2,6 +2,7 @@ import { TRANSPORT_TYPES } from './transport_constants.js';
 import { stepCarPhysics } from './car_physics.js';
 import { stepBoatPhysics } from './boat_physics.js';
 import { stepPlanePhysics } from './plane_physics.js';
+import { stepArcadeCar } from './arcade_car_physics.js';
 import { applyActuatorDelay } from './vehicle_safety.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -9,7 +10,10 @@ const finite=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
 const DEFAULT_RESPONSE=Object.freeze({steer:12,throttle:8,brake:16,climb:8,descend:8});
 
 function physicsStep(state,dt,input,physics){
-  if(state.type===TRANSPORT_TYPES.CAR)return stepCarPhysics(state,dt,input,physics);
+  if(state.type===TRANSPORT_TYPES.CAR){
+    if(physics?.model==='arcade-bicycle-swept')return stepArcadeCar(state,dt,input,physics);
+    return stepCarPhysics(state,dt,input,physics);
+  }
   if(state.type===TRANSPORT_TYPES.BOAT)return stepBoatPhysics(state,dt,input,physics);
   if(state.type===TRANSPORT_TYPES.PLANE)return stepPlanePhysics(state,dt,input,physics);
   throw new Error(`Unsupported transport type: ${state.type}`);
