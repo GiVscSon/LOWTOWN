@@ -18,11 +18,12 @@ export function createTrajectoryLab({ simulate, trafficRisk, blocked = () => fal
     const turnSpeed = clamp(speed, 0, 120);
     if (turn === 'TURN_AROUND') {
       const lowSpeedTurn = speed < 75;
+      const turnThrottle = speed < 25 ? 0.72 : speed < 50 ? 0.65 : speed < 75 ? 0.58 : 0.35;
       return [
-        { id: 'TURN_LEFT', steer: sign * 1, throttle: lowSpeedTurn ? 0.9 : 0.35, brake: 0, horizon: lowSpeedTurn ? 0.85 : 1.0, maneuver: 'TURN_AROUND' },
-        { id: 'TURN_RIGHT', steer: -sign * 1, throttle: lowSpeedTurn ? 0.9 : 0.35, brake: 0, horizon: lowSpeedTurn ? 0.85 : 1.0, maneuver: 'TURN_AROUND' },
-        { id: 'BRAKE_TURN', steer: sign * 0.8, throttle: lowSpeedTurn ? 0.72 : 0.18, brake: lowSpeedTurn ? 0 : 0.85, horizon: 1.0, maneuver: 'TURN_AROUND' },
-        { id: 'COAST_ALIGN', steer: sign * 0.55, throttle: lowSpeedTurn ? 0.62 : 0.18, brake: lowSpeedTurn ? 0 : 0.25, horizon: 1.2, maneuver: 'TURN_AROUND' },
+        { id: 'TURN_LEFT', steer: sign * 1, throttle: turnThrottle, brake: 0, horizon: lowSpeedTurn ? 0.85 : 1.0, maneuver: 'TURN_AROUND' },
+        { id: 'TURN_RIGHT', steer: -sign * 1, throttle: turnThrottle, brake: 0, horizon: lowSpeedTurn ? 0.85 : 1.0, maneuver: 'TURN_AROUND' },
+        { id: 'BRAKE_TURN', steer: sign * 0.8, throttle: lowSpeedTurn ? Math.min(0.62, turnThrottle) : 0.18, brake: lowSpeedTurn ? 0 : 0.85, horizon: 1.0, maneuver: 'TURN_AROUND' },
+        { id: 'COAST_ALIGN', steer: sign * 0.55, throttle: lowSpeedTurn ? Math.min(0.55, turnThrottle) : 0.18, brake: lowSpeedTurn ? 0 : 0.25, horizon: 1.2, maneuver: 'TURN_AROUND' },
         { id: 'FULL_BRAKE', steer: 0, throttle: 0, brake: 1, horizon: 0.8, maneuver: 'STOP' }
       ];
     }
@@ -58,20 +59,7 @@ export function createTrajectoryLab({ simulate, trafficRisk, blocked = () => fal
       const stopBonus = className === 'TURN_AROUND' && candidate.id === 'FULL_BRAKE' && speed > 180 ? 80 : 0;
       const progress = target ? -targetDistance * 0.75 : result.speed * 0.12;
       const score = progress + turnBonus + directionBonus + lowSpeedTurnBonus + stopBonus - wallPenalty - risk.risk * 5 - collisionPenalty - alignment * 12 - Math.abs(candidate.steer) * 8;
-      return {
-        ...candidate,
-        safe: !!result.safe,
-        x: result.x,
-        y: result.y,
-        speed: result.speed,
-        minWall: result.minWall,
-        collisionT: result.collisionT,
-        trafficRisk: risk.risk,
-        ttc: risk.minTtc,
-        targetDistance,
-        alignment,
-        score
-      };
+      return { ...candidate, safe: !!result.safe, x: result.x, y: result.y, speed: result.speed, minWall: result.minWall, collisionT: result.collisionT, trafficRisk: risk.risk, ttc: risk.minTtc, targetDistance, alignment, score };
     });
 
     const safe = evaluated.filter(c => c.safe && Number.isFinite(c.score));
@@ -92,17 +80,7 @@ export function createTrajectoryLab({ simulate, trafficRisk, blocked = () => fal
       cause = `CURVATURE_${curvature.toFixed(2)}`;
     }
 
-    return {
-      maneuver: className,
-      selected: selected ? { ...selected } : null,
-      candidates: evaluated,
-      safeCandidates: safe.length,
-      candidateCount: evaluated.length,
-      risk: selected ? selected.trafficRisk : Infinity,
-      reason,
-      cause,
-      rejectedUnsafe
-    };
+    return { maneuver: className, selected: selected ? { ...selected } : null, candidates: evaluated, safeCandidates: safe.length, candidateCount: evaluated.length, risk: selected ? selected.trafficRisk : Infinity, reason, cause, rejectedUnsafe };
   }
 
   return { evaluate, maneuverClass, buildCandidates };
