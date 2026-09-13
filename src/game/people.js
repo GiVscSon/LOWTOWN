@@ -4,13 +4,14 @@ import { sidewalkPoint, pedestrianRoute } from './city_semantics.js';
 export function createPeopleSystem({ nodes, blocked, seed = 4242, city = false }) {
   let state = seed >>> 0;
   const people = [];
-  const activeNodes=(city&&globalThis.__LOWTOWN_CITY_GRAPH?.length?globalThis.__LOWTOWN_CITY_GRAPH:nodes);
+  const activeNodes=(globalThis.__LOWTOWN_CITY_GRAPH?.length?globalThis.__LOWTOWN_CITY_GRAPH:nodes);
+  const useSemantic=city||activeNodes.some(n=>n?.roadId);
   const rand = () => { state = (state * 1664525 + 1013904223) >>> 0; return state / 4294967296; };
   const pick = () => activeNodes[(rand() * activeNodes.length) | 0];
   const sprite = key => { const i = new Image(); i.src = PED_ASSETS[key]; return i; };
   const sprites = { civilian: sprite('civilian'), runner: sprite('runner') };
-  const makeTarget = n => city && n?.roadId ? sidewalkPoint(n.roadId, n.index, rand() < .5 ? -1 : 1) : n;
-  const makeRoute = (p, target) => city && target?.x != null ? pedestrianRoute({x:p.x,y:p.y},{x:target.x,y:target.y}) : [target];
+  const makeTarget = n => useSemantic && n?.roadId ? sidewalkPoint(n.roadId, n.index, rand() < .5 ? -1 : 1) : n;
+  const makeRoute = (p, target) => useSemantic && target?.x != null ? pedestrianRoute({x:p.x,y:p.y},{x:target.x,y:target.y}) : [target];
   for (let i = 0; i < Math.min(48, activeNodes.length); i++) {
     const n = pick(), target = makeTarget(pick());
     people.push({ x:n.x+(rand()-.5)*28, y:n.y+(rand()-.5)*28, a:rand()*Math.PI*2, v:22+rand()*20, state:'walk', timer:rand()*4, tone:rand(), target, route:makeRoute({x:n.x,y:n.y},target), waypoint:0, panic:0 });
