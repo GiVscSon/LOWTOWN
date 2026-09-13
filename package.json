@@ -16,7 +16,8 @@
     "test:transport-ai-closed-loop-matrix": "node tests/transport-ai-closed-loop-matrix.mjs",
     "test:vehicle-safety": "node tests/vehicle-safety-smoke.mjs",
     "test:calibration-acceptance": "node tests/calibration-acceptance-smoke.mjs",
-    "test:physics-prediction": "node tests/physics-prediction-smoke.mjs"
+    "test:physics-prediction": "node tests/physics-prediction-smoke.mjs",
+    "test:trajectory-kernel-safety": "node tests/trajectory-kernel-safety-smoke.mjs"
   },
   "devDependencies": {
     "vite": "^7.1.5"
