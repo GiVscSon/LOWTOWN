@@ -1,4 +1,5 @@
 import './mobile_controls_v2.css';
+import './mobile_drive_bridge.js';
 
 export function createMobileControlsV2(){
   const root=document.createElement('div');
@@ -22,7 +23,6 @@ export function createMobileControlsV2(){
   root.addEventListener('contextmenu',e=>e.preventDefault());window.addEventListener('blur',clear);document.addEventListener('visibilitychange',()=>{if(document.hidden){clear();releaseHB();}});
   return{root,destroy:()=>{clear();releaseHB();root.remove();}};
 }
-
 if(typeof window!=='undefined'){
   const install=()=>{const mobile=matchMedia('(pointer:coarse)').matches||innerWidth<=1100;if(!mobile)return false;const wrap=document.querySelector('.game-wrap');if(!wrap)return false;if(wrap.querySelector('.lowtown-mobile-controls'))return true;const controls=createMobileControlsV2();wrap.appendChild(controls.root);document.documentElement.classList.add('mobile-controls-v2-ready');return true;};
   const boot=()=>{if(install())return;let tries=0;const timer=setInterval(()=>{if(install()||++tries>80)clearInterval(timer);},100);};
