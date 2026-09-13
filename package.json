@@ -21,7 +21,8 @@
     "test:dynamic-bicycle": "node tests/dynamic-bicycle-smoke.mjs",
     "test:transport-contact-trace": "node tests/transport-contact-trace-smoke.mjs",
     "test:gameplay-content": "node tests/gameplay-content-smoke.mjs",
-    "test:gameplay-loop": "node tests/gameplay-loop-smoke.mjs"
+    "test:gameplay-loop": "node tests/gameplay-loop-smoke.mjs",
+    "test:player-drive": "node tests/player-drive-smoke.mjs"
   },
   "devDependencies": {
     "vite": "^7.1.5"
