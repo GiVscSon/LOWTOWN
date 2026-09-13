@@ -4,6 +4,7 @@ import { createTrafficSystem } from './game/traffic.js';
 import { createMissionSystem } from './game/missions.js';
 import { createPeopleSystem } from './game/people.js';
 import { createEventSystem } from './game/events.js';
+import { createAIDriver } from './game/ai_driver.js';
 
 const app = document.querySelector('#app');
 app.innerHTML = `<main class="shell"><header class="hud"><div class="brand"><span>LOW</span>TOWN <b>// NIGHT SHIFT</b></div><div class="status"><i></i> FREE ROAM <strong id="speed">000</strong> KM/H</div></header><section class="game-wrap"><canvas id="game"></canvas><div class="mission"><small id="job-id">JOB 01</small><strong id="job-title">SHAKE THE NIGHT</strong><span id="job-text">Drive to the amber marker.</span></div><div class="hint">WASD / ARROWS · SPACE HANDBRAKE · R RESET · N NEXT JOB</div><div class="toast" id="toast">ENGINE READY</div><div class="touch" aria-label="Touch controls"><button data-key="arrowup">▲</button><div><button data-key="arrowleft">◀</button><button data-key=" ">■</button><button data-key="arrowright">▶</button></div><button data-key="arrowdown">▼</button></div></section></main>`;
@@ -50,21 +51,7 @@ const S = {
   distance: 0,
   missionReward: 0,
   collisionCooldown: 0,
-  test: {
-    active: testMode,
-    node: 0,
-    route: [],
-    lap: 0,
-    lastX: 0,
-    lastY: 0,
-    timer: 0,
-    recoveries: 0,
-    visited: new Set(),
-    contact: 0,
-    sensor: { front: 999, left: 999, right: 999, frontLeft: 999, frontRight: 999 },
-    replans: 0,
-    safeStarts: 0
-  }
+  test: { active: testMode }
 };
 
 function resize() {
@@ -96,14 +83,11 @@ function roads() {
   ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
   for (let i = -1600; i <= 1600; i += GRID) {
     const a = iso(i, -1700), b = iso(i, 1700), c = iso(-1700, i), d = iso(1700, i);
-    ctx.strokeStyle = '#272a2f';
-    ctx.lineWidth = 92;
+    ctx.strokeStyle = '#272a2f'; ctx.lineWidth = 92;
     ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.stroke();
   }
-  ctx.setLineDash([18, 20]);
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = 'rgba(224,154,62,.28)';
+  ctx.setLineDash([18, 20]); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(224,154,62,.28)';
   for (let i = -1600; i <= 1600; i += GRID) {
     const a = iso(i, -1700), b = iso(i, 1700), c = iso(-1700, i), d = iso(1700, i);
     ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
@@ -120,8 +104,7 @@ function building(x, y, w, h) {
   for (let yy = 18; yy < h; yy += 38) for (let xx = 22; xx < w; xx += 48) {
     if (((xx + yy) / 38 | 0) % 3 === 0) continue;
     const p = iso(x + xx, y + yy);
-    ctx.fillStyle = 'rgba(224,154,62,.32)';
-    ctx.fillRect(p.x - 3, p.y - 2, 6, 4);
+    ctx.fillStyle = 'rgba(224,154,62,.32)'; ctx.fillRect(p.x - 3, p.y - 2, 6, 4);
   }
 }
 function lamp(x, y) {
@@ -132,25 +115,16 @@ function lamp(x, y) {
 }
 function target() {
   const p = iso(S.target.x, S.target.y), r = 18 + Math.sin(S.t * 5) * 4;
-  ctx.strokeStyle = '#e09a3e'; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = '#e09a3e'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
   ctx.fillStyle = 'rgba(224,154,62,.18)'; ctx.fill();
-  ctx.fillStyle = '#e09a3e'; ctx.font = 'bold 10px monospace'; ctx.textAlign = 'center';
-  ctx.fillText('DROP', p.x, p.y - 27);
+  ctx.fillStyle = '#e09a3e'; ctx.font = 'bold 10px monospace'; ctx.textAlign = 'center'; ctx.fillText('DROP', p.x, p.y - 27);
 }
 function car() {
   const p = iso(S.car.x, S.car.y);
-  ctx.save();
-  ctx.translate(p.x, p.y);
-  ctx.rotate(-S.car.a - .15);
-  ctx.shadowColor = 'rgba(0,0,0,.65)'; ctx.shadowBlur = 16;
-  ctx.fillStyle = '#08090b'; ctx.fillRect(-22, -12, 44, 24);
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = '#e8b84a'; ctx.fillRect(-18, -9, 36, 18);
-  ctx.fillStyle = '#15171b'; ctx.fillRect(-9, -7, 16, 14);
-  ctx.fillStyle = keys.has('s') || keys.has('arrowdown') ? '#f06a4d' : '#d4523a';
-  ctx.fillRect(13, -7, 5, 4); ctx.fillRect(13, 3, 5, 4);
-  ctx.restore();
+  ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(-S.car.a - .15);
+  ctx.shadowColor = 'rgba(0,0,0,.65)'; ctx.shadowBlur = 16; ctx.fillStyle = '#08090b'; ctx.fillRect(-22, -12, 44, 24); ctx.shadowBlur = 0;
+  ctx.fillStyle = '#e8b84a'; ctx.fillRect(-18, -9, 36, 18); ctx.fillStyle = '#15171b'; ctx.fillRect(-9, -7, 16, 14);
+  ctx.fillStyle = keys.has('s') || keys.has('arrowdown') ? '#f06a4d' : '#d4523a'; ctx.fillRect(13, -7, 5, 4); ctx.fillRect(13, 3, 5, 4); ctx.restore();
 }
 function speed() { return Math.hypot(S.car.vx, S.car.vy); }
 function blocked(x, y) {
@@ -159,201 +133,47 @@ function blocked(x, y) {
 }
 function openRoad(x, y) { return !blocked(x, y); }
 function corridor(a, b) {
-  for (let i = 1; i <= 16; i++) {
-    const t = i / 16;
-    if (blocked(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)) return false;
-  }
+  for (let i = 1; i <= 16; i++) { const t = i / 16; if (blocked(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)) return false; }
   return true;
 }
 function buildRoadGraph() {
   const nodes = [], map = new Map();
   for (let x = -1280; x <= 1280; x += GRID) for (let y = -1280; y <= 1280; y += GRID) {
-    if (openRoad(x, y)) {
-      const n = { x, y, id: nodes.length, links: [] };
-      nodes.push(n); map.set(`${x},${y}`, n);
-    }
+    if (openRoad(x, y)) { const n = { x, y, id: nodes.length, links: [] }; nodes.push(n); map.set(`${x},${y}`, n); }
   }
   for (const n of nodes) for (const [dx, dy] of [[GRID, 0], [-GRID, 0], [0, GRID], [0, -GRID]]) {
-    const m = map.get(`${n.x + dx},${n.y + dy}`);
-    if (m && corridor(n, m)) n.links.push(m);
+    const m = map.get(`${n.x + dx},${n.y + dy}`); if (m && corridor(n, m)) n.links.push(m);
   }
   return nodes;
 }
 const roadNodes = buildRoadGraph();
 function nearestNode(x, y) {
   let best = roadNodes[0], bd = Infinity;
-  for (const n of roadNodes) {
-    const d = (n.x - x) ** 2 + (n.y - y) ** 2;
-    if (d < bd) { bd = d; best = n; }
-  }
+  for (const n of roadNodes) { const d = (n.x - x) ** 2 + (n.y - y) ** 2; if (d < bd) { bd = d; best = n; } }
   return best;
 }
-function findRoute(start, goal) {
-  if (!start || !goal) return [];
-  const q = [start], prev = new Map([[start, null]]);
-  while (q.length) {
-    const n = q.shift();
-    if (n === goal) break;
-    for (const m of n.links) if (!prev.has(m)) { prev.set(m, n); q.push(m); }
-  }
-  if (!prev.has(goal)) return [];
-  const out = [];
-  for (let n = goal; n; n = prev.get(n)) out.push(n);
-  return out.reverse();
-}
-function chooseNode() {
-  const origin = nearestNode(S.car.x, S.car.y);
-  const candidates = roadNodes.filter(n => n.links.length && Math.hypot(n.x - origin.x, n.y - origin.y) > 640 && !S.test.visited.has(n.id));
-  if (candidates.length) return candidates[(Math.random() * candidates.length) | 0];
-  const open = roadNodes.filter(n => n.links.length);
-  return open[(Math.random() * open.length) | 0] || origin;
-}
-function alignAtSafeStart() {
-  const n = nearestNode(S.car.x, S.car.y);
-  if (!n || !n.links.length) return;
-  const next = n.links[0];
-  S.car.x = n.x; S.car.y = n.y;
-  S.car.a = Math.atan2(next.y - n.y, next.x - n.x);
-  S.car.vx = 0; S.car.vy = 0;
-  S.test.safeStarts++;
-}
-function recover(reason = 'stuck') {
-  const current = nearestNode(S.car.x, S.car.y);
-  const candidates = roadNodes.filter(n => n.links.length && Math.hypot(n.x - S.car.x, n.y - S.car.y) > 90 && Math.hypot(n.x - S.car.x, n.y - S.car.y) < 300 && !blocked(n.x, n.y));
-  const n = candidates[(Math.random() * candidates.length) | 0] || current;
-  if (!n) return;
-  const next = n.links[0] || n;
-  S.car.x = n.x; S.car.y = n.y;
-  S.car.a = Math.atan2(next.y - n.y, next.x - n.x);
-  S.car.vx = 0; S.car.vy = 0;
-  S.test.recoveries++;
-  S.stuck++;
-  S.test.replans++;
-  S.test.route = [];
-  S.test.node = 0;
-  toast.textContent = reason === 'obstacle' ? 'AI AVOID // ROUTE REPLANNED' : 'AI RECOVERED';
-}
-function rayDistance(angle, max = 240) {
-  for (let d = 12; d <= max; d += 10) {
-    if (blocked(S.car.x + Math.cos(angle) * d, S.car.y + Math.sin(angle) * d)) return d;
-  }
-  return max;
-}
-function senseWorld() {
-  const a = S.car.a;
-  S.test.sensor.front = rayDistance(a, 260);
-  S.test.sensor.frontLeft = rayDistance(a - .45, 220);
-  S.test.sensor.frontRight = rayDistance(a + .45, 220);
-  S.test.sensor.left = rayDistance(a - Math.PI / 2, 150);
-  S.test.sensor.right = rayDistance(a + Math.PI / 2, 150);
-  return S.test.sensor;
-}
-function routeLookahead() {
-  if (!S.test.route.length) return nearestNode(S.car.x, S.car.y);
-  let index = Math.min(S.test.node, S.test.route.length - 1);
-  let point = S.test.route[index];
-  let remaining = 105;
-  while (index + 1 < S.test.route.length && remaining > 0) {
-    const next = S.test.route[index + 1];
-    const dx = next.x - point.x, dy = next.y - point.y;
-    const len = Math.hypot(dx, dy) || 1;
-    if (len >= remaining) return { x: point.x + dx * remaining / len, y: point.y + dy * remaining / len };
-    remaining -= len;
-    point = next;
-    index++;
-  }
-  return point;
-}
 function drive(dt, throttle, brake, steer, handbrake = false) {
-  const c = S.car;
-  const sub = Math.max(1, Math.ceil(dt / (1 / 120)));
-  const h = dt / sub;
+  const c = S.car; const sub = Math.max(1, Math.ceil(dt / (1 / 120))); const h = dt / sub;
   for (let n = 0; n < sub; n++) {
     const fx = Math.cos(c.a), fy = Math.sin(c.a), rx = -fy, ry = fx;
     const fs = c.vx * fx + c.vy * fy, ls = c.vx * rx + c.vy * ry;
     c.vx += fx * throttle * 460 * h; c.vy += fy * throttle * 460 * h;
-    if (brake) {
-      const amount = fs > 10 ? Math.min(Math.abs(fs), 760 * brake * h) : 260 * brake * h;
-      c.vx -= fx * Math.sign(fs || 1) * amount; c.vy -= fy * Math.sign(fs || 1) * amount;
-    }
-    const grip = handbrake ? 2 : 10.5;
-    const correction = Math.min(1, grip * h);
+    if (brake) { const amount = fs > 10 ? Math.min(Math.abs(fs), 760 * brake * h) : 260 * brake * h; c.vx -= fx * Math.sign(fs || 1) * amount; c.vy -= fy * Math.sign(fs || 1) * amount; }
+    const grip = handbrake ? 2 : 10.5, correction = Math.min(1, grip * h);
     c.vx -= rx * ls * correction; c.vy -= ry * ls * correction;
-    const drag = handbrake ? .972 : .993;
-    c.vx *= Math.pow(drag, h * 60); c.vy *= Math.pow(drag, h * 60);
-    const cur = c.vx * fx + c.vy * fy;
-    const authority = Math.min(1, Math.abs(cur) / 55);
+    const drag = handbrake ? .972 : .993; c.vx *= Math.pow(drag, h * 60); c.vy *= Math.pow(drag, h * 60);
+    const cur = c.vx * fx + c.vy * fy, authority = Math.min(1, Math.abs(cur) / 55);
     c.a += steer * (handbrake ? 1.65 : 1.9) * authority * h * (cur >= 0 ? 1 : -1);
-    const nfx = Math.cos(c.a), nfy = Math.sin(c.a);
-    const forward = c.vx * nfx + c.vy * nfy;
+    const nfx = Math.cos(c.a), nfy = Math.sin(c.a), forward = c.vx * nfx + c.vy * nfy;
     if (forward > 520) { const e = forward - 520; c.vx -= nfx * e; c.vy -= nfy * e; }
     if (forward < -180) { const e = forward + 180; c.vx -= nfx * e; c.vy -= nfy * e; }
     const nx = c.x + c.vx * h, ny = c.y + c.vy * h;
-    if (!blocked(nx, ny)) {
-      c.x = nx; c.y = ny;
-    } else {
+    if (!blocked(nx, ny)) { c.x = nx; c.y = ny; }
+    else {
       const oldV = speed();
-      if (!blocked(nx, c.y)) c.x = nx;
-      else if (!blocked(c.x, ny)) c.y = ny;
-      else { c.vx *= -.2; c.vy *= -.2; }
-      if (S.collisionCooldown <= 0) {
-        S.collisions++;
-        S.damage += Math.min(3, Math.max(.5, oldV / 220));
-        S.collisionCooldown = .28;
-        toast.textContent = 'BODY HIT';
-      }
+      if (!blocked(nx, c.y)) c.x = nx; else if (!blocked(c.x, ny)) c.y = ny; else { c.vx *= -.2; c.vy *= -.2; }
+      if (S.collisionCooldown <= 0) { S.collisions++; S.damage += Math.min(3, Math.max(.5, oldV / 220)); S.collisionCooldown = .28; toast.textContent = 'BODY HIT'; }
     }
-  }
-}
-function autonomousDrive(dt) {
-  const sensor = senseWorld();
-  const current = nearestNode(S.car.x, S.car.y);
-  const routeEnd = S.test.route[S.test.route.length - 1];
-  const targetReached = routeEnd && Math.hypot(routeEnd.x - S.car.x, routeEnd.y - S.car.y) < 48;
-  if (!S.test.route.length || S.test.node >= S.test.route.length || targetReached) {
-    const goal = chooseNode();
-    S.test.route = findRoute(current, goal);
-    S.test.node = Math.min(1, Math.max(0, S.test.route.length - 1));
-    if (goal) S.test.visited.add(goal.id);
-    S.test.replans++;
-    if (S.test.visited.size >= 18) { S.test.lap++; S.test.visited.clear(); }
-  }
-  while (S.test.node < S.test.route.length - 1 && Math.hypot(S.test.route[S.test.node].x - S.car.x, S.test.route[S.test.node].y - S.car.y) < 48) S.test.node++;
-
-  const look = routeLookahead();
-  const desired = Math.atan2(look.y - S.car.y, look.x - S.car.x);
-  let d = desired - S.car.a;
-  while (d > Math.PI) d -= Math.PI * 2;
-  while (d < -Math.PI) d += Math.PI * 2;
-
-  let avoid = 0;
-  if (sensor.front < 125) {
-    const leftOpen = sensor.frontLeft + sensor.left * .55;
-    const rightOpen = sensor.frontRight + sensor.right * .55;
-    avoid = leftOpen > rightOpen ? -1 : 1;
-    if (sensor.front < 62) avoid *= 1.35;
-  }
-  if (sensor.frontLeft < 48) avoid += .7;
-  if (sensor.frontRight < 48) avoid -= .7;
-
-  const steer = Math.max(-1, Math.min(1, d * 2.4 + avoid));
-  const v = speed();
-  const turn = Math.abs(d);
-  const obstacleBrake = sensor.front < 105 ? Math.min(1, (105 - sensor.front) / 65) : 0;
-  const cornerSpeed = Math.max(100, 400 - turn * 145);
-  const desiredSpeed = Math.min(cornerSpeed, 390 - obstacleBrake * 300);
-  const brake = v > desiredSpeed + 18 ? Math.min(1, (v - desiredSpeed) / 130) : 0;
-  const throttle = obstacleBrake > .82 ? 0 : v > desiredSpeed + 12 ? 0 : 1;
-  drive(dt, throttle, brake, steer, turn > 1.7 && v > 210);
-
-  S.test.timer += dt;
-  S.distance += v * dt;
-  if (sensor.front < 38) S.test.contact += dt; else S.test.contact = Math.max(0, S.test.contact - dt * 2);
-  if (S.test.contact > .22) recover('obstacle');
-  if (S.test.timer > 1.2) {
-    const moved = Math.hypot(S.car.x - S.test.lastX, S.car.y - S.test.lastY);
-    if (moved < 22 && v < 28) recover('stuck');
-    S.test.lastX = S.car.x; S.test.lastY = S.car.y; S.test.timer = 0;
   }
 }
 
@@ -361,131 +181,88 @@ const traffic = createTrafficSystem({ nodes: roadNodes, blocked });
 const people = createPeopleSystem({ nodes: roadNodes, blocked });
 const events = createEventSystem({ nodes: roadNodes });
 const missions = createMissionSystem(WORLD);
+const ai = createAIDriver({ nodes: roadNodes, blocked, getTraffic: () => traffic.cars });
 
 function refreshMission() {
-  const m = missions.state();
-  const idx = missions.templates.findIndex(t => t.id === m.id);
-  S.target = m.target;
-  jobId.textContent = `JOB 0${idx + 1}`;
-  jobTitle.textContent = m.title;
-  jobText.textContent = `${m.text}  $${m.reward}`;
+  const m = missions.state(); const idx = missions.templates.findIndex(t => t.id === m.id);
+  S.target = m.target; jobId.textContent = `JOB 0${idx + 1}`; jobTitle.textContent = m.title; jobText.textContent = `${m.text}  $${m.reward}`;
 }
 function trafficCollisions() {
   const now = performance.now();
   for (const n of traffic.cars) {
     const dx = n.x - S.car.x, dy = n.y - S.car.y, d = Math.hypot(dx, dy);
     if (d < 34 && now - (n.hitAt || 0) > 550) {
-      const nx = dx / (d || 1), ny = dy / (d || 1);
-      const impact = Math.max(20, speed() - n.v);
-      S.car.vx += nx * impact * .16; S.car.vy += ny * impact * .16;
-      n.v = Math.max(15, n.v - impact * .1); n.hitAt = now;
+      const nx = dx / (d || 1), ny = dy / (d || 1), impact = Math.max(20, speed() - n.v);
+      S.car.vx += nx * impact * .16; S.car.vy += ny * impact * .16; n.v = Math.max(15, n.v - impact * .1); n.hitAt = now;
       S.trafficHits++; S.damage += Math.min(3, impact / 90); toast.textContent = 'TRAFFIC HIT';
     }
   }
 }
 function reset() {
-  S.car = { x: 0, y: 0, a: 0, vx: 0, vy: 0 };
-  S.cam = { x: 0, y: 0 };
-  S.done = false; S.damage = 0; S.collisions = 0; S.trafficHits = 0; S.stuck = 0;
-  S.maxSpeed = 0; S.distance = 0; S.collisionCooldown = 0;
-  S.test.node = 0; S.test.route = []; S.test.timer = 0; S.test.contact = 0; S.test.visited.clear(); S.test.replans = 0;
-  if (S.test.active) alignAtSafeStart();
+  S.car = { x: 0, y: 0, a: 0, vx: 0, vy: 0 }; S.cam = { x: 0, y: 0 }; S.done = false; S.damage = 0; S.collisions = 0; S.trafficHits = 0; S.stuck = 0; S.maxSpeed = 0; S.distance = 0; S.collisionCooldown = 0;
+  if (S.test.active) ai.start(S.car);
+  else { ai.state.enabled = false; const n = nearestNode(S.car.x, S.car.y); if (n?.links.length) { const next = n.links[0]; S.car.x = n.x; S.car.y = n.y; S.car.a = Math.atan2(next.y - n.y, next.x - n.x); } }
   toast.textContent = 'ENGINE READY'; toast.classList.remove('hot'); refreshMission();
 }
 
 refreshMission();
+if (testMode) reset();
 
 function update(dt) {
   S.collisionCooldown = Math.max(0, S.collisionCooldown - dt);
   if (keys.has('n')) { missions.next(); S.done = false; keys.delete('n'); refreshMission(); toast.textContent = 'NEW JOB'; }
   if (keys.has('r')) { reset(); keys.delete('r'); }
-  if (S.test.active) autonomousDrive(dt);
-  else {
-    const u = keys.has('w') || keys.has('arrowup');
-    const d = keys.has('s') || keys.has('arrowdown');
-    const l = keys.has('a') || keys.has('arrowleft');
-    const r = keys.has('d') || keys.has('arrowright');
-    drive(dt, u ? 1 : 0, d ? 1 : 0, (r ? 1 : 0) - (l ? 1 : 0), keys.has(' '));
-    S.distance += speed() * dt;
+  if (S.test.active) {
+    const control = ai.update(S.car, dt);
+    if (control) drive(dt, control.throttle, control.brake, control.steer, control.handbrake);
+    S.distance = ai.state.distance;
+    S.test.recoveries = ai.state.recoveries;
+  } else {
+    const u = keys.has('w') || keys.has('arrowup'), d = keys.has('s') || keys.has('arrowdown'), l = keys.has('a') || keys.has('arrowleft'), r = keys.has('d') || keys.has('arrowright');
+    drive(dt, u ? 1 : 0, d ? 1 : 0, (r ? 1 : 0) - (l ? 1 : 0), keys.has(' ')); S.distance += speed() * dt;
   }
   events.update(dt, S.car);
   const ev = events.state();
   traffic.update(dt, S.car, ev);
   people.update(dt, S.car, ev ? 1 : 0);
   trafficCollisions();
-  if (!S.done && missions.update(S.car)) {
-    S.done = true; S.missionReward += missions.state().reward;
-    S.car.vx *= .45; S.car.vy *= .45;
-    toast.textContent = `JOB COMPLETE // +$${missions.state().reward}`; toast.classList.add('hot');
-  }
-  const v = speed();
-  S.maxSpeed = Math.max(S.maxSpeed, v);
-  S.cam.x += (S.car.x - S.cam.x) * Math.min(1, dt * 5);
-  S.cam.y += (S.car.y - S.cam.y) * Math.min(1, dt * 5);
-  speedEl.textContent = String(Math.round(v * .19)).padStart(3, '0');
+  if (!S.done && missions.update(S.car)) { S.done = true; S.missionReward += missions.state().reward; S.car.vx *= .45; S.car.vy *= .45; toast.textContent = `JOB COMPLETE // +$${missions.state().reward}`; toast.classList.add('hot'); }
+  const v = speed(); S.maxSpeed = Math.max(S.maxSpeed, v); S.cam.x += (S.car.x - S.cam.x) * Math.min(1, dt * 5); S.cam.y += (S.car.y - S.cam.y) * Math.min(1, dt * 5); speedEl.textContent = String(Math.round(v * .19)).padStart(3, '0');
 }
 function drawTestOverlay() {
   if (!S.test.active) return;
-  const ev = events.state(), sensor = S.test.sensor;
+  const a = ai.state, ev = events.state();
   const lines = [
-    'AI DRIVER // LOCAL PERCEPTION',
+    `AI DRIVER // ${a.mode}`,
     `POS ${Math.round(S.car.x)},${Math.round(S.car.y)}  HEADING ${Math.round(S.car.a * 57.3)}°`,
-    `NODES ${roadNodes.length}  ROUTE ${S.test.node}/${S.test.route.length}  REPLANS ${S.test.replans}`,
-    `COLLISIONS ${S.collisions}  TRAFFIC ${S.trafficHits}  RECOVERIES ${S.test.recoveries}`,
-    `SENSE F:${Math.round(sensor.front)} FL:${Math.round(sensor.frontLeft)} FR:${Math.round(sensor.frontRight)}`,
-    `MAX ${Math.round(S.maxSpeed * .19)} KM/H  PEOPLE ${people.people.length}  EVENT ${ev?.id || 'NONE'}`
+    `NODES ${roadNodes.length} ROUTE ${a.node}/${a.route.length} REPLANS ${a.replans}`,
+    `COLLISIONS ${S.collisions} TRAFFIC ${S.trafficHits} RECOVERIES ${a.recoveries}`,
+    `SENSE F:${Math.round(a.sensor.front)} FL:${Math.round(a.sensor.frontLeft)} FR:${Math.round(a.sensor.frontRight)}`,
+    `PRED ${a.prediction.safe ? 'SAFE' : 'DANGER'} TTC:${Number.isFinite(a.prediction.ttc) ? a.prediction.ttc.toFixed(2) : '--'} RISK:${a.prediction.risk.toFixed(2)}`,
+    `CROSS ${Math.round(a.crossTrack)} CURVE ${a.curvature.toFixed(2)} DECISIONS ${a.decisions}`,
+    `MAX ${Math.round(S.maxSpeed * .19)} KM/H PEOPLE ${people.people.length} EVENT ${ev?.id || 'NONE'}`
   ];
-  ctx.save();
-  ctx.font = '11px monospace'; ctx.textAlign = 'left';
+  ctx.save(); ctx.font = '11px monospace'; ctx.textAlign = 'left';
   lines.forEach((line, i) => { ctx.fillStyle = i === 0 ? '#e8b84a' : '#a6abb1'; ctx.fillText(line, 18, 22 + i * 15); });
   ctx.restore();
 }
 function draw() {
-  S.t += 1 / 60;
-  roads();
-  buildings.forEach(b => building(...b));
-  lamps.forEach(l => lamp(...l));
-  events.draw(ctx, iso);
-  traffic.draw(ctx, iso);
-  people.draw(ctx, iso);
-  if (!S.done) target();
-  car();
-  drawTestOverlay();
+  S.t += 1 / 60; roads(); buildings.forEach(b => building(...b)); lamps.forEach(l => lamp(...l)); events.draw(ctx, iso); traffic.draw(ctx, iso); people.draw(ctx, iso); if (!S.done) target(); car(); drawTestOverlay();
 }
 
 window.__LOWTOWN_TEST = {
   state: () => ({
-    x: S.car.x,
-    y: S.car.y,
-    speed: speed(),
-    maxSpeed: S.maxSpeed,
-    distance: S.distance,
-    collisions: S.collisions,
-    trafficHits: S.trafficHits,
-    damage: S.damage,
-    stuck: S.stuck,
-    recoveries: S.test.recoveries,
-    replans: S.test.replans,
-    safeStarts: S.test.safeStarts,
-    trafficCars: traffic.cars.length,
-    pedestrians: people.people.length,
-    activeEvent: events.state()?.id || null,
-    routeLength: S.test.route.length,
-    missionComplete: S.done,
-    missionReward: S.missionReward,
-    sensor: { ...S.test.sensor }
+    x: S.car.x, y: S.car.y, speed: speed(), maxSpeed: S.maxSpeed, distance: S.distance, collisions: S.collisions, trafficHits: S.trafficHits, damage: S.damage, stuck: S.stuck,
+    recoveries: ai.state.recoveries, replans: ai.state.replans, safeStarts: ai.state.safeStarts, trafficCars: traffic.cars.length, pedestrians: people.people.length,
+    activeEvent: events.state()?.id || null, routeLength: ai.state.route.length, missionComplete: S.done, missionReward: S.missionReward,
+    sensor: { ...ai.state.sensor }, mode: ai.state.mode, ttc: ai.state.prediction.ttc, risk: ai.state.prediction.risk, decisions: ai.state.decisions,
+    candidates: ai.state.candidates
   }),
   start: () => { S.test.active = true; reset(); },
-  stop: () => { S.test.active = false; },
+  stop: () => { S.test.active = false; ai.state.enabled = false; },
   reset
 };
 
 let last = performance.now();
-function frame(now) {
-  const dt = Math.min(.05, Math.max(.001, (now - last) / 1000));
-  last = now;
-  update(dt);
-  draw();
-  requestAnimationFrame(frame);
-}
+function frame(now) { const dt = Math.min(.05, Math.max(.001, (now - last) / 1000)); last = now; update(dt); draw(); requestAnimationFrame(frame); }
 requestAnimationFrame(frame);
