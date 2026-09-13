@@ -1,4 +1,5 @@
-import { createTransportState, transportStep, transportTelemetry, TRANSPORT_TYPES } from './transport_physics.js';
+import { createTransportState, transportStep, transportTelemetry } from './transport_physics.js';
+import { TRANSPORT_TYPES } from './transport_constants.js';
 import { getTransportProfile, getTransportTypeProfile, resolveTransportPhysics } from './transport_profiles.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -9,6 +10,7 @@ export function createTransportController(vehicleId='sedan',initial={}){
   const state=createTransportState({type:profile().type,vehicleId:currentId,mass:profile().mass,...initial});
   let physics=resolveTransportPhysics(currentId);
   state.mass=physics.mass;
+  state.physics=physics;
   let lastInput={throttle:0,brake:0,steer:0,handbrake:false,climb:0,descend:0};
 
   function setVehicle(id){
@@ -18,6 +20,7 @@ export function createTransportController(vehicleId='sedan',initial={}){
     state.vehicleId=currentId;
     state.type=next.type;
     state.mass=physics.mass;
+    state.physics=physics;
     state.surface=next.type===TRANSPORT_TYPES.CAR?'road':next.type===TRANSPORT_TYPES.BOAT?'water':'air';
     return next;
   }
@@ -43,11 +46,8 @@ export function createTransportController(vehicleId='sedan',initial={}){
     const dx=state.x-old.x,dy=state.y-old.y,dz=state.z-old.z;
     telemetry.frameDistance=Math.hypot(dx,dy,dz);
     telemetry.vehicleId=currentId;
-    telemetry.physics={
-      type:physics.type,mass:physics.mass,maxSpeed:physics.maxForwardSpeed,
-      engineForce:physics.engineForce,brakeForce:physics.brakeForce,
-      steeringRate:physics.steeringRate,grip:physics.lateralGrip,turnRadius:physics.turnRadius
-    };
+    telemetry.physics={type:physics.type,mass:physics.mass,maxSpeed:physics.maxForwardSpeed,engineForce:physics.engineForce,brakeForce:physics.brakeForce,steeringRate:physics.steeringRate,grip:physics.lateralGrip,turnRadius:physics.turnRadius};
+    state.telemetry=telemetry;
     return telemetry;
   }
 
