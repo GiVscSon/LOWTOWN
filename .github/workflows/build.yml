@@ -16,6 +16,10 @@ jobs:
           node-version: 20
       - run: npm install
       - run: npm run build
+      - name: Test road topology first
+        run: node tests/road-topology-smoke.mjs
+      - name: Test ferry and island transport
+        run: node tests/transport-smoke.mjs
       - name: Run island topology smoke test
         run: node tests/islands-smoke.mjs
       - name: Run navigation brain smoke test
