@@ -21,8 +21,8 @@ export const ISLANDS = [
 
 export const BRIDGES = [
   { id: 'EAST_BRIDGE', a: { x: 640, y: 160 }, b: { x: 1120, y: 160 }, width: 70 },
-  // Grid-aligned endpoint keeps the bridge connected to the road graph.
-  { id: 'NORTH_BRIDGE', a: { x: -320, y: 800 }, b: { x: 0, y: 1120 }, width: 90 }
+  // Ends deep enough inside NORTH RIDGE to guarantee a real road-graph connection.
+  { id: 'NORTH_BRIDGE', a: { x: -320, y: 800 }, b: { x: 0, y: 1360 }, width: 90 }
 ];
 
 const ellipse = (x, y, island) => {
@@ -39,4 +39,4 @@ const bridgeHit = (x, y, bridge) => {
 };
 export function islandAt(x, y) { return ISLANDS.find(island => ellipse(x, y, island)) || null; }
 export function isLand(x, y) { return !!islandAt(x, y) || BRIDGES.some(bridge => bridgeHit(x, y, bridge)); }
-export function biomeAt(x, y) { return islandAt(x, y)?.biome || (BRIDGES.some(bridge => bridgeHit(x, y, bridge)) ? 'BRIDGE' : 'WATER'); }
+export function biomeAt(x, y) { return islandAt(x, y)?.biome || (BRIDGES.some(bridge => bridgeHit(x, y)) ? 'BRIDGE' : 'WATER'); }
