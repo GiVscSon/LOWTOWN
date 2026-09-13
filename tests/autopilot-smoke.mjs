@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { createBlackBox } from '../src/game/black_box.js';
 
 const ARTIFACT_DIR = 'ai-run-artifacts';
 const RUN_MS = 18000;
@@ -10,6 +11,8 @@ await mkdir(ARTIFACT_DIR, { recursive: true });
 const server = spawn('npx', ['vite', '--host', '127.0.0.1', '--port', '4173'], { stdio: 'inherit', shell: true });
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+const blackBox = createBlackBox({ capacity: 900, eventCapacity: 80 });
+blackBox.start();
 
 async function waitForServer() {
   for (let i = 0; i < 60; i++) {
@@ -29,7 +32,8 @@ function snapshot() {
     const ai = window.__LOWTOWN_AI;
     if (!test || !ai) return null;
     const s = test.state();
-    const a = ai.state || ai;
+    // __LOWTOWN_AI is currently the state object itself. It also contains a string field named "state".
+    const a = ai && typeof ai.state === 'object' ? ai.state : ai;
     const p = a.prediction || {};
     const sensor = a.sensor || {};
     const dynamic = a.dynamic || {};
@@ -62,6 +66,7 @@ const telemetry = [];
 let finalState = null;
 let failure = null;
 let sampleTimer = null;
+let previousSample = null;
 
 try {
   await waitForServer();
@@ -71,15 +76,27 @@ try {
   sampleTimer = setInterval(async () => {
     try {
       const s = await snapshot();
-      if (s) telemetry.push(s);
+      if (!s) return;
+      telemetry.push(s);
+      const dt = previousSample ? Math.max(0, (s.t - previousSample.t) / 1000) : SAMPLE_MS / 1000;
+      blackBox.sample(s, dt);
+      previousSample = s;
     } catch {}
   }, SAMPLE_MS);
 
   while (Date.now() - started < RUN_MS) await new Promise(r => setTimeout(r, 250));
   finalState = await snapshot();
   if (!finalState) throw new Error('LOWTOWN state unavailable after run.');
+  if (previousSample && (!telemetry.length || telemetry[telemetry.length - 1].t < finalState.t)) {
+    const dt = Math.max(0, (finalState.t - previousSample.t) / 1000);
+    blackBox.sample(finalState, dt);
+    telemetry.push(finalState);
+  }
 
+  const blackBoxReport = blackBox.report({ runMs: RUN_MS });
+  console.log('LOWTOWN BLACK BOX SUMMARY:', JSON.stringify({ summary: blackBoxReport.summary, findings: blackBoxReport.findings }));
   console.log('LOWTOWN AI DRIVER REPORT:', JSON.stringify(finalState));
+
   const s = finalState.game;
   const a = finalState.ai;
   const maxTelemetrySpeed = telemetry.reduce((m, x) => Math.max(m, x.game.speed || 0), 0);
@@ -89,6 +106,8 @@ try {
   const maxRisk = telemetry.reduce((m, x) => Math.max(m, x.ai.prediction?.risk || 0), 0);
   const maxTtcRisk = telemetry.filter(x => Number.isFinite(x.ai.prediction?.ttc)).reduce((m, x) => Math.min(m, x.ai.prediction.ttc), Infinity);
   const modes = [...new Set(telemetry.map(x => x.ai.mode).filter(Boolean))];
+  const uniqueNodes = new Set(telemetry.map(x => x.ai.node).filter(n => Number.isFinite(n)));
+  const uniquePositions = new Set(telemetry.map(x => `${Math.round(x.game.x / 80)},${Math.round(x.game.y / 80)}`));
 
   if (!a.enabled) throw new Error('Predictive AI driver did not activate.');
   if (a.safeStarts < 1) throw new Error('AI has no safe start.');
@@ -108,23 +127,30 @@ try {
   const report = {
     status: 'PASS', runMs: RUN_MS, samples: telemetry.length,
     maxSpeed: maxTelemetrySpeed, distance: maxDistance, explorationRadius: maxExplore,
+    uniqueNodes: uniqueNodes.size, uniquePositionCells: uniquePositions.size,
     maxCrossTrack, maxRisk, minimumTtc: Number.isFinite(maxTtcRisk) ? maxTtcRisk : null,
     buildingCollisions: s.collisions, trafficHits: s.trafficHits, stuck: s.stuck,
     replans: a.replans, recoveries: a.recoveries, safeStarts: a.safeStarts,
     decisions: a.decisions, overtakes: a.overtakes || 0, nearMisses: a.nearMisses || 0,
-    collisionsAvoided: a.collisionsAvoided || 0, modes
+    collisionsAvoided: a.collisionsAvoided || 0, modes,
+    blackBox: blackBoxReport
   };
   await writeFile(`${ARTIFACT_DIR}/report.json`, JSON.stringify(report, null, 2));
+  await writeFile(`${ARTIFACT_DIR}/black-box.json`, JSON.stringify(blackBoxReport, null, 2));
   console.log('LOWTOWN AI DRIVER SMOKE TEST: PASS');
 } catch (error) {
   failure = { message: error.message, stack: error.stack };
+  const blackBoxReport = blackBox.report({ runMs: RUN_MS, failure });
   console.error('LOWTOWN AI DRIVER SMOKE TEST: FAIL', error.stack || error);
+  try { await writeFile(`${ARTIFACT_DIR}/black-box.json`, JSON.stringify(blackBoxReport, null, 2)); } catch {}
   throw error;
 } finally {
   if (sampleTimer) clearInterval(sampleTimer);
   try {
+    const blackBoxReport = blackBox.report({ runMs: RUN_MS, failure });
     await writeFile(`${ARTIFACT_DIR}/telemetry.json`, JSON.stringify({ runMs: RUN_MS, sampleMs: SAMPLE_MS, samples: telemetry, final: finalState, failure }, null, 2));
-    if (failure) await writeFile(`${ARTIFACT_DIR}/report.json`, JSON.stringify({ status: 'FAIL', failure, samples: telemetry.length, final: finalState }, null, 2));
+    await writeFile(`${ARTIFACT_DIR}/black-box.json`, JSON.stringify(blackBoxReport, null, 2));
+    if (failure) await writeFile(`${ARTIFACT_DIR}/report.json`, JSON.stringify({ status: 'FAIL', failure, samples: telemetry.length, final: finalState, blackBox: blackBoxReport }, null, 2));
   } catch (error) {
     console.error('Could not write AI artifacts:', error);
   }
