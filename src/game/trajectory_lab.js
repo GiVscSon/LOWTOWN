@@ -1,9 +1,39 @@
+import { predictVehicle } from './physics_prediction.js';
+
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const wrap = a => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
 
 export function createTrajectoryLab({ simulate, trafficRisk, blocked = () => false } = {}) {
   if (typeof simulate !== 'function') throw new TypeError('trajectory lab requires simulate()');
   if (typeof trafficRisk !== 'function') throw new TypeError('trajectory lab requires trafficRisk()');
+
+  function predict(car, candidate) {
+    const physics = car?.physics;
+    if (!physics) return simulate(car, candidate.horizon, candidate.steer, candidate.throttle, candidate.brake);
+    const result = predictVehicle(car, candidate.horizon, {
+      steer: candidate.steer,
+      throttle: candidate.throttle,
+      brake: candidate.brake,
+      handbrake: false
+    }, physics, { blocked, useActuatorDelay: true });
+    let minWall = Infinity;
+    const probe = Math.min(80, Math.max(20, result.speed * .25));
+    if (Number.isFinite(result.x) && Number.isFinite(result.y)) {
+      const a = result.a || car.a || 0;
+      const probes = [0, .3, -.3];
+      for (const offset of probes) {
+        const hit = blocked(result.x + Math.cos(a + offset) * probe, result.y + Math.sin(a + offset) * probe);
+        minWall = Math.min(minWall, hit ? probe : 999);
+      }
+    }
+    return {
+      ...result,
+      points: result.points || [],
+      minWall,
+      collisionT: result.collisionT,
+      safe: result.safe
+    };
+  }
 
   function maneuverClass({ headingError = 0, curvature = 0 } = {}) {
     if (Math.abs(headingError) > 2.2 || curvature > 2.35) return 'TURN_AROUND';
@@ -47,11 +77,11 @@ export function createTrajectoryLab({ simulate, trafficRisk, blocked = () => fal
     const className = maneuverClass({ headingError, curvature });
 
     const evaluated = candidates.map(candidate => {
-      const result = simulate(car, candidate.horizon, candidate.steer, candidate.throttle, candidate.brake);
+      const result = predict(car, candidate);
       const risk = trafficRisk(result, hazards);
       const targetDistance = target ? Math.hypot(result.x - target.x, result.y - target.y) : 0;
       const alignment = target ? Math.abs(wrap(Math.atan2(target.y - result.y, target.x - result.x) - (car.a || 0))) : Math.abs(headingError);
-      const wallPenalty = Math.max(0, 70 - result.minWall) * 5;
+      const wallPenalty = Number.isFinite(result.minWall) ? Math.max(0, 70 - result.minWall) * 5 : 0;
       const collisionPenalty = result.safe ? 0 : 100000 + (candidate.horizon - result.collisionT) * 8000;
       const turnBonus = className === 'TURN_AROUND' && candidate.maneuver === 'TURN_AROUND' ? 120 : 0;
       const directionBonus = className === 'TURN_AROUND' ? (candidate.steer * headingError > 0 ? 190 : candidate.steer === 0 ? 30 : -70) : 0;
