@@ -56,8 +56,23 @@ assert.ok(['CONTROLLED_TURN_AROUND', 'CONTROLLED_STOP_BEFORE_TURN'].includes(utu
 assert.ok(uturn.cause.includes('HEADING_ERROR_'));
 assert.ok(uturn.candidates.every(c => Number.isFinite(c.score)));
 
+const lowSpeedTurn = lab.evaluate({ x: 0, y: 0, a: 0, vx: 12, vy: 0 }, {
+  headingError: -2.7,
+  curvature: Math.PI,
+  baseSteer: -1,
+  speed: 12,
+  target: { x: -180, y: 0 },
+  hazards: []
+});
+assert.equal(lowSpeedTurn.maneuver, 'TURN_AROUND');
+assert.ok(lowSpeedTurn.selected.throttle > 0.55);
+assert.equal(lowSpeedTurn.selected.brake, 0);
+assert.ok(lowSpeedTurn.selected.steer < -0.7);
+assert.equal(lowSpeedTurn.reason, 'LOW_SPEED_TURN_AUTHORITY');
+
 console.log('TRAJECTORY_LAB_OK', JSON.stringify({
   normal: { candidates: normal.candidateCount, safe: normal.safeCandidates, selected: normal.selected.id },
   filtered: { candidates: filtered.candidateCount, safe: filtered.safeCandidates, selected: filtered.selected.id },
-  uturn: { maneuver: uturn.maneuver, selected: uturn.selected.id, reason: uturn.reason }
+  uturn: { maneuver: uturn.maneuver, selected: uturn.selected.id, reason: uturn.reason },
+  lowSpeedTurn: { selected: lowSpeedTurn.selected.id, throttle: lowSpeedTurn.selected.throttle, steer: lowSpeedTurn.selected.steer }
 }));
