@@ -7,6 +7,7 @@ import { createPeopleSystem } from './game/people.js';
 import { createEventSystem } from './game/events.js';
 import { createAIDriver } from './game/ai_driver.js';
 import { createTransportSystem } from './game/transport.js';
+import { createCityVisuals } from './game/city_visuals.js';
 
 const app = document.querySelector('#app');
 app.innerHTML = `<main class="shell"><header class="hud"><div class="brand"><span>LOW</span>TOWN <b>// NIGHT SHIFT</b></div><div class="status"><i></i> FREE ROAM <strong id="speed">000</strong> KM/H</div></header><section class="game-wrap"><canvas id="game"></canvas><div class="mission"><small id="job-id">JOB 01</small><strong id="job-title">SHAKE THE NIGHT</strong><span id="job-text">Drive to the amber marker.</span></div><div class="hint">WASD / ARROWS · SPACE HANDBRAKE · R RESET · N NEXT JOB</div><div class="toast" id="toast">ENGINE READY</div><div class="touch" aria-label="Touch controls"><button data-key="arrowup">▲</button><div><button data-key="arrowleft">◀</button><button data-key=" ">■</button><button data-key="arrowright">▶</button></div><button data-key="arrowdown">▼</button></div></section></main>`;
@@ -25,6 +26,7 @@ document.querySelectorAll('[data-key]').forEach(button => { const key=button.dat
 
 const buildings = WORLD.buildings;
 const lamps = WORLD.lamps;
+const cityVisuals = createCityVisuals();
 const GRID = 160;
 const CITY_LIMIT = 2720;
 const ROAD_DRAW_LIMIT = 2880;
@@ -65,7 +67,7 @@ function reset(){S.car={x:-320,y:-20,a:0,vx:0,vy:0};S.cam={x:-320,y:-20};S.done=
 refreshMission();if(testMode)reset();
 function update(dt){S.collisionCooldown=Math.max(0,S.collisionCooldown-dt);if(keys.has('n')){missions.next();S.done=false;keys.delete('n');refreshMission();toast.textContent='NEW JOB';}if(keys.has('r')){reset();keys.delete('r');}if(S.test.active){const control=ai.update(S.car,dt);if(control)drive(dt,control.throttle,control.brake,control.steer,control.handbrake);S.distance=ai.state.distance;}else{const u=keys.has('w')||keys.has('arrowup'),d=keys.has('s')||keys.has('arrowdown'),l=keys.has('a')||keys.has('arrowleft'),r=keys.has('d')||keys.has('arrowright');drive(dt,u?1:0,d?1:0,(r?1:0)-(l?1:0),keys.has(' '));S.distance+=speed()*dt;}events.update(dt,S.car);traffic.update(dt,S.car,events.state());people.update(dt,S.car,events.state()?1:0);transport.update(dt);trafficCollisions();if(!S.done&&missions.update(S.car)){S.done=true;S.missionReward+=missions.state().reward;S.car.vx*=.45;S.car.vy*=.45;toast.textContent=`JOB COMPLETE // +$${missions.state().reward}`;toast.classList.add('hot');}const v=speed();S.maxSpeed=Math.max(S.maxSpeed,v);S.cam.x+=(S.car.x-S.cam.x)*Math.min(1,dt*5);S.cam.y+=(S.car.y-S.cam.y)*Math.min(1,dt*5);speedEl.textContent=String(Math.round(v*.19)).padStart(3,'0');}
 function drawTestOverlay(){if(!S.test.active)return;const a=ai.state,ev=events.state(),lines=[`AI DRIVER // ${a.mode}`,`POS ${Math.round(S.car.x)},${Math.round(S.car.y)} HEADING ${Math.round(S.car.a*57.3)}°`,`NODES ${roadNodes.length} ROUTE ${a.node}/${a.route.length} REPLANS ${a.replans}`,`SPEED ${Math.round(speed())} DIST ${Math.round(S.distance)} RISK ${a.prediction.risk.toFixed(2)}`,`TTC ${Number.isFinite(a.prediction.ttc)?a.prediction.ttc.toFixed(2):'INF'} TRAFFIC ${traffic.cars.length} PEOPLE ${people.people.length}`,`BIOME ${biomeAt(S.car.x,S.car.y)} EVENT ${ev?.id||'NONE'}`];ctx.fillStyle='rgba(8,9,11,.78)';ctx.fillRect(14,14,300,lines.length*17+14);ctx.fillStyle='#e8b84a';ctx.font='12px monospace';lines.forEach((line,i)=>ctx.fillText(line,24,34+i*17));}
-function draw(){roads();for(const b of buildings)building(...b);for(const l of lamps)lamp(...l);traffic.draw(ctx,iso);people.draw(ctx,iso,S.car);transport.draw(ctx,iso,S.t*1000);target();car();drawTestOverlay();}
+function draw(){roads();for(const b of buildings)building(...b);for(const l of lamps)lamp(...l);cityVisuals.draw(ctx,iso,buildings,lamps,S.t);traffic.draw(ctx,iso);people.draw(ctx,iso,S.car);transport.draw(ctx,iso,S.t*1000);target();car();drawTestOverlay();}
 let last=performance.now();function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;S.t+=dt;update(dt);draw();requestAnimationFrame(frame);}requestAnimationFrame(frame);
 window.__LOWTOWN_AI=ai.state;
 window.__LOWTOWN_TRANSPORT=transport.state;
