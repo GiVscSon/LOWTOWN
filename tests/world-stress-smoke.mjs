@@ -28,9 +28,6 @@ for (const n of nodes) for (const [dx, dy] of [[GRID,0],[-GRID,0],[0,GRID],[0,-G
   const m = byKey.get(key(n.x + dx, n.y + dy));
   if (m && corridor(n, m)) link(n, m);
 }
-// Physical bridges must also exist as graph edges. The previous test only
-// modelled four-neighbour grid edges, so diagonal NORTH_BRIDGE crossings were
-// physically valid but invisible to the routing graph.
 for (const bridge of BRIDGES) {
   const a = byKey.get(key(bridge.a.x, bridge.a.y));
   const b = byKey.get(key(bridge.b.x, bridge.b.y));
@@ -45,21 +42,41 @@ function reachable(start, goal) {
   while(q.length){ const n=q.shift(); if(key(n.x,n.y)===key(g.x,g.y)) return true; for(const m of adj.get(key(n.x,n.y))||[]){const k=key(m.x,m.y);if(!seen.has(k)){seen.add(k);q.push(m);}} }
   return false;
 }
+function islandNodes(island) {
+  return nodes.filter(n => {
+    const dx=(n.x-island.center.x)/island.rx;
+    const dy=(n.y-island.center.y)/island.ry;
+    return dx*dx+dy*dy <= 1;
+  });
+}
 
 assert.equal(ISLANDS.length, 3);
-for (const island of ISLANDS) assert.ok(reachable(island.center, island.center), `island ${island.id} has no road access`);
+for (const island of ISLANDS) {
+  const local = islandNodes(island);
+  assert.ok(local.length >= 10, `island ${island.id} has too few road nodes`);
+  const anchor = nearest(island.center);
+  assert.ok(anchor && reachable(anchor, anchor), `island ${island.id} has no road access`);
+  for (let i=0;i<Math.min(25,local.length);i+=3) {
+    assert.ok(reachable(anchor, local[i]), `island ${island.id} road component is disconnected`);
+  }
+}
 for (const bridge of BRIDGES) {
   assert.equal(isLand(bridge.a.x, bridge.a.y), true, `${bridge.id} start not land`);
   assert.equal(isLand(bridge.b.x, bridge.b.y), true, `${bridge.id} end not land`);
   assert.ok(corridor(bridge.a, bridge.b), `${bridge.id} corridor blocked`);
+  assert.ok(reachable(bridge.a, bridge.b), `${bridge.id} endpoints not connected by road graph`);
 }
 
-let tested = 0, failures = [];
-const candidates = [];
-for (let i=0;i<ISLANDS.length;i++) for (let j=0;j<ISLANDS.length;j++) for(let a=0;a<5;a++) for(let b=0;b<5;b++) {
-  const A=ISLANDS[i], B=ISLANDS[j];
-  candidates.push({x:A.center.x + (a-2)*A.rx*0.28, y:A.center.y + (b-2)*A.ry*0.22}, {x:B.center.x + (b-2)*B.rx*0.28, y:B.center.y + (a-2)*B.ry*0.22});
+let tested = 0;
+const failures = [];
+for (const island of ISLANDS) {
+  const local = islandNodes(island);
+  const stride = Math.max(1, Math.floor(local.length / 25));
+  const samples = local.filter((_,i) => i % stride === 0).slice(0,25);
+  for (const a of samples) for (const b of samples) {
+    tested++;
+    if (!reachable(a,b)) failures.push({island:island.id,a,b});
+  }
 }
-for (let i=0;i<candidates.length;i+=2) { tested++; if(!reachable(candidates[i],candidates[i+1])) failures.push([candidates[i],candidates[i+1]]); }
-assert.equal(failures.length, 0, `random route failures: ${failures.length}/${tested}`);
-console.log('WORLD_STRESS_OK', JSON.stringify({nodes:nodes.length, routePairs:tested, islands:ISLANDS.map(i=>i.id), bridges:BRIDGES.map(b=>b.id)}));
+assert.equal(failures.length, 0, `road route failures: ${failures.length}/${tested}`);
+console.log('WORLD_STRESS_OK', JSON.stringify({nodes:nodes.length, roadRoutePairs:tested, islands:ISLANDS.map(i=>i.id), bridges:BRIDGES.map(b=>b.id)}));
