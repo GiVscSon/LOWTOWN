@@ -21,22 +21,23 @@ export const ISLANDS = [
 
 export const BRIDGES = [
   { id: 'EAST_BRIDGE', a: { x: 640, y: 160 }, b: { x: 1120, y: 160 }, width: 70 },
-  // Ends deep enough inside NORTH RIDGE to guarantee a real road-graph connection.
   { id: 'NORTH_BRIDGE', a: { x: -320, y: 800 }, b: { x: 0, y: 1360 }, width: 90 }
 ];
 
 const ellipse = (x, y, island) => {
+  if (!island || !Number.isFinite(x) || !Number.isFinite(y)) return false;
   const dx = (x - island.center.x) / island.rx;
   const dy = (y - island.center.y) / island.ry;
   return dx * dx + dy * dy <= 1;
 };
 const bridgeHit = (x, y, bridge) => {
+  if (!bridge?.a || !bridge?.b || !Number.isFinite(x) || !Number.isFinite(y)) return false;
   const vx = bridge.b.x - bridge.a.x, vy = bridge.b.y - bridge.a.y;
   const len2 = vx * vx + vy * vy || 1;
   const t = Math.max(0, Math.min(1, ((x - bridge.a.x) * vx + (y - bridge.a.y) * vy) / len2));
   const px = bridge.a.x + vx * t, py = bridge.a.y + vy * t;
-  return Math.hypot(x - px, y - py) <= bridge.width;
+  return Math.hypot(x - px, y - py) <= (bridge.width || 0);
 };
 export function islandAt(x, y) { return ISLANDS.find(island => ellipse(x, y, island)) || null; }
 export function isLand(x, y) { return !!islandAt(x, y) || BRIDGES.some(bridge => bridgeHit(x, y, bridge)); }
-export function biomeAt(x, y) { return islandAt(x, y)?.biome || (BRIDGES.some(bridge => bridgeHit(x, y)) ? 'BRIDGE' : 'WATER'); }
+export function biomeAt(x, y) { return islandAt(x, y)?.biome || (BRIDGES.some(bridge => bridgeHit(x, y, bridge)) ? 'BRIDGE' : 'WATER'); }
