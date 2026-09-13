@@ -10,5 +10,6 @@ for(let i=0;i<140;i++){const t=director.update(car);assert.ok(t);unique.add(Math
 assert.ok(director.state.districts.size>=1);
 assert.ok(director.state.completed>=1);
 assert.ok(unique.size>=2,'director should seek multiple city areas');
-console.log(JSON.stringify(director.status(),null,2));
+const status=director.status();
+console.log(JSON.stringify({...status,target:status.target?{id:status.target.id,x:status.target.x,y:status.target.y}:null},null,2));
 console.log('city director smoke test: PASS');
