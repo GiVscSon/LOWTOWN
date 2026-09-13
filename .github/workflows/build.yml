@@ -16,6 +16,16 @@ jobs:
           node-version: 20
       - run: npm install
       - run: npm run build
+      - name: Run navigation brain smoke test
+        run: node tests/navigation-brain-smoke.mjs
+      - name: Run city director smoke test
+        run: node tests/city-director-smoke.mjs
+      - name: Run AI safety layer smoke test
+        run: node tests/ai-safety-layer-smoke.mjs
+      - name: Run AI diagnostics smoke test
+        run: node tests/ai-diagnostics-smoke.mjs
+      - name: Run AI expansion smoke test
+        run: node tests/ai-expansion-smoke.mjs
       - name: Install browser test runner
         run: npm install --no-save playwright
       - name: Install Chromium
