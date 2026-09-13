@@ -2,22 +2,26 @@ export const ISLANDS = [
   {
     id: 'LOWTOWN', name: 'LOWTOWN', biome: 'URBAN', center: { x: -560, y: -180 }, rx: 1320, ry: 1040,
     colors: { land: '#202326', shore: '#7b6650', accent: '#e09a3e' },
-    districts: ['downtown', 'residential', 'old industrial']
+    districts: ['downtown', 'residential', 'old industrial'],
+    ferry: { x: 640, y: -560 }, airfield: { x: 120, y: 620 }
   },
   {
     id: 'IRON_HARBOR', name: 'IRON HARBOR', biome: 'INDUSTRIAL_COAST', center: { x: 1700, y: -100 }, rx: 760, ry: 900,
     colors: { land: '#25282a', shore: '#6b716f', accent: '#d4523a' },
-    districts: ['docks', 'warehouses', 'shipyard']
+    districts: ['docks', 'warehouses', 'shipyard'],
+    ferry: { x: 1120, y: -560 }, airfield: { x: 1150, y: 260 }
   },
   {
     id: 'NORTH_RIDGE', name: 'NORTH RIDGE', biome: 'FOREST_HIGHLAND', center: { x: 0, y: 1800 }, rx: 1080, ry: 600,
     colors: { land: '#202820', shore: '#6e765d', accent: '#b7a66a' },
-    districts: ['pine road', 'hill town', 'reservoir']
+    districts: ['pine road', 'hill town', 'reservoir'],
+    ferry: null, airfield: { x: 300, y: 1350 }
   }
 ];
 
 export const BRIDGES = [
-  { id: 'EAST_BRIDGE', a: { x: 800, y: 0 }, b: { x: 960, y: 0 }, width: 110 },
+  // Grid-aligned endpoints keep both shores reachable by the road graph.
+  { id: 'EAST_BRIDGE', a: { x: 640, y: -560 }, b: { x: 1120, y: -560 }, width: 70 },
   { id: 'NORTH_BRIDGE', a: { x: 0, y: 800 }, b: { x: 0, y: 1200 }, width: 90 }
 ];
 
