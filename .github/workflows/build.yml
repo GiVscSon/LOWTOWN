@@ -50,6 +50,8 @@ jobs:
         run: node tests/scenario-feedback-smoke.mjs
       - name: Run trajectory lab smoke test
         run: node tests/trajectory-lab-smoke.mjs
+      - name: Run turn arbitration integration smoke test
+        run: node tests/turn-arbitration-smoke.mjs
       - name: Run scenario benchmark smoke test
         run: node tests/benchmark-smoke.mjs
       - name: Install browser test runner
