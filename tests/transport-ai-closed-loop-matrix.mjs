@@ -40,7 +40,7 @@ for(const vehicleId of VEHICLES){
     const transport=createTransportController(vehicleId,{x:160,y:640,a:0});
     const ai=createAIDriver({nodes,blocked,getTraffic:()=>traffic});
     ai.start(transport.state);
-    let collisions=0,nearMisses=0,replans0=0,recoveries0=0,maxSpeed=0,stuckFrames=0,prevX=transport.state.x,prevY=transport.state.y;
+    let collisions=0,nearMisses=0,replans0=0,recoveries0=0,maxSpeed=0,stuckFrames=0,throttleFrames=0,steeringFrames=0,prevX=transport.state.x,prevY=transport.state.y,initialHeading=transport.state.a,maxHeadingDelta=0;
     for(let frame=0;frame<360;frame++){
       traffic=trafficFor(template,frame);
       if(template==='braking'&&frame===120)transport.state.vx*=.35;
@@ -56,6 +56,9 @@ for(const vehicleId of VEHICLES){
       assert.equal(s.physics,transport.physics,`${vehicleId}/${template}:physics identity`);
       assert.equal(s.mass,transport.physics.mass,`${vehicleId}/${template}:mass sync`);
       const speed=Math.hypot(s.vx,s.vy);maxSpeed=Math.max(maxSpeed,speed);
+      if(control.throttle>.05)throttleFrames++;
+      if(Math.abs(control.steer)>.05)steeringFrames++;
+      maxHeadingDelta=Math.max(maxHeadingDelta,Math.abs(s.a-initialHeading));
       if(Math.hypot(s.x-prevX,s.y-prevY)<.15)stuckFrames++; else stuckFrames=0;
       prevX=s.x;prevY=s.y;
       if(t.collision||t.contact)collisions++;
@@ -63,10 +66,14 @@ for(const vehicleId of VEHICLES){
     }
     replans0=ai.state.replans;
     recoveries0=ai.state.recoveries;
-    metrics.push({vehicleId,template,frames:360,collisions,nearMisses,replans:replans0,recoveries:recoveries0,stuckFrames,maxSpeed:+maxSpeed.toFixed(3),decisions:ai.state.decisions,routeFailures:ai.state.routeFailures});
+    metrics.push({vehicleId,template,frames:360,collisions,nearMisses,replans:replans0,recoveries:recoveries0,stuckFrames,maxSpeed:+maxSpeed.toFixed(3),distance:+transport.state.distance.toFixed(3),throttleFrames,steeringFrames,maxHeadingDelta:+maxHeadingDelta.toFixed(4),decisions:ai.state.decisions,routeFailures:ai.state.routeFailures});
     assert(ai.state.decisions>100,`${vehicleId}/${template}: insufficient decisions`);
     assert(ai.state.route.length>0,`${vehicleId}/${template}: route missing`);
     assert(ai.state.replans>0,`${vehicleId}/${template}: no replans`);
+    assert(throttleFrames>30,`${vehicleId}/${template}: insufficient throttle engagement`);
+    assert(maxSpeed>.5,`${vehicleId}/${template}: no real vehicle motion; maxSpeed=${maxSpeed}`);
+    assert(transport.state.distance>.5,`${vehicleId}/${template}: transport distance did not increase`);
+    if(template!=='straight'&&template!=='stuck')assert(steeringFrames>5,`${vehicleId}/${template}: insufficient steering activity`);
   }
 }
 
@@ -74,7 +81,13 @@ const total=metrics.length;
 const collisions=metrics.reduce((s,m)=>s+m.collisions,0);
 const stuck=metrics.reduce((s,m)=>s+m.stuckFrames,0);
 const recoveries=metrics.reduce((s,m)=>s+m.recoveries,0);
+const totalDistance=metrics.reduce((s,m)=>s+m.distance,0);
+const totalThrottleFrames=metrics.reduce((s,m)=>s+m.throttleFrames,0);
+const totalSteeringFrames=metrics.reduce((s,m)=>s+m.steeringFrames,0);
 assert.equal(total,VEHICLES.length*templates.length);
+assert(totalDistance>total*.5);
+assert(totalThrottleFrames>total*30);
+assert(totalSteeringFrames>total*5);
 assert(collisions>=0&&stuck>=0&&recoveries>=0);
-console.log('TRANSPORT AI CLOSED LOOP MATRIX: PASS');
-console.log(JSON.stringify({vehicles:VEHICLES,scenarios:templates.length,runs:total,collisions,stuckFrames:stuck,recoveries},null,2));
+console.log('TRANSPORT AI CLOSED LOOP MATRIX: PASS REAL MOTION + STEERING');
+console.log(JSON.stringify({vehicles:VEHICLES,scenarios:templates.length,runs:total,collisions,stuckFrames:stuck,recoveries,totalDistance:+totalDistance.toFixed(3),totalThrottleFrames,totalSteeringFrames},null,2));
