@@ -19,7 +19,7 @@ export function createTrafficSystem({nodes,blocked,seed=1337}){
    c.vx+=fx*control.throttle*430*h;c.vy+=fy*control.throttle*430*h;
    if(control.brake){const amount=Math.min(Math.abs(fs),760*control.brake*h);c.vx-=fx*Math.sign(fs||1)*amount;c.vy-=fy*Math.sign(fs||1)*amount}
    c.vx-=rx*ls*Math.min(1,10.5*h);c.vy-=ry*ls*Math.min(1,10.5*h);
-   const drag=control.handbrake?.972:.993;c.vx*=Math.pow(drag,h*60);c.vy*=Math.pow(drag,h*60);
+   const drag=control.handbrake ? .972 : .993;c.vx*=Math.pow(drag,h*60);c.vy*=Math.pow(drag,h*60);
    const forward=c.vx*fx+c.vy*fy;
    c.a+=control.steer*(control.handbrake?1.65:1.9)*Math.min(1,Math.abs(forward)/55)*h*(forward>=0?1:-1);
    const nx=c.x+c.vx*h,ny=c.y+c.vy*h;
