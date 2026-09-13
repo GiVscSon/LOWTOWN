@@ -1,6 +1,7 @@
 import { normalizeTypeInput } from './transport_type_physics.js';
 import { TRANSPORT_TYPES } from './transport_constants.js';
 import { dynamicBlendWeight, dynamicHandlingActive, stepDynamicBicycle } from './dynamic_bicycle.js';
+import { applySurfacePhysics, surfaceTelemetry } from './surface_physics.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const finite=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
@@ -36,9 +37,11 @@ function blendState(a,b,t){
 }
 
 export function stepCarPhysics(state,dt,input,physics){
-  const p=physics||{};
+  const p0=physics||{};
   const safeDt=clamp(finite(dt),0,.1);
   const c=normalizeTypeInput(input,TRANSPORT_TYPES.CAR);
+  const surface=input?.surface??state.surface??'dry';
+  const p=applySurfacePhysics(p0,surface);
   const fx=Math.cos(state.a),fy=Math.sin(state.a);
   const forward=state.vx*fx+state.vy*fy;
   const speed=Math.hypot(state.vx,state.vy);
@@ -96,6 +99,7 @@ export function stepCarPhysics(state,dt,input,physics){
   if(limited<-(p.maxReverseSpeed||0)){const e=limited+p.maxReverseSpeed;state.vx-=nfx*e;state.vy-=nfy*e;}
   state.x+=state.vx*safeDt;
   state.y+=state.vy*safeDt;
+  state.surface=surface;
   state.handlingModel=handlingModel;
   state.modelBlend=dynamicBlend;
   return carTelemetry(state,c,p,dynamicTelemetry);
@@ -107,5 +111,5 @@ export function carTelemetry(state,input={},physics={},dynamic=null){
   const lateral=-state.vx*Math.sin(state.a)+state.vy*Math.cos(state.a);
   const speed=Math.hypot(state.vx,state.vy);
   const slip=Math.atan2(lateral,Math.max(1,Math.abs(forward)));
-  return {type:TRANSPORT_TYPES.CAR,x:state.x,y:state.y,heading:state.a,velocity:speed,forwardSpeed:forward,lateralSpeed:lateral,verticalSpeed:0,acceleration:Math.abs(finite(input.throttle))*finite(physics.acceleration),yawRate:state.yawRate,slipAngle:slip,traction:clamp(1-Math.abs(slip)/1.05,0,1),surface:'road',drift:Math.abs(slip)>.12,handlingModel:state.handlingModel||'kinematic-grip',modelBlend:clamp(finite(state.modelBlend),0,1),dynamic:dynamic?{frontForce:dynamic.frontForce,rearForce:dynamic.rearForce,frontLoad:dynamic.frontLoad,rearLoad:dynamic.rearLoad}:null,controls:{...input}};
+  return {type:TRANSPORT_TYPES.CAR,x:state.x,y:state.y,heading:state.a,velocity:speed,forwardSpeed:forward,lateralSpeed:lateral,verticalSpeed:0,acceleration:Math.abs(finite(input.throttle))*finite(physics.acceleration),yawRate:state.yawRate,slipAngle:slip,traction:clamp(1-Math.abs(slip)/1.05,0,1),surface:surfaceTelemetry(state.surface||input.surface||'dry',physics),drift:Math.abs(slip)>.12,handlingModel:state.handlingModel||'kinematic-grip',modelBlend:clamp(finite(state.modelBlend),0,1),dynamic:dynamic?{frontForce:dynamic.frontForce,rearForce:dynamic.rearForce,frontLoad:dynamic.frontLoad,rearLoad:dynamic.rearLoad}:null,controls:{...input}};
 }
