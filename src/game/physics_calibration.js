@@ -6,7 +6,7 @@ export function buildPhysicsErrorProfile(report={}){
   const vehicles={};
   for(const [id,v] of Object.entries(report.vehicles||{})){
     const accel=finite(v.meanAccelerationError),steer=finite(v.meanSteeringError),samples=Math.max(0,finite(v.samples));
-    vehicles[id]={vehicleId:id,accelerationBias:+clamp(accel,-50,50).toFixed(5),steeringBias:+clamp(steer,-10,10).toFixed(5),speedLimitViolations:Number(v.speedLimitViolations)||0,confidence:Math.min(1,samples/120),samples};
+    vehicles[id]={vehicleId:id,accelerationBias:+clamp(accel,-50,50).toFixed(5),steeringBias:+clamp(steer,-10,10).toFixed(5),speedLimitViolations:Number(v.speedLimitViolations)||0,confidence:Math.min(1,samples/120),samples,ready:samples>=30};
   }
   return {version:1,vehicles};
 }
@@ -19,7 +19,9 @@ export function calibrateSamples(samples=[],{minSamples=30,maxBiasAccel=50,maxBi
     const accel=robustMean(list.map(s=>finite(s.accelerationError,NaN)));
     const steer=robustMean(list.map(s=>finite(s.steeringError,NaN)));
     const n=list.length;
-    vehicles[id]={vehicleId:id,accelerationBias:+clamp(accel,-maxBiasAccel,maxBiasAccel).toFixed(5),steeringBias:+clamp(steer,-maxBiasSteer,maxBiasSteer).toFixed(5),confidence:Math.min(1,n/minSamples),samples:n,ready:n>=minSamples};
+    const accelerationBias=+clamp(accel,-maxBiasAccel,maxBiasAccel).toFixed(5);
+    const steeringBias=+clamp(steer,-maxBiasSteer,maxBiasSteer).toFixed(5);
+    vehicles[id]={vehicleId:id,accelerationBias,steeringBias,accelerationScale:clamp(1-accelerationBias/20,.75,1.25),brakingScale:1,steeringScale:clamp(1-steeringBias/4,.75,1.25),dragScale:1,turnRadiusScale:1,confidence:Math.min(1,n/minSamples),samples:n,ready:n>=minSamples};
   }
   return {version:1,vehicles};
 }
@@ -27,10 +29,13 @@ export function calibrateSamples(samples=[],{minSamples=30,maxBiasAccel=50,maxBi
 export function applyPhysicsCalibration(input={},profile={}){
   const id=input.vehicleId||input.id||'sedan',p=profile.vehicles?.[id];
   if(!p||p.ready===false)return {...input,calibrationApplied:false};
-  const confidence=clamp(finite(p.confidence),0,1),accelScale=clamp(p.accelerationBias/100,-.25,.25),steerScale=clamp(p.steeringBias/10,-.25,.25);
-  return {...input,throttle:clamp(finite(input.throttle)*(1-accelScale*confidence),-1,1),steer:clamp(finite(input.steer)*(1-steerScale*confidence),-1,1),calibrationApplied:true,calibrationConfidence:confidence};
+  const confidence=clamp(finite(p.confidence),0,1),accelScale=clamp(finite(p.accelerationScale,1),.75,1.25),steerScale=clamp(finite(p.steeringScale,1),.75,1.25);
+  return {...input,throttle:clamp(finite(input.throttle)*(1-(accelScale-1)*confidence),-1,1),steer:clamp(finite(input.steer)*(1-(steerScale-1)*confidence),-1,1),calibrationApplied:true,calibrationConfidence:confidence};
 }
 
-export function mergeCalibrationProfiles(base={},next={}){
-  return {version:1,vehicles:{...(base.vehicles||{}),...(next.vehicles||{})}};
+export function calibrationScalesFromError({accelerationBias=0,steeringBias=0,brakingBias=0,dragBias=0,turnRadiusBias=0,confidence=0}={}){
+  const c=clamp(confidence,0,1);
+  return {accelerationScale:clamp(1-accelerationBias/20,.75,1.25),brakingScale:clamp(1-brakingBias/20,.75,1.25),steeringScale:clamp(1-steeringBias/4,.75,1.25),dragScale:clamp(1+dragBias/20,.75,1.25),turnRadiusScale:clamp(1+turnRadiusBias/20,.75,1.25),confidence:c};
 }
+
+export function mergeCalibrationProfiles(base={},next={}){return {version:1,vehicles:{...(base.vehicles||{}),...(next.vehicles||{})}};}
