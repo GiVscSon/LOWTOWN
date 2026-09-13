@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import { createTransportController } from '../src/game/transport_controller.js';
+
+const car=createTransportController('sedan',{x:-120,y:-360,a:0});
+const start={x:car.state.x,y:car.state.y};
+for(let i=0;i<90;i++)car.step(1/60,{throttle:1});
+assert.ok(car.state.x>start.x+25,'W must move the player forward');
+assert.ok(car.state.v>25,'W must create real speed');
+const movingX=car.state.x;
+for(let i=0;i<180;i++)car.step(1/60,{throttle:0,brake:1});
+assert.equal(car.state.v,0,'brake must bring the player to a complete stop');
+assert.ok(car.state.x-movingX<40,'braking must prevent uncontrolled coasting');
+const heading=car.state.a;
+for(let i=0;i<90;i++)car.step(1/60,{throttle:1,steer:1});
+assert.ok(car.state.a>heading+.05,'steering must change heading');
+assert.ok(car.state.v>15,'steering must preserve forward motion');
+const landX=car.state.x,landY=car.state.y;
+car.state.x=5000;car.state.y=5000;car.state.v=100;car.state.vx=100;car.state.vy=0;
+car.step(1/60,{throttle:1});
+assert.equal(car.state.x,5000,'guard test setup must remain outside world');
+assert.equal(car.state.v,0,'world guard must stop an out-of-world car');
+car.state.x=landX;car.state.y=landY;car.state.v=0;car.state.vx=0;car.state.vy=0;
+console.log('PLAYER DRIVE ACCEPTANCE: PASS MOVE + STEER + HARD STOP + WORLD GUARD');
