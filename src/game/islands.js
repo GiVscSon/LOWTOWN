@@ -5,7 +5,7 @@ export const ISLANDS = [
     districts: ['downtown', 'residential', 'old industrial']
   },
   {
-    id: 'IRON_HARBOR', name: 'IRON HARBOR', biome: 'INDUSTRIAL_COAST', center: { x: 1700, y: -100 }, rx: 720, ry: 900,
+    id: 'IRON_HARBOR', name: 'IRON HARBOR', biome: 'INDUSTRIAL_COAST', center: { x: 1700, y: -100 }, rx: 760, ry: 900,
     colors: { land: '#25282a', shore: '#6b716f', accent: '#d4523a' },
     districts: ['docks', 'warehouses', 'shipyard']
   },
@@ -17,8 +17,8 @@ export const ISLANDS = [
 ];
 
 export const BRIDGES = [
-  { id: 'EAST_BRIDGE', a: { x: 760, y: -20 }, b: { x: 980, y: -20 }, width: 72 },
-  { id: 'NORTH_BRIDGE', a: { x: 0, y: 860 }, b: { x: 0, y: 1200 }, width: 72 }
+  { id: 'EAST_BRIDGE', a: { x: 800, y: 0 }, b: { x: 960, y: 0 }, width: 110 },
+  { id: 'NORTH_BRIDGE', a: { x: 0, y: 800 }, b: { x: 0, y: 1200 }, width: 90 }
 ];
 
 const ellipse = (x, y, island) => {
@@ -33,13 +33,6 @@ const bridgeHit = (x, y, bridge) => {
   const px = bridge.a.x + vx * t, py = bridge.a.y + vy * t;
   return Math.hypot(x - px, y - py) <= bridge.width;
 };
-
-export function islandAt(x, y) {
-  return ISLANDS.find(island => ellipse(x, y, island)) || null;
-}
-export function isLand(x, y) {
-  return !!islandAt(x, y) || BRIDGES.some(bridge => bridgeHit(x, y, bridge));
-}
-export function biomeAt(x, y) {
-  return islandAt(x, y)?.biome || (BRIDGES.some(bridge => bridgeHit(x, y, bridge)) ? 'BRIDGE' : 'WATER');
-}
+export function islandAt(x, y) { return ISLANDS.find(island => ellipse(x, y, island)) || null; }
+export function isLand(x, y) { return !!islandAt(x, y) || BRIDGES.some(bridge => bridgeHit(x, y, bridge)); }
+export function biomeAt(x, y) { return islandAt(x, y)?.biome || (BRIDGES.some(bridge => bridgeHit(x, y, bridge)) ? 'BRIDGE' : 'WATER'); }
