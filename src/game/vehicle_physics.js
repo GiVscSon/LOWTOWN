@@ -12,7 +12,8 @@ export function createVehicleState({x=0,y=0,a=0,vx=0,vy=0,yawRate=0}={}){return{
 export function vehicleSpeed(c){return Math.hypot(c.vx,c.vy);}
 
 export function vehicleStep(car,dt,input={},cfg=VEHICLE_PHYSICS){
-  const sub=Math.max(1,Math.ceil(Math.min(dt,cfg.maxDt)/(1/120))),h=Math.min(dt,cfg.maxDt)/sub;
+  const safeDt=Math.max(0,Number(dt)||0);
+  const sub=Math.max(1,Math.ceil(safeDt/(1/120))),h=safeDt/sub;
   const throttle=clamp(Number(input.throttle)||0,-1,1),brake=clamp(Number(input.brake)||0,0,1),steer=clamp(Number(input.steer)||0,-1,1),handbrake=!!input.handbrake;
   let distance=0,slipAngle=0,lateralSpeed=0;
   for(let i=0;i<sub;i++){
