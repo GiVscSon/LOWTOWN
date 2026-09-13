@@ -44,6 +44,8 @@ jobs:
         run: node tests/scenario-generator-smoke.mjs
       - name: Run corridor guardian smoke test
         run: node tests/corridor-guardian-smoke.mjs
+      - name: Run Black Box telemetry smoke test
+        run: node tests/black-box-telemetry-smoke.mjs
       - name: Run scenario feedback smoke test
         run: node tests/scenario-feedback-smoke.mjs
       - name: Run trajectory lab smoke test
