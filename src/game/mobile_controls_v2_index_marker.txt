@@ -1,0 +1,1 @@
+mobile controls v2 is bootstrapped by the index entry added in the current deployment commit.
