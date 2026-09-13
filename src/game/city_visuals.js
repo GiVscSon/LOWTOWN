@@ -1,5 +1,7 @@
-import { CITY_ROADS, CITY_DESTINATIONS, roadPoint } from './city_semantics.js';
+import { CITY_ROADS, CITY_DESTINATIONS, roadPoint, buildCityGraph } from './city_semantics.js';
 
+const CITY_GRAPH=buildCityGraph();
+if(typeof globalThis!=='undefined')globalThis.__LOWTOWN_CITY_GRAPH=CITY_GRAPH;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function hash(x,y,n=0){const v=Math.sin(x*12.9898+y*78.233+n*37.719)*43758.5453;return v-Math.floor(v);}
 function diamond(ctx,p,size){ctx.beginPath();ctx.moveTo(p.x,p.y-size*.45);ctx.lineTo(p.x+size,p.y);ctx.lineTo(p.x,p.y+size*.45);ctx.lineTo(p.x-size,p.y);ctx.closePath();}
@@ -9,4 +11,4 @@ function wetStreetSheen(ctx,iso,buildings,t){for(let i=0;i<buildings.length;i++)
 function roadLabels(ctx,iso){ctx.save();ctx.textAlign='center';ctx.textBaseline='middle';for(const road of CITY_ROADS){const mid=Math.floor((road.points.length-1)/2),p=roadPoint(road.id,mid,road.lanes*18+18);if(!p)continue;const q=iso(p.x,p.y);ctx.translate(q.x,q.y-8);ctx.rotate(-p.heading*.55);ctx.font=road.class==='ARTERIAL'?'bold 8px monospace':'7px monospace';ctx.fillStyle='rgba(224,154,62,.68)';ctx.fillText(road.name.toUpperCase(),0,0);ctx.setTransform(1,0,0,1,0,0);}ctx.restore();}
 function intersections(ctx,iso){for(const road of CITY_ROADS){for(let i=0;i<road.points.length;i++){const [x,y]=road.points[i],connections=CITY_ROADS.filter(r=>r.id!==road.id&&r.points.some(p=>Math.hypot(p[0]-x,p[1]-y)<3));if(connections.length===0)continue;const p=iso(x,y);ctx.strokeStyle='rgba(154,160,168,.22)';ctx.lineWidth=3;for(const s of [-1,1]){ctx.beginPath();ctx.moveTo(p.x-10*s,p.y-4);ctx.lineTo(p.x+10*s,p.y+4);ctx.stroke();}}}}
 function destinationSigns(ctx,iso){for(const d of CITY_DESTINATIONS){const p=roadPoint(d.roadId,d.index,(CITY_ROADS.find(r=>r.id===d.roadId)?.lanes||2)*14+30);if(!p)continue;const q=iso(p.x,p.y);ctx.fillStyle='rgba(12,13,16,.8)';ctx.fillRect(q.x-30,q.y-28,60,11);ctx.fillStyle='rgba(154,160,168,.72)';ctx.font='6px monospace';ctx.textAlign='center';ctx.fillText(d.name.toUpperCase(),q.x,q.y-20);}}
-export function createCityVisuals(){return{version:'CITY_LIFE_1',draw(ctx,iso,buildings,lamps,t){for(const b of buildings)buildingDetails(ctx,iso,b,t);wetStreetSheen(ctx,iso,buildings,t);streetAtmosphere(ctx,iso,lamps,t);intersections(ctx,iso);roadLabels(ctx,iso);destinationSigns(ctx,iso);}};}
+export function createCityVisuals(){return{version:'CITY_LIFE_2',draw(ctx,iso,buildings,lamps,t){for(const b of buildings)buildingDetails(ctx,iso,b,t);wetStreetSheen(ctx,iso,buildings,t);streetAtmosphere(ctx,iso,lamps,t);intersections(ctx,iso);roadLabels(ctx,iso);destinationSigns(ctx,iso);}};}
