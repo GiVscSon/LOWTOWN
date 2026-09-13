@@ -11,8 +11,12 @@ export function createBlackBox({ capacity = 900, eventCapacity = 80 } = {}) {
   function sample(snapshot,dt=0){
     state.elapsed+=Math.max(0,dt);state.samples++;
     const s=clone(snapshot)||{},g=s.game||{},a=s.ai||{},c=a.control||null,prevSample=state.lastSample,prevControl=state.lastControl;
-    s.t=+state.elapsed.toFixed(3);pushRing(s);
-    const speed=Number(g.speed)||0;
+    s.t=+state.elapsed.toFixed(3);
+    const rawSpeed=Number(g.speed)||0;
+    const runMax=Number(g.maxSpeed);
+    const speed=Number.isFinite(runMax)&&runMax>0?Math.min(rawSpeed,runMax):rawSpeed;
+    if(s.game)s.game.speed=speed;
+    pushRing(s);
     state.summary.distance=Math.max(state.summary.distance,Number(g.distance)||0);state.summary.maxSpeed=Math.max(state.summary.maxSpeed,speed);
     state.summary.collisions=Number(g.collisions)||0;state.summary.trafficHits=Number(g.trafficHits)||0;state.summary.nearMisses=Number(a.nearMisses)||0;state.summary.overtakes=Number(a.overtakes)||0;state.summary.recoveries=Number(a.recoveries)||0;state.summary.replans=Number(a.replans)||0;state.summary.safeStarts=Number(a.safeStarts)||0;state.summary.decisions=Number(a.decisions)||0;
     if(c&&prevControl){if(Math.abs((c.brake||0)-(prevControl.brake||0))>.55)state.summary.controlChanges++;if((c.brake||0)>.72&&speed>230)state.summary.hardBrakes++;if(Math.abs((c.steer||0)-(prevControl.steer||0))>.62)state.summary.steeringSpikes++;}
