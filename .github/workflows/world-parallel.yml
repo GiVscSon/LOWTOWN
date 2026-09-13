@@ -1,0 +1,38 @@
+name: LOWTOWN World Parallel Tests
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  world-test:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: roads
+            test: tests/road-topology-smoke.mjs
+          - name: world-stress
+            test: tests/world-stress-smoke.mjs
+          - name: transport
+            test: tests/transport-smoke.mjs
+          - name: islands
+            test: tests/islands-smoke.mjs
+          - name: navigation
+            test: tests/navigation-brain-smoke.mjs
+          - name: safety
+            test: tests/ai-safety-layer-smoke.mjs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install
+      - name: Build
+        run: npm run build
+      - name: Run isolated test
+        run: node ${{ matrix.test }}
