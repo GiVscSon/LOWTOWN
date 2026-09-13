@@ -1,4 +1,5 @@
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const wrap = a => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
 
 export function createTrajectoryLab({ simulate, trafficRisk, blocked = () => false } = {}) {
   if (typeof simulate !== 'function') throw new TypeError('trajectory lab requires simulate()');
@@ -47,13 +48,14 @@ export function createTrajectoryLab({ simulate, trafficRisk, blocked = () => fal
       const result = simulate(car, candidate.horizon, candidate.steer, candidate.throttle, candidate.brake);
       const risk = trafficRisk(result, hazards);
       const targetDistance = target ? Math.hypot(result.x - target.x, result.y - target.y) : 0;
-      const alignment = target ? Math.abs(Math.atan2(target.y - result.y, target.x - result.x) - (car.a || 0)) : Math.abs(headingError);
+      const alignment = target ? Math.abs(wrap(Math.atan2(target.y - result.y, target.x - result.x) - (car.a || 0))) : Math.abs(headingError);
       const wallPenalty = Math.max(0, 70 - result.minWall) * 5;
       const collisionPenalty = result.safe ? 0 : 100000 + (candidate.horizon - result.collisionT) * 8000;
       const turnBonus = className === 'TURN_AROUND' && candidate.maneuver === 'TURN_AROUND' ? 120 : 0;
+      const directionBonus = className === 'TURN_AROUND' ? (candidate.steer * headingError > 0 ? 190 : candidate.steer === 0 ? 30 : -70) : 0;
       const stopBonus = className === 'TURN_AROUND' && candidate.id === 'FULL_BRAKE' && speed > 180 ? 80 : 0;
       const progress = target ? -targetDistance * 0.75 : result.speed * 0.12;
-      const score = progress + turnBonus + stopBonus - wallPenalty - risk.risk * 5 - collisionPenalty - alignment * 12 - Math.abs(candidate.steer) * 8;
+      const score = progress + turnBonus + directionBonus + stopBonus - wallPenalty - risk.risk * 5 - collisionPenalty - alignment * 12 - Math.abs(candidate.steer) * 8;
       return {
         ...candidate,
         safe: !!result.safe,
