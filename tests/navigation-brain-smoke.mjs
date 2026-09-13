@@ -6,7 +6,9 @@ for(let y=0;y<8;y++) for(let x=0;x<8;x++) nodes.push({id:`${x}:${y}`,x:x*160,y:y
 for(const n of nodes){const [x,y]=n.id.split(':').map(Number);for(const m of nodes){const [mx,my]=m.id.split(':').map(Number);if(Math.abs(mx-x)+Math.abs(my-y)===1)n.links.push(m);}}
 const brain=createNavigationBrain({nodes});
 const car={x:0,y:0,a:0,vx:100,vy:0};
-for(let i=0;i<20;i++) brain.observe(i%4*160,Math.floor(i/4)*160);
+for(let i=0;i<20;i++) brain.observe((i%4)*160,Math.floor(i/4)*160);
+// Explicitly revisit cells so the anti-loop detector is tested for its intended behavior.
+for(let i=0;i<12;i++) brain.observe((i%2)*160,0);
 const destination=brain.choose(car);
 assert.ok(destination,'navigation brain should choose a destination');
 assert.ok(brain.state.cells.size>0,'exploration memory should contain cells');
