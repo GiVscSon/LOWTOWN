@@ -1,6 +1,6 @@
 import { normalizeTypeInput } from './transport_type_physics.js';
 import { TRANSPORT_TYPES } from './transport_constants.js';
-import { dynamicBlendWeight, stepDynamicBicycle } from './dynamic_bicycle.js';
+import { dynamicBlendWeight, dynamicHandlingActive, stepDynamicBicycle } from './dynamic_bicycle.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const finite=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
@@ -55,15 +55,17 @@ export function stepCarPhysics(state,dt,input,physics){
 
   const postDriveSpeed=Math.hypot(state.vx,state.vy);
   const explicitDynamic=p.handlingModel==='dynamic';
-  const dynamicBlend=explicitDynamic?1:dynamicBlendWeight(postDriveSpeed,p);
-  const useDynamic=!c.handbrake&&dynamicBlend>0;
+  const wasDynamic=state.dynamicHandlingActive===true;
+  const autoDynamic=dynamicHandlingActive(postDriveSpeed,p,wasDynamic);
+  const dynamicBlend=explicitDynamic?1:(autoDynamic?Math.max(.5,dynamicBlendWeight(postDriveSpeed,p)):0);
+  const useDynamic=!c.handbrake&&(explicitDynamic||autoDynamic);
   let handlingModel='kinematic-grip';
   let dynamicTelemetry=null;
 
   if(useDynamic){
     const dynamicState={...state};
     dynamicTelemetry=stepDynamicBicycle(dynamicState,safeDt,{...p,steerInput:c.steer,longitudinalAcceleration:driveAcceleration});
-    if(dynamicBlend>=.999){
+    if(dynamicBlend>=.999||autoDynamic){
       state.vx=dynamicState.vx;
       state.vy=dynamicState.vy;
       state.yawRate=dynamicState.yawRate;
@@ -75,12 +77,13 @@ export function stepCarPhysics(state,dt,input,physics){
       blendState(state,dynamicState,dynamicBlend);
       state.a=kinematicState.a+(Math.atan2(Math.sin(dynamicState.a-kinematicState.a),Math.cos(dynamicState.a-kinematicState.a)))*dynamicBlend;
       state.yawRate=kinematicState.yawRate+(dynamicState.yawRate-kinematicState.yawRate)*dynamicBlend;
-      handlingModel=dynamicBlend>=.5?'dynamic-bicycle-blend':'kinematic-grip-blend';
+      handlingModel='dynamic-bicycle-blend';
     }
   }else{
     stepKinematicGrip(state,safeDt,c,p);
   }
 
+  state.dynamicHandlingActive=autoDynamic||explicitDynamic;
   const resistance=(p.rollingResistance||0)*speed*safeDt;
   if(speed>1){state.vx-=state.vx/speed*resistance;state.vy-=state.vy/speed*resistance;}
   const drag=c.handbrake?p.handbrakeDrag:p.drag;
