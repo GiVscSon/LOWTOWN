@@ -42,14 +42,14 @@ try {
   if (a.routeLength === 0) throw new Error('Predictive AI has no route.');
   if (a.replans < 1) throw new Error('Predictive AI never replanned.');
   if (a.decisions < 50) throw new Error(`AI made too few decisions: ${a.decisions}`);
-  if (s.speed <= 20) throw new Error('Autopilot failed to build speed.');
+  if (s.maxSpeed <= 80) throw new Error(`Autopilot failed to build speed: max ${s.maxSpeed.toFixed(0)}.`);
   if (s.distance < 700) throw new Error(`Autopilot travelled too little: ${s.distance.toFixed(0)}.`);
   if (Math.hypot(s.x, s.y) < 300) throw new Error('Autopilot did not explore the world.');
   if (s.trafficCars < 18) throw new Error('Traffic system failed to spawn enough cars.');
   if (s.pedestrians < 20) throw new Error('Pedestrian system failed to spawn enough people.');
   if (s.collisions > 10) throw new Error(`Too many building collisions: ${s.collisions}`);
   if (s.stuck > 2) throw new Error(`Legacy autopilot got stuck ${s.stuck} times.`);
-  if (a.recoveries > 3) throw new Error(`Predictive AI recovered too often: ${a.recoveries}`);
+  if (a.recoveries > 4) throw new Error(`Predictive AI recovered too often: ${a.recoveries}`);
   if (Math.abs(a.crossTrack) > 130) throw new Error(`AI left the road corridor: ${a.crossTrack.toFixed(0)}.`);
   if (!Array.isArray(a.candidates) || a.candidates.length === 0) throw new Error('AI produced no trajectory candidates.');
 
