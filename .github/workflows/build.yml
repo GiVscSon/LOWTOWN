@@ -16,6 +16,8 @@ jobs:
           node-version: 20
       - run: npm install
       - run: npm run build
+      - name: Test player drive acceptance
+        run: node tests/player-drive-smoke.mjs
       - name: Test standalone character physics
         run: node tests/character-physics-smoke.mjs
       - name: Test vehicle physics
@@ -72,6 +74,8 @@ jobs:
         run: node tests/city-semantics-smoke.mjs
       - name: Test gameplay content pass
         run: node tests/gameplay-content-smoke.mjs
+      - name: Test gameplay loop
+        run: node tests/gameplay-loop-smoke.mjs
       - name: Diagnose world connectivity
         run: node tests/world-connectivity-diagnostic.mjs
       - name: Stress-test world routing
