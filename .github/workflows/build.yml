@@ -30,6 +30,12 @@ jobs:
         run: node tests/transport-ai-closed-loop-stress.mjs
       - name: Test physics diagnostics
         run: node tests/physics-diagnostics-smoke.mjs
+      - name: Test physics calibration
+        run: node tests/physics-calibration-smoke.mjs
+      - name: Test physics calibration closed loop
+        run: node tests/physics-calibration-closed-loop-smoke.mjs
+      - name: Run calibration lab
+        run: node tests/calibration-lab.mjs
       - name: Test persistent world state
         run: node tests/world-state-smoke.mjs
       - name: Test road topology first
