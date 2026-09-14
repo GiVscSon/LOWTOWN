@@ -74,6 +74,8 @@ jobs:
         run: node tests/city-semantics-smoke.mjs
       - name: Test gameplay content pass
         run: node tests/gameplay-content-smoke.mjs
+      - name: Test AI mission route lock
+        run: node tests/ai-route-lock-smoke.mjs
       - name: Test gameplay loop
         run: node tests/gameplay-loop-smoke.mjs
       - name: Diagnose world connectivity
