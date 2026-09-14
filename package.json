@@ -25,7 +25,8 @@
     "test:gameplay-job-chain": "node tests/gameplay-job-chain-smoke.mjs",
     "test:player-drive": "node tests/player-drive-acceptance.mjs",
     "test:transport-world-sweep": "node tests/transport-world-sweep-smoke.mjs",
-    "test:road-authority": "node tests/road-authority-smoke.mjs"
+    "test:road-authority": "node tests/road-authority-smoke.mjs",
+    "test:vehicle-road-collision": "node tests/vehicle-road-collision-smoke.mjs"
   },
   "devDependencies": {
     "vite": "^7.1.5"
