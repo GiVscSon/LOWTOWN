@@ -17,13 +17,27 @@ const first = destinationPoint(s.route[0]);
 const second = destinationPoint(s.route[1]);
 const route = vehicleRoute(first, second);
 assert.ok(route.length >= 2, 'semantic destinations must be vehicle-connected');
+
+const aiStub = { state: { enabled: true, route: [], node: 0, goal: null, routeTimer: 2.9, mode: 'CRUISE', state: 'CRUISE', replans: 0 } };
+globalThis.__LOWTOWN_AI = aiStub;
+missions.update({ x: -320, y: 0 });
+assert.ok(aiStub.state.route.length >= 2, 'active mission must take control of the AI route');
+assert.equal(aiStub.state.mode, 'MISSION', 'AI must enter mission navigation mode');
+assert.ok(aiStub.state.goal && Number.isFinite(aiStub.state.goal.x) && Number.isFinite(aiStub.state.goal.y));
+assert.equal(aiStub.state.routeTimer, 0, 'mission navigation must suppress free-roam replanning');
+
 missions.update({ x: first.x, y: first.y });
 s = missions.state();
 assert.equal(s.stage, 1, 'reaching a destination must advance the mission');
+missions.update({ x: -320, y: 0 });
+assert.ok(aiStub.state.route.length >= 2, 'next mission stage must install a new AI route');
+assert.ok(aiStub.state.goal && Number.isFinite(aiStub.state.goal.x) && Number.isFinite(aiStub.state.goal.y));
+
+delete globalThis.__LOWTOWN_AI;
 missions.next();
 assert.equal(missions.state().id, 'RUN');
 missions.next();
 assert.equal(missions.state().id, 'GETAWAY');
 missions.reset();
 assert.equal(missions.state().stage, 0);
-console.log('GAMEPLAY CONTENT PASS: PASS SEMANTIC MISSIONS + DESTINATIONS + ROUTE PROGRESSION');
+console.log('GAMEPLAY CONTENT PASS: PASS SEMANTIC MISSIONS + DESTINATIONS + MISSION AI ROUTING');
