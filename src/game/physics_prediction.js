@@ -20,14 +20,16 @@ function physicsStep(state,dt,input,physics){
 }
 
 export function predictVehicle(state,seconds,input={},physics=state.physics,options={}){
-  const safeSeconds=clamp(finite(seconds),0,10),physicsDt=1/120;
-  const controlDt=Math.max(physicsDt,finite(options.controlDt,1/60));
+  const safeSeconds=clamp(finite(seconds),0,10);
+  const arcadeCar=state.type===TRANSPORT_TYPES.CAR&&physics?.model==='arcade-bicycle-swept';
+  const physicsDt=arcadeCar?.05:1/120;
   const useActuator=options.useActuatorDelay!==false&&!!state.actuatorState;
   const response=useActuator?{...DEFAULT_RESPONSE,...(options.actuatorResponse||{})}:null;
+  const controlDt=useActuator?Math.max(physicsDt,finite(options.controlDt,1/60)):physicsDt;
   let current={...state,telemetry:state.telemetry?{...state.telemetry}:state.telemetry};
   let actuator=useActuator?{...state.actuatorState}:null;
   const points=[];const blocked=typeof options.blocked==='function'?options.blocked:null;
-  let collision=false,collisionT=safeSeconds,elapsed=0,controlElapsed=0,stepIndex=0,minWall=Infinity;
+  let collision=false,collisionT=safeSeconds,elapsed=0,stepIndex=0,minWall=Infinity;
   const sampleEvery=Math.max(1,Math.floor(Math.max(physicsDt,safeSeconds/24)/physicsDt));
   while(elapsed<safeSeconds-1e-9){
     const frame=Math.min(controlDt,safeSeconds-elapsed);
@@ -41,7 +43,6 @@ export function predictVehicle(state,seconds,input={},physics=state.physics,opti
       if(stepIndex%sampleEvery===0)points.push({x:current.x,y:current.y,z:current.z,a:current.a,vx:current.vx,vy:current.vy,vz:current.vz});
     }
     if(collision)break;
-    controlElapsed+=frame;
   }
   const speed=Math.hypot(current.vx,current.vy,current.vz),forward=current.vx*Math.cos(current.a)+current.vy*Math.sin(current.a),lateral=-current.vx*Math.sin(current.a)+current.vy*Math.cos(current.a),slip=Math.atan2(lateral,Math.max(1,Math.abs(forward)));
   const horizonUncertainty=clamp(safeSeconds*.035,0,.35),slipUncertainty=clamp(Math.abs(slip)/1.05*.22,0,.22),actuatorUncertainty=useActuator?clamp(Math.abs((actuator?.throttle||0)-(input.throttle||0))*.08+Math.abs((actuator?.steer||0)-(input.steer||0))*.12,0,.2):0;
