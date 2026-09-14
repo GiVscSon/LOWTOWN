@@ -23,4 +23,11 @@ for(let i=0;i<120;i++)traffic.update(1/60,{x:10000,y:10000});
 assert.equal(stuck.x,start.x,'stuck NPC must not teleport to a random node');
 assert.equal(stuck.y,start.y,'stuck NPC must not teleport to a random node');
 assert.equal(stuck.v,0,'stuck NPC should settle to wait/replan state');
-console.log('TRAFFIC STABILITY: PASS bounded load + overlap separation + no stuck teleport');
+
+const densityUrl='?scenario='+encodeURIComponent(JSON.stringify({trafficDensity:0.2}));
+globalThis.location={search:densityUrl};
+const sparse=createTrafficSystem({nodes:[a,b],blocked:()=>false,seed:11});
+assert.equal(sparse.cars.length,12,'scenario trafficDensity must remain available');
+for(let i=0;i<60;i++)sparse.update(1/60,{x:0,y:0});
+for(const c of sparse.cars)assert.ok(Math.hypot(c.x,c.y)>30,'traffic recovery must not leave an NPC on the player');
+console.log('TRAFFIC STABILITY: PASS bounded load + overlap separation + no stuck teleport + player-safe recovery + density control');
