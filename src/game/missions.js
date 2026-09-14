@@ -8,6 +8,8 @@ export function createMissionSystem(world) {
     { id: 'GETAWAY', title: 'LOSE THE TAIL', text: 'Run from Dock Works through Freight Depot to the motel.', reward: 700, route: ['DOCK_WORKS', 'FREIGHT_DEPOT', 'NORTH_RIDGE_MOTEL'] }
   ];
   let active = 0, stage = 0, complete = false, started = false, aiRouteKey = null;
+  const MISSION_ROUTE_LOCK = 1.2;
+  const EMERGENCY_STUCK = 1.5;
   function current() { return templates[active]; }
   function target() { const m = current(); return destination(m.route[stage % m.route.length]); }
   function routePreview() {
@@ -27,6 +29,9 @@ export function createMissionSystem(world) {
         ai.state.route = route;
         ai.state.node = 0;
         ai.state.routeTimer = 0;
+        ai.state.routeLockRemaining = MISSION_ROUTE_LOCK;
+        ai.state.routeLocked = true;
+        ai.state.routeLockReason = 'MISSION';
         ai.state.mode = ai.state.state = 'MISSION';
         ai.state.replans = (ai.state.replans || 0) + 1;
         aiRouteKey = key;
@@ -34,12 +39,31 @@ export function createMissionSystem(world) {
     } else {
       ai.state.routeTimer = 0;
       ai.state.mode = ai.state.state === 'IDLE' ? 'MISSION' : ai.state.state;
+      ai.state.routeLocked = true;
+      ai.state.routeLockReason = 'MISSION';
+      if (Number.isFinite(ai.state.routeLockRemaining)) ai.state.routeLockRemaining = Math.max(0, ai.state.routeLockRemaining - 1 / 60);
+    }
+  }
+  function emergencyReplan(car) {
+    const ai = globalThis.__LOWTOWN_AI;
+    if (!ai?.state?.enabled || !car || ai.state.mode !== 'MISSION') return;
+    if (!(ai.state.stuckTime > EMERGENCY_STUCK) || typeof ai.replan !== 'function') return;
+    const ok = ai.replan(car);
+    if (ok) {
+      ai.state.stuckTime = 0;
+      ai.state.routeTimer = 0;
+      ai.state.routeLocked = true;
+      ai.state.routeLockRemaining = MISSION_ROUTE_LOCK;
+      ai.state.routeLockReason = 'MISSION_EMERGENCY';
+      ai.state.mode = ai.state.state = 'MISSION';
+      ai.state.recoveries = (ai.state.recoveries || 0) + 1;
     }
   }
   function update(car) {
     if (complete) return false;
     const p = target();
     syncMissionAI(car, p);
+    emergencyReplan(car);
     if (Math.hypot(car.x - p.x, car.y - p.y) < (p.radius || 55)) {
       started = true; stage++;
       aiRouteKey = null;
