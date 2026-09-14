@@ -11,6 +11,7 @@ assert.ok(start,'a road spawn must exist');
 assert.equal(vehicleWorldBlocked(start.x,start.y,start.heading,lines,{length:56,width:28}),false,'car must be valid on road');
 const roadDistance=nearestRoadDistanceForVehicle(start.x,start.y,lines);
 assert.ok(roadDistance<=1,'snapped vehicle must sit on road centreline');
-const offRoadY=start.y+ROAD_WIDTH+30;
+const offRoadY=start.y+90;
 assert.equal(vehicleWorldBlocked(start.x,offRoadY,start.heading,lines,{length:56,width:28}),true,'car must not drive freely far outside road corridor');
+assert.ok(ROAD_WIDTH>0);
 console.log('VEHICLE ROAD COLLISION: PASS CENTRELINE + OFFROAD BLOCK');
