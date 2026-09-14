@@ -18,13 +18,35 @@ const second = destinationPoint(s.route[1]);
 const route = vehicleRoute(first, second);
 assert.ok(route.length >= 2, 'semantic destinations must be vehicle-connected');
 
-const aiStub = { state: { enabled: true, route: [], node: 0, goal: null, routeTimer: 2.9, mode: 'CRUISE', state: 'CRUISE', replans: 0 } };
+const aiStub = {
+  state: {
+    enabled: true, route: [], node: 0, goal: null, routeTimer: 2.9, mode: 'CRUISE', state: 'CRUISE',
+    replans: 0, stuckTime: 0, recoveries: 0
+  },
+  replan(car) {
+    this.state.replans++;
+    this.state.route = vehicleRoute({ x: car.x, y: car.y }, this.state.goal || first).filter(Boolean);
+    this.state.node = 0;
+    this.state.routeTimer = 0;
+    return this.state.route.length >= 2;
+  }
+};
 globalThis.__LOWTOWN_AI = aiStub;
 missions.update({ x: -320, y: 0 });
 assert.ok(aiStub.state.route.length >= 2, 'active mission must take control of the AI route');
 assert.equal(aiStub.state.mode, 'MISSION', 'AI must enter mission navigation mode');
 assert.ok(aiStub.state.goal && Number.isFinite(aiStub.state.goal.x) && Number.isFinite(aiStub.state.goal.y));
 assert.equal(aiStub.state.routeTimer, 0, 'mission navigation must suppress free-roam replanning');
+assert.equal(aiStub.state.routeLocked, true, 'mission route must be explicitly locked');
+assert.equal(aiStub.state.routeLockReason, 'MISSION');
+assert.ok(aiStub.state.routeLockRemaining > 0, 'mission route lock must expose a cooldown');
+
+const replanBefore = aiStub.state.replans;
+aiStub.state.stuckTime = 2;
+missions.update({ x: -320, y: 0 });
+assert.ok(aiStub.state.replans > replanBefore, 'stuck mission AI must trigger an emergency replan');
+assert.equal(aiStub.state.stuckTime, 0, 'successful emergency replan must clear stuck time');
+assert.equal(aiStub.state.routeLockReason, 'MISSION_EMERGENCY');
 
 missions.update({ x: first.x, y: first.y });
 s = missions.state();
@@ -32,6 +54,7 @@ assert.equal(s.stage, 1, 'reaching a destination must advance the mission');
 missions.update({ x: -320, y: 0 });
 assert.ok(aiStub.state.route.length >= 2, 'next mission stage must install a new AI route');
 assert.ok(aiStub.state.goal && Number.isFinite(aiStub.state.goal.x) && Number.isFinite(aiStub.state.goal.y));
+assert.equal(aiStub.state.routeLocked, true);
 
 delete globalThis.__LOWTOWN_AI;
 missions.next();
@@ -40,4 +63,4 @@ missions.next();
 assert.equal(missions.state().id, 'GETAWAY');
 missions.reset();
 assert.equal(missions.state().stage, 0);
-console.log('GAMEPLAY CONTENT PASS: PASS SEMANTIC MISSIONS + DESTINATIONS + MISSION AI ROUTING');
+console.log('GAMEPLAY CONTENT PASS: PASS SEMANTIC MISSIONS + DESTINATIONS + MISSION AI ROUTING + ROUTE LOCK + EMERGENCY REPLAN');
