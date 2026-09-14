@@ -23,19 +23,22 @@ export function createMissionSystem(world) {
     if (!ai?.state?.enabled || !car || !p) return;
     const key = `${active}:${stage}`;
     if (key !== aiRouteKey) {
-      const route = vehicleRoute({ x: car.x, y: car.y }, p).filter(Boolean);
-      if (route.length) {
+      if (typeof ai.setMissionGoal === 'function') {
+        if (!ai.setMissionGoal(p)) return;
+      } else {
+        const route = vehicleRoute({ x: car.x, y: car.y }, p).filter(Boolean);
+        if (!route.length) return;
         ai.state.goal = route[route.length - 1];
         ai.state.route = route;
         ai.state.node = 0;
-        ai.state.routeTimer = 0;
-        ai.state.routeLockRemaining = MISSION_ROUTE_LOCK;
-        ai.state.routeLocked = true;
-        ai.state.routeLockReason = 'MISSION';
-        ai.state.mode = ai.state.state = 'MISSION';
-        ai.state.replans = (ai.state.replans || 0) + 1;
-        aiRouteKey = key;
       }
+      ai.state.routeTimer = 0;
+      ai.state.routeLockRemaining = MISSION_ROUTE_LOCK;
+      ai.state.routeLocked = true;
+      ai.state.routeLockReason = 'MISSION';
+      ai.state.mode = ai.state.state = 'MISSION';
+      ai.state.replans = (ai.state.replans || 0) + 1;
+      aiRouteKey = key;
     } else {
       ai.state.routeTimer = 0;
       ai.state.mode = ai.state.state === 'IDLE' ? 'MISSION' : ai.state.state;
@@ -67,12 +70,28 @@ export function createMissionSystem(world) {
     if (Math.hypot(car.x - p.x, car.y - p.y) < (p.radius || 55)) {
       started = true; stage++;
       aiRouteKey = null;
-      if (stage >= current().route.length) { complete = true; return true; }
+      if (stage >= current().route.length) {
+        complete = true;
+        const ai = globalThis.__LOWTOWN_AI;
+        if (ai?.clearMissionLock) ai.clearMissionLock();
+        return true;
+      }
+      const ai = globalThis.__LOWTOWN_AI;
+      if (ai?.state?.enabled && ai?.setMissionGoal) ai.setMissionGoal(target());
+      aiRouteKey = `${active}:${stage}`;
     }
     return false;
   }
-  function next() { active = (active + 1) % templates.length; stage = 0; complete = false; started = false; aiRouteKey = null; }
-  function reset() { stage = 0; complete = false; started = false; aiRouteKey = null; }
+  function next() {
+    const ai = globalThis.__LOWTOWN_AI;
+    if (ai?.clearMissionLock) ai.clearMissionLock();
+    active = (active + 1) % templates.length; stage = 0; complete = false; started = false; aiRouteKey = null;
+  }
+  function reset() {
+    const ai = globalThis.__LOWTOWN_AI;
+    if (ai?.clearMissionLock) ai.clearMissionLock();
+    stage = 0; complete = false; started = false; aiRouteKey = null;
+  }
   function state() {
     const mission = current();
     return { ...mission, stage, totalStages: mission.route.length, started, complete, target: target(), routePreview: routePreview(), destinationCount: CITY_DESTINATIONS.length };
