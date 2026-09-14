@@ -34,7 +34,8 @@ export function vehicleWorldBlocked(x,y,a,roadLines=[],options={}){
   const length=Math.max(30,Number(options.length)||56);
   const width=Math.max(18,Number(options.width)||28);
   const buildingMargin=Math.max(0,Number(options.buildingMargin)||4);
-  const roadTolerance=Math.max(0,Number(options.roadTolerance)??ROAD_EDGE_TOLERANCE);
+  const rawTolerance=Number(options.roadTolerance);
+  const roadTolerance=Number.isFinite(rawTolerance)?Math.max(0,rawTolerance):ROAD_EDGE_TOLERANCE;
   const points=footprintPoints(x,y,a,length,width);
   for(const p of points){
     if(!isLand(p.x,p.y)||pointInBuilding(p.x,p.y,buildingMargin))return true;
