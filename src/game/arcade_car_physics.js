@@ -5,10 +5,10 @@ export function resetArcadeCarState(state){state.v=0;state.steerAngle=0;state.vx
 export function stepArcadeCar(state,dt,input={},profile={}){
  const h=clamp(finite(dt,1/60),0,.05);if(h<=0)return telemetry(state,input);
  const maxSpeed=Math.max(40,finite(profile.maxForwardSpeed,455));
- const acceleration=Math.max(25,finite(profile.arcadeAcceleration,145));
- const reverseAcceleration=Math.max(15,finite(profile.arcadeReverseAcceleration,85));
+ const acceleration=Math.max(25,finite(profile.arcadeAcceleration,190));
+ const reverseAcceleration=Math.max(15,finite(profile.arcadeReverseAcceleration,100));
  const brake=Math.max(40,finite(profile.arcadeBrake,420));
- const drag=Math.max(.05,finite(profile.arcadeDrag,2.8));
+ const drag=Math.max(.05,finite(profile.arcadeDrag,2.0));
  const wheelbase=Math.max(18,finite(profile.wheelbase,58));
  const maxSteer=finite(profile.maxSteering,.58);
  const steerRate=Math.max(.5,finite(profile.steeringRateArcade,3.8));
