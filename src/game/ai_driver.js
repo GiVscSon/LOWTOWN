@@ -11,6 +11,7 @@ export function createAIDriver({ nodes = [], blocked = () => false, getTraffic =
   const finite = (v, f = 0) => Number.isFinite(Number(v)) ? Number(v) : f;
   const state = {
     enabled: false, route: [], node: 0, goal: null, state: 'IDLE', mode: 'IDLE', tactical: 'CRUISE',
+    missionLocked: false, missionGoalId: null, routeVersion: 0,
     sensor: { front: 999, frontLeft: 999, frontRight: 999, left: 999, right: 999 },
     dynamic: { count: 0, nearest: null, hazards: [] },
     prediction: { safe: true, x: 0, y: 0, t: 0, ttc: Infinity, risk: 0, confidence: 1 },
@@ -202,20 +203,65 @@ export function createAIDriver({ nodes = [], blocked = () => false, getTraffic =
     return state.control;
   }
 
+  function setMissionGoal(node) {
+    const goal = node?.id && Number.isFinite(node.x) && Number.isFinite(node.y) ? node : nearestNode(node?.x, node?.y);
+    if (!goal) return false;
+    state.missionLocked = true;
+    state.missionGoalId = goal.id;
+    state.goal = goal;
+    state.route = [];
+    state.node = 0;
+    state.routeTimer = 0;
+    state.routeLockRemaining = 0;
+    state.routeLocked = true;
+    state.routeLockReason = 'MISSION';
+    state.mode = state.state = 'MISSION';
+    state.routeVersion++;
+    return true;
+  }
+
+  function clearMissionLock() {
+    state.missionLocked = false;
+    state.missionGoalId = null;
+    state.goal = null;
+    state.route = [];
+    state.node = 0;
+    state.routeTimer = 0;
+    state.routeLocked = false;
+    state.routeLockRemaining = 0;
+    state.routeLockReason = null;
+    if (state.enabled) state.mode = state.state = 'CRUISE';
+  }
+
   function chooseGoal(car) {
+    if (state.missionLocked) return state.goal || null;
     const current = nearestNode(car.x, car.y); if (!current) return null;
     if (state.visited.size > nodes.length * .7) state.visited.clear();
     const candidates = nodes.filter(n => n.id !== current.id && !blocked(n.x, n.y) && !state.visited.has(n.id));
     let best = null, bestScore = -Infinity;
     for (const n of candidates) { const r = weightedRoute(current, n); if (!r.length) continue; const score = Math.min(1800, dist(current, n)) + rand() * 220 - r.length * 12; if (score > bestScore) { bestScore = score; best = n; } }
     if (!best) { state.routeFailures++; return null; }
-    state.goal = best; state.route = weightedRoute(current, best); state.node = 0; state.replans++; state.routeTimer = 0; return best;
+    state.goal = best; state.route = weightedRoute(current, best); state.node = 0; state.replans++; state.routeTimer = 0; state.routeVersion++; return best;
   }
 
-  function replan(car) { const goal = state.goal || chooseGoal(car); if (!goal) return false; const start = nearestNode(car.x, car.y); const r = weightedRoute(start, goal); if (!r.length) { state.routeFailures++; return false; } state.route = r; state.node = 0; state.replans++; state.routeTimer = 0; return true; }
+  function replan(car) {
+    const goal = state.missionLocked ? state.goal : (state.goal || chooseGoal(car));
+    if (!goal) return false;
+    const start = nearestNode(car.x, car.y);
+    const r = weightedRoute(start, goal);
+    if (!r.length) { state.routeFailures++; return false; }
+    state.route = r; state.node = 0; state.replans++; state.routeTimer = 0; state.routeVersion++;
+    if (state.missionLocked) { state.routeLocked = true; state.routeLockReason = 'MISSION'; state.mode = state.state = 'MISSION'; }
+    return true;
+  }
 
   function start(car) {
-    state.enabled = true; state.state = 'START'; state.mode = 'CRUISE'; state.decisions = 0; state.distance = 0; state.stuckTime = 0; state.progressTimer = 0; state.routeTimer = 0; state.visited.clear();
+    state.enabled = true; state.state = 'START'; state.mode = state.missionLocked ? 'MISSION' : 'CRUISE'; state.decisions = 0; state.distance = 0; state.stuckTime = 0; state.progressTimer = 0; state.routeTimer = 0; state.visited.clear();
+    if (state.missionLocked) {
+      state.route = [];
+      state.node = 0;
+      return !!replan(car);
+    }
     const n = safeStart(car) || nearestNode(car.x, car.y); if (!n) { state.routeFailures++; return false; }
     state.route = []; state.goal = null; state.node = 0; chooseGoal(car); return !!state.route.length;
   }
@@ -223,7 +269,7 @@ export function createAIDriver({ nodes = [], blocked = () => false, getTraffic =
   function update(car, dt = 1 / 60) {
     if (!state.enabled) return null;
     const h = clamp(finite(dt, 1 / 60), 0, .1); state.routeTimer += h; state.progressTimer += h;
-    if (!state.route.length || state.routeTimer > 3 || state.node >= state.route.length - 1) { if (!replan(car)) return state.control; }
+    if (!state.route.length || state.node >= state.route.length - 1 || (!state.missionLocked && state.routeTimer > 3)) { if (!replan(car)) return state.control; }
     while (state.node + 1 < state.route.length && dist(car, state.route[state.node + 1]) < 55) { state.visited.add(state.route[state.node].id); state.node++; state.lap++; }
     const moved = Math.hypot(car.x - state.lastProgressX, car.y - state.lastProgressY); state.distance += moved;
     if (moved > 1) { state.progressTimer = 0; state.stuckTime = 0; state.lastProgressX = car.x; state.lastProgressY = car.y; }
@@ -232,8 +278,8 @@ export function createAIDriver({ nodes = [], blocked = () => false, getTraffic =
   }
 
   function reset() {
-    state.enabled = false; state.route = []; state.node = 0; state.goal = null; state.state = 'IDLE'; state.mode = 'IDLE'; state.control = { throttle: 0, brake: 0, steer: 0, handbrake: false }; state.visited.clear();
+    state.enabled = false; state.route = []; state.node = 0; state.goal = null; state.missionLocked = false; state.missionGoalId = null; state.routeVersion = 0; state.routeLocked = false; state.routeLockRemaining = 0; state.routeLockReason = null; state.state = 'IDLE'; state.mode = 'IDLE'; state.control = { throttle: 0, brake: 0, steer: 0, handbrake: false }; state.visited.clear();
   }
 
-  return { state, start, update, reset, chooseControl, replan, weightedRoute };
+  return { state, start, update, reset, chooseControl, replan, weightedRoute, setMissionGoal, clearMissionLock };
 }
