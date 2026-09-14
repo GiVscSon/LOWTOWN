@@ -1,6 +1,6 @@
-# LOWTOWN AI integration gate
+# LOWTOWN AI driver roadmap
 
-The AI Driver is the primary autonomous driving brain in the browser game. Validation is layered rather than relying on a single judge.
+This document is the isolated AI-driver/testing track. It does **not** define the gameplay priority. Gameplay work is tracked in `ROADMAP_GAMEPLAY.md`.
 
 ## Gate
 
@@ -22,3 +22,9 @@ The scenario generator creates reproducible suites from a seed and supports 1,00
 `Black Box -> analysts -> benchmark` is the evaluation path.
 
 The evaluator must not secretly steer the vehicle or replace failures with synthetic success.
+
+## Work policy
+
+- Do not spend a work session on this track unless explicitly requested.
+- Gameplay has priority until `ROADMAP_GAMEPLAY.md` Prototype 0.2 ships and reaches parity with the gameplay layer described by the project status.
+- AI-driver tests may continue to run in CI as regression protection, but they are not a reason to expand AI-driver scope during gameplay work.
