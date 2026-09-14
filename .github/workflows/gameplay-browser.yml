@@ -1,0 +1,23 @@
+name: LOWTOWN Gameplay Browser Gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  browser-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm install --no-save playwright
+      - run: npx playwright install --with-deps chromium
+      - name: 15s continuous AI motion capture
+        run: node tests/ai-15s-browser-smoke.mjs
+      - name: End-to-end DROP payout and DIST gate
+        run: node tests/gameplay-browser-acceptance.mjs
