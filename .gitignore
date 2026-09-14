@@ -1,0 +1,11 @@
+# Gameplay/debug artifacts
+*.mp4
+*.jpg
+*.png
+*-test.txt
+LOWTOWN_ACCESS_TEST.txt
+
+# Local/build output
+node_modules/
+dist/
+coverage/
