@@ -76,6 +76,8 @@ jobs:
         run: node tests/gameplay-content-smoke.mjs
       - name: Test AI mission route lock
         run: node tests/ai-route-lock-smoke.mjs
+      - name: Test traffic stability
+        run: node tests/traffic-stability-smoke.mjs
       - name: Test gameplay loop
         run: node tests/gameplay-loop-smoke.mjs
       - name: Diagnose world connectivity
@@ -146,3 +148,5 @@ jobs:
         with:
           name: lowtown-physics-calibration
           path: physics-calibration-artifacts/
+          if-no-files-found: ignore
+          retention-days: 14
