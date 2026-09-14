@@ -2,39 +2,41 @@
 
 A browser-based 1990s crime-city driving prototype with a grimy night-city presentation and strict top-down gameplay view.
 
-## Vertical prototype: 0.1
+## Vertical prototype: 0.2 gameplay track
 
-The first playable slice is intentionally small and self-contained:
-
-- top-down night-city block rendered on Canvas
-- free driving with WASD / arrow keys
-- steering, acceleration, braking and handbrake
-- follow camera
-- amber mission marker
-- simple job completion state
-- responsive HUD
-- traffic and pedestrians
-- no external game assets required
+Prototype 0.2 is now the primary development track. It is deliberately focused on player-facing gameplay rather than autonomous AI-driver research.
 
 ## What is a job?
 
-A **job** is a player-facing mission task with a clear objective and destination. The player starts the job, drives to its goal, and completes it when the required gameplay condition is satisfied. Prototype 0.2 expands this into three chained jobs with simple rewards.
+A **job** is a player-facing mission with a defined objective, destination and completion condition. Jobs are chained: completing one unlocks the next, and each successful job awards deterministic money/score.
+
+The current chain is:
+
+1. **JOB 01: SHAKE THE NIGHT**
+2. **JOB 02: THROUGH THE BLOCKS**
+3. **JOB 03: LOSE THE TAIL**
+
+The prototype chain is complete only after Job 3 is completed.
 
 ## Win condition
 
-For the current prototype, a job is won when its active mission objective is completed. The Prototype 0.2 gameplay milestone is won when the player completes the full chain **Job 1 -> Job 2 -> Job 3** and receives the associated economy/score rewards.
+The current gameplay milestone is won by completing **Job 1 -> Job 2 -> Job 3** in order and receiving all three rewards: $250 + $450 + $700 = **$1,400**.
+
+## Persistence
+
+Prototype 0.2 stores completed-job progress and money in browser `localStorage`, so a reload can continue the gameplay progression. A fresh reset remains available for development/testing.
 
 ## Current limitations
 
-- static world collision with buildings and curbs is still being hardened for Prototype 0.2
-- the economy/score and three-job chain are not yet shipped
-- persistent save state is not yet shipped
-- pedestrian/police reactions are currently limited and will be expanded with deterministic scripted reactions
+- static building/land collision is implemented through a shared world-geometry contract; curb/road-edge behavior is still being hardened
+- the three-job economy chain is prototype-simple and has no inventory or shop system
+- pedestrian and police reactions are scripted prototype behaviors, not a full wanted/police simulation
+- combat/fight is scoped and approved in Issue #1 but is not yet part of the shipped 0.2 gameplay layer
 - autonomous AI-driver development is intentionally a separate track and is not the current gameplay priority
 
 ## Gameplay roadmap
 
-See [`ROADMAP_GAMEPLAY.md`](./ROADMAP_GAMEPLAY.md) for the Prototype 0.2 gameplay sequence and acceptance guardrails.
+See [`ROADMAP_GAMEPLAY.md`](./ROADMAP_GAMEPLAY.md) for the player-facing Prototype 0.2 sequence and acceptance criteria.
 
 ## AI driver roadmap
 
@@ -56,7 +58,9 @@ Then open the Vite URL shown in the terminal.
 - A,D / Arrow Left,Right: steer
 - Space: handbrake / tighter steering
 - R: reset car and job
+- N: advance to the next completed job during prototype testing
+- I: toggle AI driver for regression testing only
 
 ## Direction
 
-LOWTOWN is deliberately moving toward a grimy, wet, sodium-lit 1990s crime-racer mood rather than neon cyberpunk. The gameplay layer is being synchronized around one top-down world geometry contract for rendering, driving, traffic, pedestrians, collisions and mission targets.
+LOWTOWN is deliberately moving toward a grimy, wet, sodium-lit 1990s crime-racer mood rather than neon cyberpunk. The gameplay layer is synchronized around one top-down world-coordinate contract for rendering, driving, traffic, pedestrians, collisions and mission targets.
