@@ -24,13 +24,14 @@ export function predictVehicle(state,seconds,input={},physics=state.physics,opti
   const arcadeCar=state.type===TRANSPORT_TYPES.CAR&&physics?.model==='arcade-bicycle-swept';
   const physicsDt=arcadeCar?.05:1/120;
   const useActuator=options.useActuatorDelay!==false&&!!state.actuatorState;
-  const response=useActuator?{...DEFAULT_RESPONSE,...(options.actuatorResponse||{})}:null;
+  const response=useActuator?{...DEFAULT_RESPONSE,...(state.actuatorResponse||{}),...(options.actuatorResponse||{})}:null;
   const controlDt=useActuator?Math.max(physicsDt,finite(options.controlDt,1/60)):physicsDt;
   let current={...state,telemetry:state.telemetry?{...state.telemetry}:state.telemetry};
   let actuator=useActuator?{...state.actuatorState}:null;
   const points=[];const blocked=typeof options.blocked==='function'?options.blocked:null;
-  let collision=false,collisionT=safeSeconds,elapsed=0,stepIndex=0,minWall=Infinity;
+  let collision=false,collisionT=safeSeconds,stepIndex=0,minWall=Infinity;
   const sampleEvery=Math.max(1,Math.floor(Math.max(physicsDt,safeSeconds/24)/physicsDt));
+  let elapsed=0;
   while(elapsed<safeSeconds-1e-9){
     const frame=Math.min(controlDt,safeSeconds-elapsed);
     if(useActuator){actuator=applyActuatorDelay(input,actuator,frame,response);current.actuatorState={...actuator};}
