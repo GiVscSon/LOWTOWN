@@ -7,7 +7,7 @@ export function createMissionSystem(world) {
     { id: 'RUN', title: 'THROUGH THE BLOCKS', text: 'Hit Garage, City Hall and Old Foundry in one run.', reward: 450, route: ['CENTRAL_GARAGE', 'CITY_HALL', 'OLD_FOUNDRY'] },
     { id: 'GETAWAY', title: 'LOSE THE TAIL', text: 'Run from Dock Works through Freight Depot to the motel.', reward: 700, route: ['DOCK_WORKS', 'FREIGHT_DEPOT', 'NORTH_RIDGE_MOTEL'] }
   ];
-  let active = 0, stage = 0, complete = false, started = false;
+  let active = 0, stage = 0, complete = false, started = false, aiRouteKey = null;
   function current() { return templates[active]; }
   function target() { const m = current(); return destination(m.route[stage % m.route.length]); }
   function routePreview() {
@@ -16,17 +16,39 @@ export function createMissionSystem(world) {
     const to = destination(m.route[Math.min(stage + 1, m.route.length - 1)]);
     return vehicleRoute(from, to);
   }
+  function syncMissionAI(car, p) {
+    const ai = globalThis.__LOWTOWN_AI;
+    if (!ai?.state?.enabled || !car || !p) return;
+    const key = `${active}:${stage}`;
+    if (key !== aiRouteKey) {
+      const route = vehicleRoute({ x: car.x, y: car.y }, p).filter(Boolean);
+      if (route.length) {
+        ai.state.goal = route[route.length - 1];
+        ai.state.route = route;
+        ai.state.node = 0;
+        ai.state.routeTimer = 0;
+        ai.state.mode = ai.state.state = 'MISSION';
+        ai.state.replans = (ai.state.replans || 0) + 1;
+        aiRouteKey = key;
+      }
+    } else {
+      ai.state.routeTimer = 0;
+      ai.state.mode = ai.state.state === 'IDLE' ? 'MISSION' : ai.state.state;
+    }
+  }
   function update(car) {
     if (complete) return false;
     const p = target();
+    syncMissionAI(car, p);
     if (Math.hypot(car.x - p.x, car.y - p.y) < (p.radius || 55)) {
       started = true; stage++;
+      aiRouteKey = null;
       if (stage >= current().route.length) { complete = true; return true; }
     }
     return false;
   }
-  function next() { active = (active + 1) % templates.length; stage = 0; complete = false; started = false; }
-  function reset() { stage = 0; complete = false; started = false; }
+  function next() { active = (active + 1) % templates.length; stage = 0; complete = false; started = false; aiRouteKey = null; }
+  function reset() { stage = 0; complete = false; started = false; aiRouteKey = null; }
   function state() {
     const mission = current();
     return { ...mission, stage, totalStages: mission.route.length, started, complete, target: target(), routePreview: routePreview(), destinationCount: CITY_DESTINATIONS.length };
