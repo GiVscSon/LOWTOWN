@@ -30,14 +30,7 @@ const buildings=WORLD.buildings||[];
 const lamps=WORLD.lamps||[];
 const cityVisuals=createCityVisuals();
 const testMode=new URLSearchParams(location.search).has('autotest');
-
-// STREET owns buildings. LOWER and UPPER are independent collision layers.
-const blocked=(x,y,level=ROAD_LEVELS.STREET)=>{
-  if(!isLand(x,y))return true;
-  if(level!==ROAD_LEVELS.STREET)return false;
-  const r=18;
-  return buildings.some(([bx,by,bw,bh])=>x>bx-r&&x<bx+bw+r&&y>by-r&&y<by+bh+r);
-};
+const blocked=(x,y,level=ROAD_LEVELS.STREET)=>{if(!isLand(x,y))return true;if(level!==ROAD_LEVELS.STREET)return false;const r=18;return buildings.some(([bx,by,bw,bh])=>x>bx-r&&x<bx+bw+r&&y>by-r&&y<by+bh+r);};
 const roadNodes=buildLayeredRoadTopology({isLand,blocked,limit:ROAD_LIMIT,grid:ROAD_GRID});
 const roadLines=layeredRoadSegments(roadNodes);
 const streetNodes=roadNodes.filter(n=>n.level===ROAD_LEVELS.STREET);
@@ -53,7 +46,6 @@ const ai=createAIDriver({nodes:roadNodes,blocked,getTraffic:()=>traffic.cars});
 const transport=createTransportSystem();
 const S={car:playerTransport.state,cam:{x:start.x,y:start.y},target:WORLD.mission||{x:start.x,y:start.y},t:0,done:false,damage:0,collisions:0,trafficHits:0,stuck:0,maxSpeed:0,distance:0,missionReward:0,money:0,completedJobs:0,aiActive:testMode,aiDebug:{frames:0,elapsed:0,movedDistance:0,initialX:start.x,initialY:start.y,last:null}};
 S.car.roadLevel=ROAD_LEVELS.STREET;
-
 function resize(){const r=canvas.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2);canvas.width=Math.max(1,Math.round(r.width*d));canvas.height=Math.max(1,Math.round(r.height*d));ctx.setTransform(d,0,0,d,0,0);}addEventListener('resize',resize);resize();
 function iso(x,y,z=ROAD_LEVEL_Z[ROAD_LEVELS.STREET]){return{x:canvas.clientWidth/2+(x-S.cam.x)*.78+(y-S.cam.y)*.42,y:canvas.clientHeight/2+(y-S.cam.y)*.42-(x-S.cam.x)*.78-z*.72};}
 function poly(points,fill,stroke){ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.stroke();}}
@@ -63,10 +55,18 @@ function roads(){terrain();ctx.lineCap='round';for(const level of [ROAD_LEVELS.L
 function building(x,y,w,h){const island=islandAt(x+w/2,y+h/2);if(!island)return;const z=ROAD_LEVEL_Z[ROAD_LEVELS.STREET],top=[iso(x,y,z),iso(x+w,y,z),iso(x+w,y+h,z),iso(x,y+h,z)],f=top.map(p=>({x:p.x,y:p.y-(island.biome==='FOREST_HIGHLAND'?48:70)}));poly(f,island.biome==='INDUSTRIAL_COAST'?'#3a3b3b':'#34373c','#111317');poly([f[0],f[1],top[1],top[0]],'#292b2e');poly([f[1],f[2],top[2],top[1]],'#202226');for(let yy=18;yy<h;yy+=38)for(let xx=22;xx<w;xx+=48){if(((xx+yy)/38|0)%3===0)continue;const p=iso(x+xx,y+yy,z);ctx.fillStyle='rgba(224,154,62,.32)';ctx.fillRect(p.x-3,p.y-2,6,4);}}
 function lamp(x,y){if(!isLand(x,y))return;const p=iso(x,y,ROAD_LEVEL_Z[ROAD_LEVELS.STREET]);ctx.strokeStyle='#55585d';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x,p.y-35);ctx.stroke();ctx.fillStyle='#e09a3e';ctx.beginPath();ctx.arc(p.x,p.y-39,4,0,Math.PI*2);ctx.fill();}
 function target(){const p=iso(S.target.x,S.target.y,ROAD_LEVEL_Z[S.car.roadLevel]??ROAD_LEVEL_Z[1]),r=18+Math.sin(S.t*5)*4;ctx.strokeStyle='#e09a3e';ctx.lineWidth=3;ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.stroke();ctx.fillStyle='rgba(224,154,62,.18)';ctx.fill();ctx.fillStyle='#e09a3e';ctx.font='bold 10px monospace';ctx.textAlign='center';ctx.fillText('DROP',p.x,p.y-27);}
-function playerCar(){const z=ROAD_LEVEL_Z[S.car.roadLevel]??ROAD_LEVEL_Z[1],p=iso(S.car.x,S.car.y,z),f=iso(S.car.x+Math.cos(S.car.a)*10,S.car.y+Math.sin(S.car.a)*10,z),ang=Math.atan2(f.y-p.y,f.x-p.x);ctx.save();ctx.translate(p.x,p.y);ctx.rotate(ang);ctx.fillStyle='rgba(0,0,0,.55)';ctx.beginPath();ctx.ellipse(0,9,34,7,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#252a2e';ctx.beginPath();ctx.moveTo(-28,-10);ctx.lineTo(25,-10);ctx.lineTo(35,6);ctx.lineTo(25,11);ctx.lineTo(-28,11);ctx.lineTo(-36,4);ctx.closePath();ctx.fill();ctx.fillStyle='#e8b84a';ctx.strokeStyle='#171a1e';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-26,-8);ctx.lineTo(23,-8);ctx.lineTo(31,5);ctx.lineTo(22,8);ctx.lineTo(-25,8);ctx.lineTo(-31,3);ctx.closePath();ctx.fill();ctx.stroke();ctx.fillStyle='#1b2228';ctx.beginPath();ctx.moveTo(-13,-5);ctx.lineTo(10,-5);ctx.lineTo(20,4);ctx.lineTo(-18,4);ctx.closePath();ctx.fill();ctx.fillStyle='#d4523a';ctx.fillRect(-27,3,7,3);ctx.fillStyle='#fff1a7';ctx.fillRect(22,2,6,4);ctx.fillStyle='#0a0b0d';ctx.fillRect(-20,-12,11,4);ctx.fillRect(11,-12,11,4);ctx.restore();}
+function playerCar(){const z=ROAD_LEVEL_Z[S.car.roadLevel]??ROAD_LEVEL_Z[1],p=iso(S.car.x,S.car.y,z),f=iso(S.car.x+Math.cos(S.car.a)*12,S.car.y+Math.sin(S.car.a)*12,z),ang=Math.atan2(f.y-p.y,f.x-p.x);ctx.save();ctx.translate(p.x,p.y);ctx.rotate(ang);ctx.lineJoin='round';
+  ctx.fillStyle='rgba(0,0,0,.62)';ctx.beginPath();ctx.ellipse(0,10,31,8,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#111419';ctx.beginPath();ctx.roundRect(-31,-10,62,22,6);ctx.fill();
+  ctx.fillStyle='#e8b84a';ctx.strokeStyle='#171a1e';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(-28,-9,56,20,5);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#252b31';ctx.beginPath();ctx.moveTo(-13,-7);ctx.lineTo(10,-7);ctx.lineTo(19,2);ctx.lineTo(13,7);ctx.lineTo(-16,7);ctx.lineTo(-20,2);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#59636b';ctx.globalAlpha=.72;ctx.beginPath();ctx.moveTo(-10,-5);ctx.lineTo(8,-5);ctx.lineTo(14,1);ctx.lineTo(-14,1);ctx.closePath();ctx.fill();ctx.globalAlpha=1;
+  ctx.fillStyle='#0b0d10';ctx.fillRect(-22,-13,11,4);ctx.fillRect(11,-13,11,4);ctx.fillRect(-22,9,11,4);ctx.fillRect(11,9,11,4);
+  ctx.fillStyle='#fff0a6';ctx.fillRect(24,-5,4,6);ctx.fillStyle='#d4523a';ctx.fillRect(-28,3,4,6);
+  ctx.fillStyle='rgba(255,255,255,.18)';ctx.fillRect(-4,-8,7,2);ctx.restore();}
 function speed(){return Math.hypot(S.car.vx||0,S.car.vy||0);}
 function updateRoadLevel(){const current=S.car.roadLevel??ROAD_LEVELS.STREET;const hit=nearestLayeredRoadPoint(S.car.x,S.car.y,roadNodes,current);if(hit&&hit.distance<=ROAD_WIDTH*.58)return;const any=nearestAnyRoadPoint(S.car.x,S.car.y,roadNodes);if(any&&any.distance<=ROAD_WIDTH*.58)S.car.roadLevel=any.level;}
-function keepPlayerOnRoad(before){updateRoadLevel();const near=nearestLayeredRoadPoint(S.car.x,S.car.y,roadNodes,S.car.roadLevel??ROAD_LEVELS.STREET);if(!near||near.distance>ROAD_WIDTH*.62){S.car.x=before.x;S.car.y=before.y;S.car.a=before.a;S.car.v*=.2;S.car.vx*=.2;S.car.vy*=.2;S.car.yawRate*=.2;S.stuck++;return false;}S.stuck=0;return true;}
+function keepPlayerOnRoad(before){updateRoadLevel();const level=S.car.roadLevel??ROAD_LEVELS.STREET;const near=nearestLayeredRoadPoint(S.car.x,S.car.y,roadNodes,level);if(!near||near.distance>ROAD_WIDTH*.62){const fallback=nearestAnyRoadPoint(before.x,before.y,roadNodes);if(fallback){S.car.x=fallback.x;S.car.y=fallback.y;S.car.roadLevel=fallback.level;S.car.a=fallback.heading;}else{S.car.x=before.x;S.car.y=before.y;S.car.a=before.a;}S.car.v*=.2;S.car.vx*=.2;S.car.vy*=.2;S.car.yawRate*=.2;S.stuck++;return false;}S.stuck=0;return true;}
 function drive(input,dt){const before={x:S.car.x,y:S.car.y,a:S.car.a};playerTransport.step(dt,input);keepPlayerOnRoad(before);S.distance+=speed()*dt;}
 function trafficCollisions(){const now=performance.now();for(const n of traffic.cars){if((n.level??ROAD_LEVELS.STREET)!==(S.car.roadLevel??ROAD_LEVELS.STREET))continue;const dx=n.x-S.car.x,dy=n.y-S.car.y,d=Math.hypot(dx,dy);if(d<34&&now-(n.hitAt||0)>550){const nx=dx/(d||1),ny=dy/(d||1),impact=Math.max(20,speed()-n.v);S.car.vx-=nx*impact*.12;S.car.vy-=ny*impact*.12;n.v=Math.max(0,n.v-impact*.12);n.x-=nx*(34-d)*.5;n.y-=ny*(34-d)*.5;n.hitAt=now;S.trafficHits++;S.damage+=Math.min(3,impact/90);toast.textContent='TRAFFIC HIT';}}}
 function refreshMission(){const m=missions.state();if(!m)return;const idx=missions.templates.findIndex(t=>t.id===m.id);S.target=m.target||S.target;jobId.textContent=`JOB ${String(idx+1).padStart(2,'0')}`;jobTitle.textContent=m.title||'FREE ROAM';jobText.textContent=m.text||'Drive through LOWTOWN.';}
