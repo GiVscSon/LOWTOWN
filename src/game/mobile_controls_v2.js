@@ -5,11 +5,13 @@ export function createMobileControlsV2(){
   const action=()=>window.__LOWTOWN_ACTIONS__;
   const held=new Set();
   let ai=false;
+  let repeatTimer=null;
   const setKey=(key,pressed)=>{const normalized=String(key);if(pressed){if(held.has(normalized))return;held.add(normalized);window.dispatchEvent(new KeyboardEvent('keydown',{key:normalized,bubbles:true,cancelable:true}));}else{if(!held.has(normalized))return;held.delete(normalized);window.dispatchEvent(new KeyboardEvent('keyup',{key:normalized,bubbles:true,cancelable:true}));}};
-  const releaseDrive=()=>{for(const key of [...held])setKey(key,false);};
+  const releaseDrive=()=>{if(repeatTimer){clearInterval(repeatTimer);repeatTimer=null;}for(const key of [...held])setKey(key,false);};
   const actionKey=key=>window.dispatchEvent(new KeyboardEvent('keydown',{key,bubbles:true,cancelable:true}));
-  for(const button of root.querySelectorAll('.mobile-arrow')){const key=button.dataset.key;const press=e=>{e.preventDefault();button.setPointerCapture?.(e.pointerId);setKey(key,true);button.classList.add('pressed');};const release=e=>{e.preventDefault();setKey(key,false);button.classList.remove('pressed');};button.addEventListener('pointerdown',press,{passive:false});button.addEventListener('pointerup',release,{passive:false});button.addEventListener('pointercancel',release,{passive:false});button.addEventListener('lostpointercapture',release,{passive:false});}
-  root.querySelector('[data-mobile="ai"]').addEventListener('pointerdown',e=>{e.preventDefault();releaseDrive();const result=action()?.toggleAI?.();if(typeof result!=='boolean'){actionKey('i');ai=!ai;}else ai=!!result;e.currentTarget.textContent=ai?'AI: ON':'AI: OFF';e.currentTarget.classList.toggle('pressed',ai);},{passive:false});
+  const pressDrive=(button,key,e)=>{e.preventDefault();button.setPointerCapture?.(e.pointerId);setKey(key,true);button.classList.add('pressed');if(repeatTimer)clearInterval(repeatTimer);repeatTimer=setInterval(()=>{if(held.has(key))window.dispatchEvent(new KeyboardEvent('keydown',{key,bubbles:true,cancelable:true}));},120);};
+  for(const button of root.querySelectorAll('.mobile-arrow')){const key=button.dataset.key;const press=e=>pressDrive(button,key,e);const release=e=>{e.preventDefault();setKey(key,false);button.classList.remove('pressed');if(repeatTimer){clearInterval(repeatTimer);repeatTimer=null;}};button.addEventListener('pointerdown',press,{passive:false});button.addEventListener('pointerup',release,{passive:false});button.addEventListener('pointercancel',release,{passive:false});button.addEventListener('lostpointercapture',release,{passive:false});}
+  root.querySelector('[data-mobile="ai"]').addEventListener('pointerdown',e=>{e.preventDefault();releaseDrive();let result=action()?.toggleAI?.();if(typeof result!=='boolean'){actionKey('i');setTimeout(()=>{if(!window.__LOWTOWN_TEST?.state?.().aiActive)actionKey('i');},250);ai=!ai;}else ai=!!result;e.currentTarget.textContent=ai?'AI: ON':'AI: OFF';e.currentTarget.classList.toggle('pressed',ai);},{passive:false});
   root.querySelector('[data-mobile="reset"]').addEventListener('pointerdown',e=>{e.preventDefault();releaseDrive();if(typeof action()?.reset==='function')action().reset();else actionKey('r');},{passive:false});
   root.addEventListener('contextmenu',e=>e.preventDefault());
   window.addEventListener('blur',releaseDrive);
