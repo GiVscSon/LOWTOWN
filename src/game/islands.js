@@ -1,3 +1,6 @@
+import { WORLD } from './world.js';
+import { CITY_ROADS } from './city_semantics.js';
+
 export const ISLANDS = [
   {
     id: 'LOWTOWN', name: 'LOWTOWN', biome: 'URBAN', center: { x: -560, y: -180 }, rx: 1320, ry: 1040,
@@ -30,6 +33,7 @@ const ellipse = (x, y, island) => {
   const dy = (y - island.center.y) / island.ry;
   return dx * dx + dy * dy <= 1;
 };
+
 const bridgeHit = (x, y, bridge) => {
   if (!bridge?.a || !bridge?.b || !Number.isFinite(x) || !Number.isFinite(y)) return false;
   const vx = bridge.b.x - bridge.a.x, vy = bridge.b.y - bridge.a.y;
@@ -38,15 +42,48 @@ const bridgeHit = (x, y, bridge) => {
   const px = bridge.a.x + vx * t, py = bridge.a.y + vy * t;
   return Math.hypot(x - px, y - py) <= (bridge.width || 0);
 };
-export function islandAt(x, y) { return ISLANDS.find(island => ellipse(x, y, island)) || null; }
-export function isLand(x, y) { return !!islandAt(x, y) || BRIDGES.some(bridge => bridgeHit(x, y, bridge)); }
-export function biomeAt(x, y) { return islandAt(x, y)?.biome || (BRIDGES.some(bridge => bridgeHit(x, y, bridge)) ? 'BRIDGE' : 'WATER'); }
 
-// Building anchors may sit on developed/reclaimed city ground outside the procedural shore mask.
+const segmentDistance = (x, y, a, b) => {
+  const dx = b[0] - a[0], dy = b[1] - a[1], len2 = dx * dx + dy * dy || 1;
+  const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / len2));
+  return Math.hypot(x - (a[0] + dx * t), y - (a[1] + dy * t));
+};
+
+// City roads are engineered/reclaimed ground, so the physical world must agree with
+// the road graph even where the older procedural shoreline ellipse does not reach.
+const CITY_GROUND_WIDTH = 58;
+const cityRoadHit = (x, y) => CITY_ROADS.some(road => {
+  for (let i = 0; i < road.points.length - 1; i++) {
+    if (segmentDistance(x, y, road.points[i], road.points[i + 1]) <= CITY_GROUND_WIDTH) return true;
+  }
+  return false;
+});
+
+const buildingHit = (x, y) => WORLD.buildings.some(([bx, by, bw, bh]) =>
+  x >= bx - 8 && x <= bx + bw + 8 && y >= by - 8 && y <= by + bh + 8
+);
+
 export function buildingIslandAt(x, y) {
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-  if (x < 900) return ISLANDS.find(i => i.id === 'LOWTOWN') || null;
-  if (x >= 900 && x < 2600) return ISLANDS.find(i => i.id === 'IRON_HARBOR') || null;
   if (y > 1200 && Math.abs(x) < 1100) return ISLANDS.find(i => i.id === 'NORTH_RIDGE') || null;
+  if (x >= 900 && x < 2600) return ISLANDS.find(i => i.id === 'IRON_HARBOR') || null;
+  if (x < 900) return ISLANDS.find(i => i.id === 'LOWTOWN') || null;
   return null;
+}
+
+export function islandAt(x, y) {
+  const natural = ISLANDS.find(island => ellipse(x, y, island));
+  if (natural) return natural;
+  if (buildingHit(x, y)) return buildingIslandAt(x, y);
+  return null;
+}
+
+export function isLand(x, y) {
+  return !!islandAt(x, y) || BRIDGES.some(bridge => bridgeHit(x, y, bridge)) || cityRoadHit(x, y);
+}
+
+export function biomeAt(x, y) {
+  return islandAt(x, y)?.biome ||
+    (BRIDGES.some(bridge => bridgeHit(x, y, bridge)) ? 'BRIDGE' :
+      (cityRoadHit(x, y) ? 'URBAN_RECLAIMED' : 'WATER'));
 }
