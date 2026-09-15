@@ -49,7 +49,12 @@ export function stepCarPhysics(state,dt,input,physics){
   const mass=Math.max(1,p.mass||state.mass||1);
   const requestedDrive=c.throttle>=0?p.engineForce:Math.abs(p.reverseForce||0);
   const drive=limitDriveForce(c.throttle*requestedDrive,{drivetrain:p.drivetrain,mass,friction:p.friction,gravity:p.gravity,loads:{front:mass*(p.gravity||9.81)*.52,rear:mass*(p.gravity||9.81)*.48}});
-  const driveAcceleration=drive.force/mass;
+  // The controller exposes arcade acceleration explicitly. Use it for the
+  // player-car drive model instead of accidentally reducing it to the
+  // tyre-load traction cap (which made a 1-second throttle input barely move).
+  const arcadeAcceleration=c.throttle>=0?finite(p.arcadeAcceleration,0):finite(p.arcadeReverseAcceleration,0);
+  const forceAcceleration=drive.force/mass;
+  const driveAcceleration=arcadeAcceleration>0?c.throttle*arcadeAcceleration:forceAcceleration;
   state.vx+=fx*driveAcceleration*safeDt;
   state.vy+=fy*driveAcceleration*safeDt;
   if(c.brake){
