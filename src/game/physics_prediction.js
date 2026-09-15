@@ -21,14 +21,14 @@ function physicsStep(state,dt,input,physics){
 
 export function predictVehicle(state,seconds,input={},physics=state.physics,options={}){
   const safeSeconds=clamp(finite(seconds),0,10);
-  const arcadeCar=state.type===TRANSPORT_TYPES.CAR&&physics?.model==='arcade-bicycle-swept';
-  const physicsDt=arcadeCar?.05:1/120;
+  const isCar=state.type===TRANSPORT_TYPES.CAR;
+  const arcadeCar=isCar&&physics?.model==='arcade-bicycle-swept';
+  // Cars use the same maximum integration substep as the live controller.
+  // This keeps the prediction numerically aligned instead of merely using the
+  // same equations at a different integration cadence.
+  const physicsDt=isCar?.05:1/120;
   const useActuator=options.useActuatorDelay!==false&&!!state.actuatorState;
   const response=useActuator?{...DEFAULT_RESPONSE,...(state.actuatorResponse||{}),...(options.actuatorResponse||{})}:null;
-  // Match the live controller cadence. The prediction may use smaller physics
-  // substeps, but actuator delay must be sampled at the same 60 Hz cadence as
-  // transport_controller.step(), otherwise the predicted input is applied
-  // more often than the real vehicle receives it.
   const controlDt=useActuator?Math.max(1/60,finite(options.controlDt,1/60)):physicsDt;
   let current={...state,telemetry:state.telemetry?{...state.telemetry}:state.telemetry};
   let actuator=useActuator?{...state.actuatorState}:null;
