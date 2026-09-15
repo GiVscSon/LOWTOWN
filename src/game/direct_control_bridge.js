@@ -13,8 +13,7 @@ const install = () => {
 
   const originalStep = transport.step.bind(transport);
   transport.step = (dt, input = {}) => {
-    const active = state.enabled;
-    if (!active) return originalStep(dt, input);
+    if (!state.enabled) return originalStep(dt, input);
     return originalStep(dt, {
       throttle: Number(state.throttle) || 0,
       brake: Number(state.brake) || 0,
@@ -27,7 +26,20 @@ const install = () => {
 };
 
 const ready = () => {
-  if (install()) return;
+  if (install()) {
+    const params = new URLSearchParams(location.search);
+    if (params.has('directtest')) {
+      state.throttle = 1;
+      state.enabled = true;
+      window.__LOWTOWN_DIRECT_TEST__ = { startedAt: performance.now() };
+      setTimeout(() => {
+        state.throttle = 0;
+        state.enabled = false;
+        window.__LOWTOWN_DIRECT_TEST__.finishedAt = performance.now();
+      }, 3000);
+    }
+    return;
+  }
   requestAnimationFrame(ready);
 };
 ready();
