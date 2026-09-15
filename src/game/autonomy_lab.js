@@ -4,6 +4,7 @@ import { createAutonomyStack } from './autonomy_stack.js';
 
 const params=new URLSearchParams(location.search);
 const enabled=params.has('autonomy')||params.has('autotest');
+const controlEnabled=params.has('autonomy');
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
 async function boot(){
@@ -12,8 +13,6 @@ async function boot(){
 
   const ai=window.__LOWTOWN_AI;
   const startTest=window.__LOWTOWN_TEST;
-  // The driver has a randomized safety start. For automated experiments, reject
-  // starts that are already pressed against an island edge and sample again.
   for(let attempt=0;attempt<8;attempt++){
     const s=startTest.state();
     const sensors=s.sensor||{};
@@ -25,7 +24,7 @@ async function boot(){
 
   const worldModel=createAIWorldModel();
   const stack=createAutonomyStack({worldModel});
-  const lab={enabled:true,startedAt:performance.now(),decisions:0,forcedReplans:0,intent:'EXPLORE',reason:'BOOT',lastGoal:null,memory:new Map(),failures:[],history:[],world:worldModel,status:stack.status()};
+  const lab={enabled:true,startedAt:performance.now(),decisions:0,forcedReplans:0,intent:'EXPLORE',reason:controlEnabled?'BOOT':'OBSERVE_ONLY',lastGoal:null,memory:new Map(),failures:[],history:[],world:worldModel,status:stack.status()};
   const nodes=[];const seen=new Set();
   const remember=n=>{
     if(!n||!Number.isFinite(n.x)||!Number.isFinite(n.y))return;
@@ -34,10 +33,6 @@ async function boot(){
     seen.add(id);
     const node={x:n.x,y:n.y,id,links:[]};
     nodes.push(node);lab.memory.set(id,{x:n.x,y:n.y,visits:0});
-
-    // The autonomy lab feeds remembered nodes into freeWill. They must form a
-    // traversable graph, not isolated self-links, otherwise a newly selected
-    // goal can invalidate the main driver's route and leave the car stationary.
     for(const other of nodes){
       if(other===node)continue;
       if(Math.hypot(node.x-other.x,node.y-other.y)<=245){
@@ -59,6 +54,20 @@ async function boot(){
     stack.observe({x:state.x,y:state.y,speed:state.speed,risk:state.risk});
     const now=performance.now(),risk=Number(state.risk||0),ttc=Number(state.ttc),stuck=Number(state.stuck||0);
     const trajectory=stack.evaluate({candidates:ai.candidates||[],risk,ttc,stuck});
+
+    // Browser AI smoke tests use ?autotest to measure the primary driver.
+    // The autonomy lab remains observational there and must not replace the
+    // driver's goal/route while the motion capture is running.
+    if(!controlEnabled){
+      const snapshot=`${Math.round(state.x)}:${Math.round(state.y)}:${state.collisions}:${state.trafficHits}`;
+      if(lastSnapshot&&snapshot===lastSnapshot){
+        lab.failures.push({t:Math.round((now-lab.startedAt)/1000),type:'NO_STATE_CHANGE',intent:'OBSERVE_ONLY'});
+        if(lab.failures.length>40)lab.failures.shift();
+      }
+      lastSnapshot=snapshot;
+      lab.status=stack.status();
+      continue;
+    }
 
     const routeLength=Array.isArray(ai.route)?ai.route.length:0;
     const routeFinished=routeLength<2||Number(ai.node)>=routeLength-1;
