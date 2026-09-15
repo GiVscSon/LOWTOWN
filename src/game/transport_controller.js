@@ -3,7 +3,6 @@ import { TRANSPORT_TYPES } from './transport_constants.js';
 import { getTransportProfile, getTransportTypeProfile, resolveTransportPhysics } from './transport_profiles.js';
 import { applyActuatorDelay } from './vehicle_safety.js';
 import { stepArcadeCar, resetArcadeCarState } from './arcade_car_physics.js';
-import { pointBlocked } from './world_geometry.js';
 import { vehicleWorldBlocked } from './vehicle_collision.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -15,9 +14,7 @@ function calibratedPhysics(base,calibration=null){
   const a=scale(calibration.accelerationScale),b=scale(calibration.brakingScale),s=scale(calibration.steeringScale),d=scale(calibration.dragScale),r=scale(calibration.turnRadiusScale);
   return {...base,engineForce:base.engineForce*(1+(a-1)*confidence),brakeForce:base.brakeForce*(1+(b-1)*confidence),steeringRate:base.steeringRate*(1+(s-1)*confidence),drag:base.drag*(1+(d-1)*confidence),turnRadius:base.turnRadius*(1+(r-1)*confidence),calibration:{accelerationScale:a,brakingScale:b,steeringScale:s,dragScale:d,turnRadiusScale:r,confidence}};
 }
-
 function calibrationForVehicle(profile,id){return profile&&typeof profile==='object'?profile.vehicles?.[id]||null:null;}
-
 function arcadeProfile(p,physics){return{maxForwardSpeed:Math.min(p.maxSpeed||physics.maxForwardSpeed||455,physics.maxForwardSpeed||455),arcadeAcceleration:p.arcadeAcceleration||145,arcadeReverseAcceleration:p.arcadeReverseAcceleration||85,arcadeBrake:p.arcadeBrake||420,arcadeDrag:p.arcadeDrag||2.8,wheelbase:p.wheelbase||58,maxSteering:p.maxSteering||.58,steeringRateArcade:p.steeringRateArcade||3.8};}
 function buildActivePhysics(id,type,calibration){const base=calibratedPhysics(resolveTransportPhysics(id),calibration);return type===TRANSPORT_TYPES.CAR?{...base,...arcadeProfile(getTransportProfile(id),base),model:'arcade-bicycle-swept'}:{...base,model:'force-based'};}
 
@@ -34,7 +31,6 @@ export function createTransportController(vehicleId='sedan',initial={}){
   let actuator={throttle:0,brake:0,steer:0,climb:0,descend:0};
   let actuatorResponse={steer:12,throttle:8,brake:16,climb:8,descend:8};
   state.actuatorResponse={...actuatorResponse};
-
   function activeCalibration(){return calibrationByVehicle[currentId]||calibrationForVehicle(calibrationProfile,currentId);}
   function rebuildPhysics(){physics=buildActivePhysics(currentId,state.type,activeCalibration());state.mass=physics.mass;state.physics=physics;return physics;}
   function setVehicle(id){const next=getTransportProfile(id);currentId=next.id;state.vehicleId=currentId;state.type=next.type;state.surface=next.type===TRANSPORT_TYPES.CAR?'road':next.type===TRANSPORT_TYPES.BOAT?'water':'air';resetActuators();resetArcadeCarState(state);rebuildPhysics();return next;}
@@ -58,10 +54,26 @@ export function createTransportController(vehicleId='sedan',initial={}){
       for(let i=0;i<slices;i++){
         const before={x:state.x,y:state.y,z:state.z,a:state.a,v:state.v,vx:state.vx,vy:state.vy,vz:state.vz,yawRate:state.yawRate,distance:state.distance,age:state.age,steerAngle:state.steerAngle};
         stepArcadeCar(state,h,lastInput,arcadeProfile(profile(),physics));
-        const worldHit=vehicleWorldBlocked(state.x,state.y,state.a,roadLines,{length:vehicleLength,width:vehicleWidth});
-        const legacyHit=pointBlocked(state.x,state.y);
-        if(worldHit||legacyHit){
-          state.x=before.x;state.y=before.y;state.z=before.z;state.a=before.a;state.v=0;state.vx=0;state.vy=0;state.vz=0;state.yawRate=0;state.distance=before.distance;state.age=before.age;state.steerAngle=before.steerAngle;blockedHit=true;break;
+        const hit=vehicleWorldBlocked(state.x,state.y,state.a,roadLines,{length:vehicleLength,width:vehicleWidth,roadTolerance:24});
+        if(hit){
+          const candidate={x:state.x,y:state.y};
+          state.x=before.x;state.y=before.y;state.z=before.z;state.a=before.a;state.distance=before.distance;state.age=before.age;state.steerAngle=before.steerAngle;
+          const movedX=candidate.x-before.x,movedY=candidate.y-before.y;
+          let slid=false;
+          if(Math.abs(movedX)>0.001){
+            state.x=candidate.x;
+            if(!vehicleWorldBlocked(state.x,state.y,state.a,roadLines,{length:vehicleLength,width:vehicleWidth,roadTolerance:24})){state.vx*=.82;state.vy*=.96;slid=true;}
+            else state.x=before.x;
+          }
+          if(!slid&&Math.abs(movedY)>0.001){
+            state.y=candidate.y;
+            if(!vehicleWorldBlocked(state.x,state.y,state.a,roadLines,{length:vehicleLength,width:vehicleWidth,roadTolerance:24})){state.vx*=.96;state.vy*=.82;slid=true;}
+            else state.y=before.y;
+          }
+          if(!slid){state.vx=0;state.vy=0;state.v=0;state.yawRate*=.35;}
+          else {state.v*=.72;state.yawRate*=.65;}
+          blockedHit=true;
+          break;
         }
       }
       state.surface='road';
@@ -72,7 +84,6 @@ export function createTransportController(vehicleId='sedan',initial={}){
     telemetry.physics={type:physics.type,mass:physics.mass,maxSpeed:physics.maxForwardSpeed,engineForce:physics.engineForce,brakeForce:physics.brakeForce,steeringRate:physics.steeringRate,grip:physics.lateralGrip,turnRadius:physics.turnRadius,calibration:physics.calibration||null,model:physics.model};
     telemetry.calibration=activeCalibration()?{...activeCalibration()}:null;telemetry.actuator={target:{...input},applied:{...lastInput},response:{...actuatorResponse}};state.telemetry=telemetry;state.actuatorState={...actuator};return telemetry;
   }
-
   function snapshot(){const v=profile(),t=getTransportTypeProfile(v.type);return{vehicleId:v.id,profile:v,typeProfile:t,state:{...state},physics:{...physics},calibration:activeCalibration()?{...activeCalibration()}:null,calibrationProfile:calibrationProfile?{...calibrationProfile,vehicles:{...(calibrationProfile.vehicles||{})}}:null,input:{...lastInput},actuator:{...actuator},actuatorResponse:{...actuatorResponse},telemetry:transportTelemetry(state,lastInput,physics)};}
   return{get vehicleId(){return currentId;},get profile(){return profile();},get typeProfile(){return getTransportTypeProfile(state.type);},get state(){return state;},get physics(){return physics;},get calibration(){return activeCalibration();},setVehicle,setCalibration,setCalibrationProfile,getCalibration,clearCalibration,clearAllCalibration,setActuatorResponse,resetActuators,control,step,snapshot};
 }
