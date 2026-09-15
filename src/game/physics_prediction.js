@@ -25,7 +25,11 @@ export function predictVehicle(state,seconds,input={},physics=state.physics,opti
   const physicsDt=arcadeCar?.05:1/120;
   const useActuator=options.useActuatorDelay!==false&&!!state.actuatorState;
   const response=useActuator?{...DEFAULT_RESPONSE,...(state.actuatorResponse||{}),...(options.actuatorResponse||{})}:null;
-  const controlDt=useActuator?Math.max(physicsDt,finite(options.controlDt,1/60)):physicsDt;
+  // Match the live controller cadence. The prediction may use smaller physics
+  // substeps, but actuator delay must be sampled at the same 60 Hz cadence as
+  // transport_controller.step(), otherwise the predicted input is applied
+  // more often than the real vehicle receives it.
+  const controlDt=useActuator?Math.max(1/60,finite(options.controlDt,1/60)):physicsDt;
   let current={...state,telemetry:state.telemetry?{...state.telemetry}:state.telemetry};
   let actuator=useActuator?{...state.actuatorState}:null;
   const points=[];const blocked=typeof options.blocked==='function'?options.blocked:null;
