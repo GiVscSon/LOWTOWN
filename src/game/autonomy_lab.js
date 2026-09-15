@@ -32,8 +32,19 @@ async function boot(){
     const id=`${Math.round(n.x/160)}:${Math.round(n.y/160)}`;
     if(seen.has(id))return;
     seen.add(id);
-    const node={x:n.x,y:n.y,id,links:[n]};
+    const node={x:n.x,y:n.y,id,links:[]};
     nodes.push(node);lab.memory.set(id,{x:n.x,y:n.y,visits:0});
+
+    // The autonomy lab feeds remembered nodes into freeWill. They must form a
+    // traversable graph, not isolated self-links, otherwise a newly selected
+    // goal can invalidate the main driver's route and leave the car stationary.
+    for(const other of nodes){
+      if(other===node)continue;
+      if(Math.hypot(node.x-other.x,node.y-other.y)<=245){
+        if(!node.links.includes(other))node.links.push(other);
+        if(!other.links.includes(node))other.links.push(node);
+      }
+    }
   };
   const freeWill=createFreeWillDriver({nodes,blocked:()=>false});
   const intents=['EXPLORE','CRUISE','SEEK_NOVELTY','ESCAPE_TRAFFIC','INVESTIGATE'];
