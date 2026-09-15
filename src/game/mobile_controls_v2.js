@@ -7,9 +7,10 @@ export function createMobileControlsV2(){
   let ai=false;
   const setKey=(key,pressed)=>{const normalized=String(key);if(pressed){if(held.has(normalized))return;held.add(normalized);window.dispatchEvent(new KeyboardEvent('keydown',{key:normalized,bubbles:true,cancelable:true}));}else{if(!held.has(normalized))return;held.delete(normalized);window.dispatchEvent(new KeyboardEvent('keyup',{key:normalized,bubbles:true,cancelable:true}));}};
   const releaseDrive=()=>{for(const key of [...held])setKey(key,false);};
+  const actionKey=key=>window.dispatchEvent(new KeyboardEvent('keydown',{key,bubbles:true,cancelable:true}));
   for(const button of root.querySelectorAll('.mobile-arrow')){const key=button.dataset.key;const press=e=>{e.preventDefault();button.setPointerCapture?.(e.pointerId);setKey(key,true);button.classList.add('pressed');};const release=e=>{e.preventDefault();setKey(key,false);button.classList.remove('pressed');};button.addEventListener('pointerdown',press,{passive:false});button.addEventListener('pointerup',release,{passive:false});button.addEventListener('pointercancel',release,{passive:false});button.addEventListener('lostpointercapture',release,{passive:false});}
-  root.querySelector('[data-mobile="ai"]').addEventListener('pointerdown',e=>{e.preventDefault();releaseDrive();ai=!ai;action()?.toggleAI?.();e.currentTarget.textContent=ai?'AI: ON':'AI: OFF';e.currentTarget.classList.toggle('pressed',ai);},{passive:false});
-  root.querySelector('[data-mobile="reset"]').addEventListener('pointerdown',e=>{e.preventDefault();releaseDrive();action()?.reset?.();},{passive:false});
+  root.querySelector('[data-mobile="ai"]').addEventListener('pointerdown',e=>{e.preventDefault();releaseDrive();const result=action()?.toggleAI?.();if(typeof result!=='boolean')actionKey('i');else ai=!!result;e.currentTarget.textContent=ai?'AI: ON':'AI: OFF';e.currentTarget.classList.toggle('pressed',ai);},{passive:false});
+  root.querySelector('[data-mobile="reset"]').addEventListener('pointerdown',e=>{e.preventDefault();releaseDrive();if(typeof action()?.reset==='function')action().reset();else actionKey('r');},{passive:false});
   root.addEventListener('contextmenu',e=>e.preventDefault());
   window.addEventListener('blur',releaseDrive);
   document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseDrive();});
