@@ -19,9 +19,7 @@ export function createMobileControlsV2(){
     }
   };
 
-  const releaseDrive=()=>{
-    for(const key of [...held])setKey(key,false);
-  };
+  const releaseDrive=()=>{for(const key of [...held])setKey(key,false);};
 
   for(const button of root.querySelectorAll('.mobile-arrow')){
     const key=button.dataset.key;
@@ -33,25 +31,11 @@ export function createMobileControlsV2(){
     button.addEventListener('lostpointercapture',release,{passive:false});
   }
 
-  root.querySelector('[data-mobile="ai"]').addEventListener('pointerdown',e=>{
-    e.preventDefault();
-    releaseDrive();
-    ai=!ai;
-    action()?.toggleAI?.();
-    e.currentTarget.textContent=ai?'AI: ON':'AI: OFF';
-    e.currentTarget.classList.toggle('pressed',ai);
-  },{passive:false});
-
-  root.querySelector('[data-mobile="reset"]').addEventListener('pointerdown',e=>{
-    e.preventDefault();
-    releaseDrive();
-    action()?.reset?.();
-  },{passive:false});
-
+  root.querySelector('[data-mobile="ai"]').addEventListener('pointerdown',e=>{e.preventDefault();releaseDrive();ai=!ai;action()?.toggleAI?.();e.currentTarget.textContent=ai?'AI: ON':'AI: OFF';e.currentTarget.classList.toggle('pressed',ai);},{passive:false});
+  root.querySelector('[data-mobile="reset"]').addEventListener('pointerdown',e=>{e.preventDefault();releaseDrive();action()?.reset?.();},{passive:false});
   root.addEventListener('contextmenu',e=>e.preventDefault());
   window.addEventListener('blur',releaseDrive);
   document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseDrive();});
-
   return{root,destroy:()=>{releaseDrive();root.remove();}};
 }
 
@@ -67,10 +51,23 @@ if(typeof window!=='undefined'){
     document.documentElement.classList.add('mobile-controls-v2-ready');
     return true;
   };
-  const boot=()=>{
-    if(install())return;
-    let tries=0;
-    const timer=setInterval(()=>{if(install()||++tries>80)clearInterval(timer);},100);
-  };
+  const boot=()=>{if(install())return;let tries=0;const timer=setInterval(()=>{if(install()||++tries>80)clearInterval(timer);},100);};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+}
+
+const styleId='lowtown-arrow-controls-style';
+if(typeof document!=='undefined'&&!document.getElementById(styleId)){
+  const style=document.createElement('style');
+  style.id=styleId;
+  style.textContent=`
+    .lowtown-mobile-controls{display:block!important;position:absolute;inset:0;z-index:30;pointer-events:none;user-select:none;padding:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+    .mobile-arrow-pad{position:absolute;right:18px;bottom:18px;display:grid;grid-template-columns:64px 64px 64px;grid-template-rows:64px 64px;gap:8px;pointer-events:none}
+    .mobile-arrow{width:64px;height:64px;padding:0;border:2px solid rgba(224,154,62,.72);border-radius:10px;background:rgba(12,13,16,.82);color:#e8b84a;font:bold 28px/1 Arial,sans-serif;box-shadow:0 7px 18px rgba(0,0,0,.45);pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent}
+    .mobile-arrow.up{grid-column:2;grid-row:1}.mobile-arrow.left{grid-column:1;grid-row:2}.mobile-arrow.down{grid-column:2;grid-row:2}.mobile-arrow.right{grid-column:3;grid-row:2}
+    .mobile-arrow.pressed{background:rgba(224,154,62,.34);border-color:#e09a3e;transform:translateY(1px)}
+    .lowtown-mobile-controls .mobile-actions{position:absolute;right:18px;bottom:162px;display:flex;gap:8px;pointer-events:auto}
+    .lowtown-mobile-controls .mobile-btn{min-width:66px;height:48px;padding:0 10px;border:1px solid #55585d;border-radius:7px;background:rgba(12,13,16,.86);color:#e8b84a;font:bold 12px monospace;letter-spacing:.08em;box-shadow:0 7px 16px rgba(0,0,0,.35);touch-action:none}
+    @media(max-width:600px){.mobile-arrow-pad{right:12px;bottom:12px}.mobile-arrow{width:58px;height:58px}.mobile-arrow-pad{grid-template-columns:58px 58px 58px;grid-template-rows:58px 58px}.lowtown-mobile-controls .mobile-actions{right:12px;bottom:150px}}
+  `;
+  document.head.appendChild(style);
 }
