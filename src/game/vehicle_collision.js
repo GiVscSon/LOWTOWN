@@ -31,6 +31,10 @@ function footprintPoints(x,y,a,length=56,width=28){
 }
 
 export function vehicleWorldBlocked(x,y,a,roadLines=[],options={}){
+  // No road/world context means the caller is exercising pure transport physics.
+  // Keep that mode independent from the concrete game map used by runtime collision.
+  if(!roadLines.length)return false;
+
   const length=Math.max(30,Number(options.length)||56);
   const width=Math.max(18,Number(options.width)||28);
   const buildingMargin=Math.max(0,Number(options.buildingMargin)||4);
@@ -40,7 +44,7 @@ export function vehicleWorldBlocked(x,y,a,roadLines=[],options={}){
   for(const p of points){
     if(!isLand(p.x,p.y)||pointInBuilding(p.x,p.y,buildingMargin))return true;
   }
-  if(roadLines.length&&nearestRoadDistance(x,y,roadLines)>ROAD_HALF_WIDTH+roadTolerance)return true;
+  if(nearestRoadDistance(x,y,roadLines)>ROAD_HALF_WIDTH+roadTolerance)return true;
   return false;
 }
 
