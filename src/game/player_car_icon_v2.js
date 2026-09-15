@@ -1,5 +1,5 @@
-const CAR_W = 76;
-const CAR_H = 42;
+const CAR_W = 92;
+const CAR_H = 52;
 
 function drawPlayerCarIcon() {
   const canvas = document.querySelector('#game');
@@ -22,100 +22,169 @@ function drawPlayerCarIcon() {
   ctx.translate(w * 0.5, h * 0.5);
   ctx.rotate(angle);
 
-  // Ground shadow
-  ctx.fillStyle = 'rgba(0,0,0,.58)';
+  // Soft contact shadow on wet asphalt.
+  ctx.fillStyle = 'rgba(0,0,0,.66)';
   ctx.beginPath();
-  ctx.ellipse(0, 11, 39, 10, 0, 0, Math.PI * 2);
+  ctx.ellipse(-1, 14, 46, 12, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Wheels
-  ctx.fillStyle = '#090b0d';
-  for (const x of [-25, 25]) {
+  // Warm reflected light under the car.
+  ctx.fillStyle = 'rgba(224,154,62,.13)';
+  ctx.beginPath();
+  ctx.ellipse(6, 15, 38, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Wheels and dark wheel arches.
+  ctx.fillStyle = '#07090b';
+  for (const x of [-29, 29]) {
     ctx.beginPath();
-    ctx.roundRect(x - 5, -18, 10, 36, 4);
+    ctx.roundRect(x - 6, -19, 12, 39, 4);
     ctx.fill();
   }
 
-  // Lower body
-  ctx.fillStyle = '#a87422';
-  ctx.strokeStyle = '#080a0c';
-  ctx.lineWidth = 2.5;
+  // Lower bumper / rocker section gives the silhouette more mass.
+  ctx.fillStyle = '#8c641f';
+  ctx.strokeStyle = '#07090b';
+  ctx.lineWidth = 2.6;
   ctx.beginPath();
-  ctx.roundRect(-36, -13, 72, 26, 8);
+  ctx.moveTo(-40, -11);
+  ctx.lineTo(-34, -17);
+  ctx.lineTo(29, -17);
+  ctx.lineTo(41, -7);
+  ctx.lineTo(38, 10);
+  ctx.lineTo(27, 16);
+  ctx.lineTo(-33, 16);
+  ctx.lineTo(-41, 8);
+  ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
-  // Yellow upper body and hood/trunk
+  // Main yellow body with hood, shoulders and rear deck.
   ctx.fillStyle = '#e8b84a';
   ctx.beginPath();
-  ctx.moveTo(-31, -11);
-  ctx.lineTo(-17, -16);
-  ctx.lineTo(16, -16);
-  ctx.lineTo(31, -8);
-  ctx.lineTo(28, 9);
-  ctx.lineTo(-28, 9);
+  ctx.moveTo(-35, -10);
+  ctx.lineTo(-22, -18);
+  ctx.lineTo(18, -18);
+  ctx.lineTo(34, -8);
+  ctx.lineTo(31, 10);
+  ctx.lineTo(23, 13);
+  ctx.lineTo(-28, 13);
+  ctx.lineTo(-36, 6);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
-  // Cabin glass
-  ctx.fillStyle = '#182027';
+  // Bright hood plane catches the sodium streetlight.
+  ctx.fillStyle = 'rgba(255,241,167,.20)';
   ctx.beginPath();
-  ctx.moveTo(-14, -12);
-  ctx.lineTo(10, -12);
-  ctx.lineTo(22, -4);
-  ctx.lineTo(17, 5);
-  ctx.lineTo(-19, 5);
+  ctx.moveTo(15, -15);
+  ctx.lineTo(32, -7);
+  ctx.lineTo(27, 3);
+  ctx.lineTo(9, 1);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = '#4b555d';
-  ctx.lineWidth = 1.2;
+
+  // Cabin, split windshield and side glass.
+  ctx.fillStyle = '#12191e';
+  ctx.beginPath();
+  ctx.moveTo(-17, -14);
+  ctx.lineTo(9, -14);
+  ctx.lineTo(24, -5);
+  ctx.lineTo(18, 6);
+  ctx.lineTo(-22, 6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#56616a';
+  ctx.lineWidth = 1.3;
   ctx.stroke();
 
-  // Window divider
-  ctx.strokeStyle = '#0b0e11';
+  ctx.fillStyle = 'rgba(118,132,141,.28)';
   ctx.beginPath();
-  ctx.moveTo(0, -12);
+  ctx.moveTo(-13, -11);
+  ctx.lineTo(-1, -11);
+  ctx.lineTo(-2, 3);
+  ctx.lineTo(-18, 3);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(2, -11);
+  ctx.lineTo(8, -11);
+  ctx.lineTo(20, -4);
+  ctx.lineTo(16, 3);
+  ctx.lineTo(1, 3);
+  ctx.closePath();
+  ctx.fill();
+
+  // Window pillar.
+  ctx.strokeStyle = '#080b0e';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, -14);
   ctx.lineTo(-1, 5);
   ctx.stroke();
 
-  // Front grille
-  ctx.fillStyle = '#15191d';
-  ctx.fillRect(26, -5, 6, 10);
-  ctx.fillStyle = '#d9dfe1';
-  ctx.fillRect(28, -2, 4, 1);
-  ctx.fillRect(28, 2, 4, 1);
+  // Front grille and bumper detail.
+  ctx.fillStyle = '#111519';
+  ctx.fillRect(31, -6, 8, 12);
+  ctx.fillStyle = '#9ba1a4';
+  ctx.fillRect(34, -3, 4, 1);
+  ctx.fillRect(34, 0, 4, 1);
+  ctx.fillRect(34, 3, 4, 1);
 
-  // Headlights
+  // Headlights.
   ctx.fillStyle = '#fff1a7';
-  ctx.fillRect(30, -10, 5, 5);
-  ctx.fillRect(30, 5, 5, 5);
+  ctx.shadowColor = 'rgba(255,241,167,.65)';
+  ctx.shadowBlur = 7;
+  ctx.fillRect(31, -11, 6, 5);
+  ctx.fillRect(31, 6, 6, 5);
+  ctx.shadowBlur = 0;
 
-  // Tail lights
+  // Rear lamps.
   ctx.fillStyle = '#d4523a';
-  ctx.fillRect(-35, -10, 6, 5);
-  ctx.fillRect(-35, 5, 6, 5);
+  ctx.fillRect(-38, -10, 7, 5);
+  ctx.fillRect(-38, 6, 7, 5);
 
-  // Roof highlight and center stripe
-  ctx.fillStyle = 'rgba(255,241,167,.45)';
-  ctx.fillRect(-11, -14, 18, 2);
-  ctx.fillStyle = 'rgba(255,255,255,.12)';
-  ctx.fillRect(-1, -9, 2, 16);
+  // Thin chrome beltline and roof highlight.
+  ctx.strokeStyle = 'rgba(255,241,167,.42)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-22, 8);
+  ctx.lineTo(25, 8);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(255,241,167,.48)';
+  ctx.fillRect(-12, -17, 19, 2);
 
-  // Player marker, deliberately small so it reads as a vehicle marker, not a waypoint
+  // Small roof aerial for a distinctly 90s silhouette.
+  ctx.strokeStyle = '#111519';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-7, -17);
+  ctx.lineTo(-12, -24);
+  ctx.stroke();
+
+  // Subtle center reflection.
+  ctx.fillStyle = 'rgba(255,255,255,.10)';
+  ctx.fillRect(-1, -9, 2, 17);
+
+  // Tiny player marker, kept close to the roof so it reads as an in-world cue.
   ctx.fillStyle = '#e09a3e';
   ctx.beginPath();
-  ctx.moveTo(0, -31);
-  ctx.lineTo(-6, -23);
-  ctx.lineTo(6, -23);
+  ctx.moveTo(0, -34);
+  ctx.lineTo(-6, -25);
+  ctx.lineTo(6, -25);
   ctx.closePath();
   ctx.fill();
 
+  // Speed streak and red rear glow at higher velocity.
   if (speed > 20) {
-    ctx.fillStyle = 'rgba(224,154,62,.22)';
+    ctx.strokeStyle = 'rgba(224,154,62,.30)';
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.ellipse(-37, 0, 10 + Math.min(10, speed * .02), 7, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(-42, -3);
+    ctx.lineTo(-57, -5);
+    ctx.moveTo(-43, 4);
+    ctx.lineTo(-55, 7);
+    ctx.stroke();
   }
 
   ctx.restore();
