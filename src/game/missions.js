@@ -5,7 +5,7 @@ export function createMissionSystem(world) {
   const templates = [
     { id: 'DROP', title: 'SHAKE THE NIGHT', text: 'Take the package from the apartments to Market Hall.', reward: 250, route: ['LOWTOWN_APARTMENTS', 'MARKET_HALL'] },
     { id: 'RUN', title: 'THROUGH THE BLOCKS', text: 'Hit Garage, City Hall and Old Foundry in one run.', reward: 450, route: ['CENTRAL_GARAGE', 'CITY_HALL', 'OLD_FOUNDRY'] },
-    { id: 'GETAWAY', title: 'LOSE THE TAIL', text: 'Run from Dock Works through Freight Depot to the motel.', reward: 700, route: ['DOCK_WORKS', 'FREIGHT_DEPOT', 'NORTH_RIDGE_MOTEL'] }
+    { id: 'GETAWAY', title: 'LOSE THE TAIL', text: 'Run from Dock Works through Freight Depot to the motel.', reward: 700, route: ['DOCK_WORKS', 'FREIGHT_DEPOT', 'NORTH_MOTEL'] }
   ];
   let active = 0, stage = 0, complete = false, started = false, aiRouteKey = null, completedJobs = 0;
   const MISSION_ROUTE_LOCK = 1.2, EMERGENCY_STUCK = 1.5;
