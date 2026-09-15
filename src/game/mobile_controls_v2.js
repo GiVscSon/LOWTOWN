@@ -1,22 +1,25 @@
 export function createMobileControlsV2(){
   const root=document.createElement('div');
   root.className='lowtown-mobile-controls';
-  root.innerHTML='<div class="mobile-arrow-pad" aria-label="Управление машиной"><button class="mobile-arrow up" data-key="ArrowUp" aria-label="Вперёд">▲</button><button class="mobile-arrow left" data-key="ArrowLeft" aria-label="Влево">◀</button><button class="mobile-arrow down" data-key="ArrowDown" aria-label="Назад">▼</button><button class="mobile-arrow right" data-key="ArrowRight" aria-label="Вправо">▶</button></div><div class="mobile-actions"><button class="mobile-btn mobile-ai" data-mobile="ai">AI: OFF</button><button class="mobile-btn" data-mobile="reset">RESET</button></div>';
+  root.innerHTML='<div class="mobile-arrow-pad" aria-label="Управление машиной"><button class="mobile-arrow up" data-drive="forward" aria-label="Вперёд">▲</button><button class="mobile-arrow left" data-drive="left" aria-label="Влево">◀</button><button class="mobile-arrow down" data-drive="back" aria-label="Назад">▼</button><button class="mobile-arrow right" data-drive="right" aria-label="Вправо">▶</button></div><div class="mobile-actions"><button class="mobile-btn mobile-ai" data-mobile="ai">AI: OFF</button><button class="mobile-btn" data-mobile="reset">RESET</button></div>';
   const action=()=>window.__LOWTOWN_ACTIONS__;
-  const held=new Set();
+  const input={throttle:0,steer:0,brake:0,handbrake:false};
+  let timer=null;
   let ai=false;
-  let repeatTimer=null;
-  const setKey=(key,pressed)=>{const normalized=String(key);if(pressed){if(held.has(normalized))return;held.add(normalized);window.dispatchEvent(new KeyboardEvent('keydown',{key:normalized,bubbles:true,cancelable:true}));}else{if(!held.has(normalized))return;held.delete(normalized);window.dispatchEvent(new KeyboardEvent('keyup',{key:normalized,bubbles:true,cancelable:true}));}};
-  const releaseDrive=()=>{if(repeatTimer){clearInterval(repeatTimer);repeatTimer=null;}for(const key of [...held])setKey(key,false);};
-  const actionKey=key=>window.dispatchEvent(new KeyboardEvent('keydown',{key,bubbles:true,cancelable:true}));
-  const pressDrive=(button,key,e)=>{e.preventDefault();button.setPointerCapture?.(e.pointerId);setKey(key,true);button.classList.add('pressed');if(repeatTimer)clearInterval(repeatTimer);repeatTimer=setInterval(()=>{if(held.has(key))window.dispatchEvent(new KeyboardEvent('keydown',{key,bubbles:true,cancelable:true}));},120);};
-  for(const button of root.querySelectorAll('.mobile-arrow')){const key=button.dataset.key;const press=e=>pressDrive(button,key,e);const release=e=>{e.preventDefault();setKey(key,false);button.classList.remove('pressed');if(repeatTimer){clearInterval(repeatTimer);repeatTimer=null;}};button.addEventListener('pointerdown',press,{passive:false});button.addEventListener('pointerup',release,{passive:false});button.addEventListener('pointercancel',release,{passive:false});button.addEventListener('lostpointercapture',release,{passive:false});}
-  root.querySelector('[data-mobile="ai"]').addEventListener('pointerdown',e=>{e.preventDefault();releaseDrive();let result=action()?.toggleAI?.();if(typeof result!=='boolean'){actionKey('i');setTimeout(()=>{if(!window.__LOWTOWN_TEST?.state?.().aiActive)actionKey('i');},250);ai=!ai;}else ai=!!result;e.currentTarget.textContent=ai?'AI: ON':'AI: OFF';e.currentTarget.classList.toggle('pressed',ai);},{passive:false});
-  root.querySelector('[data-mobile="reset"]').addEventListener('pointerdown',e=>{e.preventDefault();releaseDrive();if(typeof action()?.reset==='function')action().reset();else actionKey('r');},{passive:false});
+  const directStep=()=>{const p=window.__LOWTOWN_TRANSPORT?.player;if(!p?.step)return false;p.step(1/60,input);return true;};
+  const start=()=>{if(timer)return;timer=setInterval(()=>directStep(),16);directStep();};
+  const stop=()=>{if(timer){clearInterval(timer);timer=null;}input.throttle=0;input.steer=0;input.brake=0;input.handbrake=false;};
+  const recompute=()=>{input.throttle=0;input.steer=0;input.brake=0;for(const b of root.querySelectorAll('.mobile-arrow.pressed')){const d=b.dataset.drive;if(d==='forward')input.throttle=1;if(d==='back'){input.throttle=-1;input.brake=1;}if(d==='left')input.steer=-1;if(d==='right')input.steer=1;}if(input.throttle||input.steer)start();else stop();};
+  for(const button of root.querySelectorAll('.mobile-arrow')){
+    const press=e=>{e.preventDefault();button.setPointerCapture?.(e.pointerId);button.classList.add('pressed');recompute();};
+    const release=e=>{e.preventDefault();button.classList.remove('pressed');recompute();};
+    button.addEventListener('pointerdown',press,{passive:false});button.addEventListener('pointerup',release,{passive:false});button.addEventListener('pointercancel',release,{passive:false});button.addEventListener('lostpointercapture',release,{passive:false});
+  }
+  root.querySelector('[data-mobile="ai"]').addEventListener('pointerdown',e=>{e.preventDefault();stop();const result=action()?.toggleAI?.();ai=typeof result==='boolean'?result:!ai;e.currentTarget.textContent=ai?'AI: ON':'AI: OFF';e.currentTarget.classList.toggle('pressed',ai);},{passive:false});
+  root.querySelector('[data-mobile="reset"]').addEventListener('pointerdown',e=>{e.preventDefault();stop();if(typeof action()?.reset==='function')action().reset();else window.__LOWTOWN_TRANSPORT?.player?.reset?.();},{passive:false});
   root.addEventListener('contextmenu',e=>e.preventDefault());
-  window.addEventListener('blur',releaseDrive);
-  document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseDrive();});
-  return{root,destroy:()=>{releaseDrive();root.remove();}};
+  window.addEventListener('blur',stop);document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
+  return{root,destroy:()=>{stop();root.remove();}};
 }
 
 if(typeof window!=='undefined'){
@@ -24,15 +27,9 @@ if(typeof window!=='undefined'){
     const coarse=window.matchMedia?.('(pointer:coarse)').matches;
     const touch=('ontouchstart' in window)||((navigator.maxTouchPoints||0)>0)||((navigator.msMaxTouchPoints||0)>0);
     const narrow=window.innerWidth<=1100;
-    const mobile=coarse||touch||narrow;
-    if(!mobile)return false;
-    const wrap=document.querySelector('.game-wrap');
-    if(!wrap)return false;
-    if(wrap.querySelector('.lowtown-mobile-controls'))return true;
-    const controls=createMobileControlsV2();
-    wrap.appendChild(controls.root);
-    document.documentElement.classList.add('mobile-controls-v2-ready');
-    return true;
+    if(!(coarse||touch||narrow))return false;
+    const wrap=document.querySelector('.game-wrap');if(!wrap)return false;if(wrap.querySelector('.lowtown-mobile-controls'))return true;
+    const controls=createMobileControlsV2();wrap.appendChild(controls.root);document.documentElement.classList.add('mobile-controls-v2-ready');return true;
   };
   const boot=()=>{if(install())return;let tries=0;const timer=setInterval(()=>{if(install()||++tries>80)clearInterval(timer);},100);};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
