@@ -2,26 +2,53 @@
 
 ## Purpose
 
-`world_geometry_diagnostics.js` is read-only. It does not alter rendering, collision, `isLand`, `CITY_ROADS`, navigation, AI, or bridge behavior. Its only job is to expose disagreements that currently remain hidden by smoke tests.
+`world_geometry_diagnostics.js` is read-only. It exposes the same geometry contract used by runtime road topology, collision and world-support checks.
+
+The authoritative pipeline is:
+
+`CITY_ROADS → real segments → geometric intersections → road corridors → world/collision/navigation adapters`
 
 ## Report fields
 
 - `explicitIntersections`: road vertices that share exactly the same coordinate across different roads.
-- `proximityCandidates`: vertices from different roads at distance `< 90`, excluding exact matches. These are candidates for legacy `buildCityGraph()` proximity links, not legal junctions.
-- `bridgeEndpointBindings`: for each endpoint of each bridge, the nearest CITY_ROADS node and distance.
-- `buildingRoadConflicts`: building rectangles whose corner enters a road corridor of `CARRIAGEWAY_WIDTH / 2 + CURB_MARGIN`.
+- `unmarkedIntersections`: real segment crossings that are not declared by shared road vertices and are not grade-separated.
+- `allowedIntersections`: grade-separated segment crossings retained as diagnostic information but not connected as normal junctions.
+- `proximityCandidates`: vertices from different roads at distance `< 90`, shown only as a legacy-risk diagnostic. Distance alone never creates a junction.
+- `bridgeEndpointBindings`: nearest authoritative road node for each bridge endpoint.
+- `buildingRoadConflicts`: full building footprint vs road-corridor conflicts using the per-road collision width.
+- `roadCorridorGaps`: sampled points inside a road support corridor that are not recognized as land.
+- `bridgeCorridorGaps`: sampled points inside a bridge deck corridor that are not recognized as supported land/bridge.
+
+## Geometry contract
+
+- Road width is derived per road from `road_constants.js` through `road_geometry.js`.
+- Vehicle containment uses the same per-road collision corridor.
+- Bridge `width` means total deck width. Corridor checks use `width / 2`.
+- Bridge rendering follows the complete declared polyline, not a straight endpoint-to-endpoint shortcut.
+- Buildings must not intersect a carriageway corridor.
+- Non-grade-separated road segments may only cross at declared road vertices.
+- Grade-separated crossings are detected but do not create normal road junctions.
+- Runtime topology is adapted from the independent geometry authority rather than from a procedural grid.
 
 ## Baseline expectations
 
-- Downtown grid has explicit intersections at matching road coordinates.
-- HARBOR_LINK `(640,160)` is close to the Eastern/Market grid at `(640,80)` but is not an exact junction.
-- NORTH_BRIDGE is expected to reveal at least one endpoint farther than 90 units from a city-road node.
-- Conflict rows are diagnostics, not immediate proof that every rectangle blocks a road: the first version deliberately errs toward reporting candidates for manual spatial review.
+- `unmarkedIntersections.length === 0` for the authored city.
+- `buildingRoadConflicts.length === 0` for the authored building layout.
+- `roadCorridorGaps.length === 0` for the authored city.
+- `bridgeCorridorGaps.length === 0` for the authored bridges.
+- Both bridge endpoints bind exactly to CITY_ROADS nodes.
+- Legacy proximity candidates may exist as diagnostic observations, but they must never become graph links.
 
-## Use before every geometry patch
+## Negative coverage
 
-1. Run the diagnostic contract.
-2. Save the JSON report as CI artifact.
-3. Review newly introduced proximity candidates, unbound bridge endpoints, and building-road conflicts.
-4. Convert intended connections into explicit `junctionId` records; do not raise a distance threshold.
-5. Delete legacy proximity linking only after all required intended joins have explicit replacements.
+`tests/global-geometry-contract.mjs` deliberately constructs broken in-memory geometry for:
+
+1. road-through-building,
+2. road-into-water,
+3. undeclared segment crossing,
+4. displaced bridge endpoint,
+5. inconsistent lane width,
+6. inconsistent sidewalk offset,
+7. forbidden proximity-only link.
+
+Each defect must fail its corresponding invariant. These cases never modify the real map.
