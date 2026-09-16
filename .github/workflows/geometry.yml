@@ -1,0 +1,25 @@
+name: LOWTOWN Geometry Contract
+
+on:
+  push:
+    branches: [phase1-geometry-foundation]
+  pull_request:
+    branches: [main]
+
+jobs:
+  geometry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - name: Build
+        run: npm run build
+      - name: Global geometry contract
+        run: node tests/global-geometry-contract.mjs
+      - name: World geometry diagnostic contract
+        run: node tests/world-geometry-diagnostic-contract.mjs
+      - name: Explicit junction graph contract
+        run: node tests/explicit-junction-graph-contract.mjs
