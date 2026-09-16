@@ -1,5 +1,6 @@
 import { WORLD } from './world.js';
 import { CITY_ROADS } from './city_semantics.js';
+import { supportHalfWidth } from './road_geometry.js';
 
 export const ISLANDS = [
   {
@@ -55,10 +56,13 @@ const bridgeHit = (x, y, bridge) => {
   return false;
 };
 
-const CITY_GROUND_WIDTH = 58;
+// Support width for city-road ground is now derived per-road from the same
+// contract as physics/visuals (collisionHalfWidth + sidewalk), instead of one
+// flat CITY_GROUND_WIDTH=58 for every road class.
 const cityRoadHit = (x, y) => CITY_ROADS.some(road => {
+  const half = supportHalfWidth(road);
   for (let i = 0; i < road.points.length - 1; i++) {
-    if (segmentDistance(x, y, road.points[i], road.points[i + 1]) <= CITY_GROUND_WIDTH) return true;
+    if (segmentDistance(x, y, road.points[i], road.points[i + 1]) <= half) return true;
   }
   return false;
 });

@@ -1,12 +1,11 @@
 import { CITY_ROADS, CITY_DISTRICTS, CITY_DESTINATIONS, roadPoint, buildCityGraph } from './city_semantics.js';
 import { buildJunctionGraph } from './city_graph_junctions.js';
-import { BRIDGE_DECK_WIDTH } from './road_constants.js';
+import { visualHalfWidth } from './road_geometry.js';
 
 const CITY_GRAPH=buildCityGraph();
 if(typeof globalThis!=='undefined')globalThis.__LOWTOWN_CITY_GRAPH=CITY_GRAPH;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function hash(x,y,n=0){const v=Math.sin(x*12.9898+y*78.233+n*37.719)*43758.5453;return v-Math.floor(v);}
-const CLASS_WIDTH={ARTERIAL:66,AVENUE:52,STREET:40,SERVICE:30};
 const BRIDGE_ROADS=new Set(['NORTH_BRIDGE_ROAD','HARBOR_LINK']);
 
 function blockPavement(ctx,iso){
@@ -79,10 +78,13 @@ function strokeRoad(ctx,iso,road,width,color){
   ctx.strokeStyle=color;ctx.lineWidth=width;ctx.stroke();
 }
 
+// All widths now derive from visualHalfWidth(road) — the same contract used
+// by physics (collisionHalfWidth) and land support (supportHalfWidth). No
+// independent CLASS_WIDTH table.
 function roadGeometry(ctx,iso){
   const roads=[...CITY_ROADS].sort((a,b)=>(BRIDGE_ROADS.has(a.id)?1:0)-(BRIDGE_ROADS.has(b.id)?1:0));
   for(const road of roads){
-    const width=BRIDGE_ROADS.has(road.id)?BRIDGE_DECK_WIDTH:(CLASS_WIDTH[road.class]||40);
+    const width=visualHalfWidth(road)*2;
     ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
     strokeRoad(ctx,iso,road,width+14,'rgba(3,5,7,.9)');
     strokeRoad(ctx,iso,road,width,road.class==='ARTERIAL'?'#36393d':'#292c30');
@@ -146,7 +148,7 @@ function destinationSigns(ctx,iso){
 }
 
 export function createCityVisuals(){
-  return {version:'CITY_NETWORK_6',draw(ctx,iso,buildings,lamps,t){
+  return {version:'CITY_NETWORK_7',draw(ctx,iso,buildings,lamps,t){
     blockPavement(ctx,iso);
     roadGeometry(ctx,iso);
     junctionPlates(ctx,iso);
