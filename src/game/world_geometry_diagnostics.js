@@ -51,9 +51,18 @@ function proximityCandidates(nodes) {
   return candidates;
 }
 
+function bridgePolyline(bridge) {
+  if (Array.isArray(bridge.points) && bridge.points.length >= 2) return bridge.points;
+  return [[bridge.a.x, bridge.a.y], [bridge.b.x, bridge.b.y]];
+}
+
 function bridgeEndpointBindings(nodes) {
   return BRIDGES.map(bridge => {
-    const endpoints = [{ name: 'a', ...bridge.a }, { name: 'b', ...bridge.b }];
+    const polyline = bridgePolyline(bridge);
+    const endpoints = [
+      { name: 'a', x: polyline[0][0], y: polyline[0][1] },
+      { name: 'b', x: polyline[polyline.length - 1][0], y: polyline[polyline.length - 1][1] }
+    ];
     return {
       bridgeId: bridge.id,
       width: bridge.width,

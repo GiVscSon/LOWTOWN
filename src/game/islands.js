@@ -23,24 +23,14 @@ export const ISLANDS = [
 ];
 
 export const BRIDGES = [
-  { id: 'EAST_BRIDGE', a: { x: 640, y: 160 }, b: { x: 1120, y: 160 }, width: 70 },
-  { id: 'NORTH_BRIDGE', a: { x: -320, y: 800 }, b: { x: 0, y: 1360 }, width: 90 }
+  { id: 'EAST_BRIDGE', points: [[640, 80], [640, 160], [1120, 160]], width: 70 },
+  { id: 'NORTH_BRIDGE', points: [[-120, 600], [-320, 800], [-120, 1240]], width: 90 }
 ];
 
 const ellipse = (x, y, island) => {
-  if (!island || !Number.isFinite(x) || !Number.isFinite(y)) return false;
   const dx = (x - island.center.x) / island.rx;
   const dy = (y - island.center.y) / island.ry;
   return dx * dx + dy * dy <= 1;
-};
-
-const bridgeHit = (x, y, bridge) => {
-  if (!bridge?.a || !bridge?.b || !Number.isFinite(x) || !Number.isFinite(y)) return false;
-  const vx = bridge.b.x - bridge.a.x, vy = bridge.b.y - bridge.a.y;
-  const len2 = vx * vx + vy * vy || 1;
-  const t = Math.max(0, Math.min(1, ((x - bridge.a.x) * vx + (y - bridge.a.y) * vy) / len2));
-  const px = bridge.a.x + vx * t, py = bridge.a.y + vy * t;
-  return Math.hypot(x - px, y - py) <= (bridge.width || 0);
 };
 
 const segmentDistance = (x, y, a, b) => {
@@ -49,8 +39,22 @@ const segmentDistance = (x, y, a, b) => {
   return Math.hypot(x - (a[0] + dx * t), y - (a[1] + dy * t));
 };
 
-// City roads are engineered/reclaimed ground, so the physical world must agree with
-// the road graph even where the older procedural shoreline ellipse does not reach.
+const bridgePoints = (bridge) => {
+  if (Array.isArray(bridge?.points) && bridge.points.length >= 2) return bridge.points;
+  if (bridge?.a && bridge?.b) return [[bridge.a.x, bridge.a.y], [bridge.b.x, bridge.b.y]];
+  return [];
+};
+
+const bridgeHit = (x, y, bridge) => {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+  const pts = bridgePoints(bridge);
+  const width = bridge.width || 0;
+  for (let i = 0; i < pts.length - 1; i += 1) {
+    if (segmentDistance(x, y, pts[i], pts[i + 1]) <= width) return true;
+  }
+  return false;
+};
+
 const CITY_GROUND_WIDTH = 58;
 const cityRoadHit = (x, y) => CITY_ROADS.some(road => {
   for (let i = 0; i < road.points.length - 1; i++) {

@@ -7,19 +7,21 @@ export const CITY_ROADS = Object.freeze([
   {id:'CENTRAL_AVENUE',name:'Central Avenue',class:ROAD.AVENUE,zone:'DOWNTOWN',speed:70,lanes:2,oneWay:false,points:[[-120,-1160],[-120,-600],[-120,-360],[-120,0],[-120,80],[-120,600],[-120,1240]]},
   {id:'EASTERN_AVENUE',name:'Eastern Avenue',class:ROAD.AVENUE,zone:'DOWNTOWN',speed:75,lanes:2,oneWay:false,points:[[640,-1160],[640,-900],[640,-600],[640,-360],[640,0],[640,80],[640,600],[640,1240]]},
   {id:'MARKET_STREET',name:'Market Street',class:ROAD.STREET,zone:'DOWNTOWN',speed:45,lanes:2,oneWay:false,points:[[-1960,80],[-1200,80],[-760,80],[-520,80],[-120,80],[200,80],[640,80],[900,80],[1500,80]]},
-  {id:'HARBOR_LINK',name:'Harbor Link',class:ROAD.ARTERIAL,zone:'DOWNTOWN',speed:80,lanes:2,oneWay:false,points:[[640,160],[1120,160],[1300,-900]]},
+  {id:'CANAL_STREET',name:'Canal Street',class:ROAD.STREET,zone:'DOWNTOWN',speed:45,lanes:2,oneWay:false,points:[[-760,0],[-120,0],[640,0]]},
+  {id:'RIDGE_STREET',name:'Ridge Street',class:ROAD.STREET,zone:'RESIDENTIAL',speed:45,lanes:2,oneWay:false,points:[[-760,600],[-120,600],[640,600]]},
+  {id:'HARBOR_LINK',name:'Harbor Link',class:ROAD.ARTERIAL,zone:'DOWNTOWN',speed:80,lanes:2,oneWay:false,points:[[640,80],[640,160],[1120,160],[1300,-900]]},
   {id:'DOCKSIDE_DRIVE',name:'Dockside Drive',class:ROAD.ARTERIAL,zone:'IRON_HARBOR',speed:85,lanes:4,oneWay:false,points:[[1300,-900],[1500,-900],[2100,-900]]},
   {id:'FREIGHTER_ROW',name:'Freighter Row',class:ROAD.AVENUE,zone:'IRON_HARBOR',speed:55,lanes:2,oneWay:false,points:[[1020,-500],[1500,-500],[2050,-500]]},
   {id:'SHIPYARD_ROAD',name:'Shipyard Road',class:ROAD.STREET,zone:'IRON_HARBOR',speed:40,lanes:2,oneWay:false,points:[[1020,-100],[1500,-100],[2050,-100]]},
-  {id:'HARBOR_SPINE',name:'Harbor Spine',class:ROAD.AVENUE,zone:'IRON_HARBOR',speed:60,lanes:2,oneWay:false,points:[[1500,-900],[1500,-500],[1500,-100]]},
+  {id:'HARBOR_SPINE',name:'Harbor Spine',class:ROAD.AVENUE,zone:'IRON_HARBOR',speed:60,lanes:2,oneWay:false,points:[[1500,-900],[1500,-500],[1500,-100],[1500,80]]},
   {id:'PINE_ROUTE',name:'Pine Route',class:ROAD.ARTERIAL,zone:'NORTH_RIDGE',speed:80,lanes:2,oneWay:false,points:[[-120,1240],[-520,1400],[-120,1700],[300,1900],[800,2050]]},
   {id:'NORTH_BRIDGE_ROAD',name:'North Bridge',class:ROAD.AVENUE,zone:'DOWNTOWN',speed:60,lanes:2,oneWay:false,points:[[-120,600],[-320,800],[-120,1240]]}
 ]);
 
 export const CITY_DISTRICTS = Object.freeze([
-  {id:'DOWNTOWN',name:'Downtown',center:{x:-560,y:-180},roadIds:['LOWTOWN_BOULEVARD','RIVER_AVENUE','CENTRAL_AVENUE','EASTERN_AVENUE','MARKET_STREET','HARBOR_LINK','NORTH_BRIDGE_ROAD'],pedestrianDensity:1.35,vehicleDensity:1.2},
-  {id:'RESIDENTIAL',name:'Residential',center:{x:-520,y:620},roadIds:['CENTRAL_AVENUE','RIVER_AVENUE'],pedestrianDensity:1.1,vehicleDensity:.75},
-  {id:'OLD_INDUSTRIAL',name:'Old Industrial',center:{x:430,y:650},roadIds:['EASTERN_AVENUE'],pedestrianDensity:.55,vehicleDensity:.9},
+  {id:'DOWNTOWN',name:'Downtown',center:{x:-560,y:-180},roadIds:['LOWTOWN_BOULEVARD','RIVER_AVENUE','CENTRAL_AVENUE','EASTERN_AVENUE','MARKET_STREET','CANAL_STREET','HARBOR_LINK','NORTH_BRIDGE_ROAD'],pedestrianDensity:1.35,vehicleDensity:1.2},
+  {id:'RESIDENTIAL',name:'Residential',center:{x:-520,y:620},roadIds:['CENTRAL_AVENUE','RIVER_AVENUE','RIDGE_STREET'],pedestrianDensity:1.1,vehicleDensity:.75},
+  {id:'OLD_INDUSTRIAL',name:'Old Industrial',center:{x:430,y:650},roadIds:['EASTERN_AVENUE','RIDGE_STREET'],pedestrianDensity:.55,vehicleDensity:.9},
   {id:'IRON_HARBOR',name:'Iron Harbor',center:{x:1700,y:-100},roadIds:['DOCKSIDE_DRIVE','FREIGHTER_ROW','SHIPYARD_ROAD','HARBOR_SPINE'],pedestrianDensity:.7,vehicleDensity:1.45},
   {id:'NORTH_RIDGE',name:'North Ridge',center:{x:0,y:1800},roadIds:['PINE_ROUTE'],pedestrianDensity:.35,vehicleDensity:.45}
 ]);
@@ -59,7 +61,12 @@ export function buildCityGraph(){
   const nodes=[];for(const road of CITY_ROADS)for(let i=0;i<road.points.length;i++)nodes.push({id:`${road.id}:${i}`,roadId:road.id,index:i,x:road.points[i][0],y:road.points[i][1],links:[]});
   const byId=new Map(nodes.map(n=>[n.id,n]));
   for(const road of CITY_ROADS)for(let i=0;i<road.points.length-1;i++){const a=byId.get(`${road.id}:${i}`),b=byId.get(`${road.id}:${i+1}`);a.links.push(b);if(!road.oneWay)b.links.push(a);}
-  for(const n of nodes)for(const road of CITY_ROADS)if(road.id!==n.roadId)for(let i=0;i<road.points.length;i++){const p=road.points[i];if(Math.hypot(p[0]-n.x,p[1]-n.y)<90){const other=byId.get(`${road.id}:${i}`);if(other&&!n.links.includes(other))n.links.push(other);}}
+  const groups=new Map();
+  for(const n of nodes){const key=`${n.x}:${n.y}`;const group=groups.get(key)||[];group.push(n);groups.set(key,group);}
+  for(const group of groups.values()){
+    if(new Set(group.map(n=>n.roadId)).size<2)continue;
+    for(const a of group)for(const b of group){if(a.id!==b.id&&!a.links.includes(b))a.links.push(b);}
+  }
   return nodes;
 }
 export function shortestRoute(start,goal){
