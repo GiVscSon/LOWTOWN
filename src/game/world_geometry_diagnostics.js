@@ -21,6 +21,22 @@ function roadNodes() {
   })));
 }
 
+function explicitIntersections(nodes) {
+  const groups = new Map();
+  for (const node of nodes) {
+    const key = `${node.x}:${node.y}`;
+    const group = groups.get(key) || [];
+    group.push(node);
+    groups.set(key, group);
+  }
+  return [...groups.values()]
+    .filter(group => new Set(group.map(node => node.roadId)).size > 1)
+    .map(group => ({
+      point: { x: group[0].x, y: group[0].y },
+      nodes: group.map(({ id, roadId, index }) => ({ id, roadId, index }))
+    }));
+}
+
 function proximityCandidates(nodes) {
   const candidates = [];
   for (let i = 0; i < nodes.length; i += 1) {
@@ -78,12 +94,7 @@ function roadCorridorGaps() {
   const gaps = [];
   for (const road of CITY_ROADS) {
     for (const sample of sampleRoadCorridor(road, { step: 20, edgeSamples: 3 })) {
-      if (!isLand(sample.x, sample.y)) gaps.push({
-        roadId: road.id,
-        x: sample.x,
-        y: sample.y,
-        offset: sample.offset
-      });
+      if (!isLand(sample.x, sample.y)) gaps.push({ roadId: road.id, x: sample.x, y: sample.y, offset: sample.offset });
     }
   }
   return gaps;
@@ -93,12 +104,7 @@ function bridgeCorridorGaps() {
   const gaps = [];
   for (const bridge of BRIDGES) {
     for (const sample of sampleBridgeCorridor(bridge, { step: 20, edgeSamples: 3 })) {
-      if (!isLand(sample.x, sample.y)) gaps.push({
-        bridgeId: bridge.id,
-        x: sample.x,
-        y: sample.y,
-        offset: sample.offset
-      });
+      if (!isLand(sample.x, sample.y)) gaps.push({ bridgeId: bridge.id, x: sample.x, y: sample.y, offset: sample.offset });
     }
   }
   return gaps;
@@ -107,6 +113,7 @@ function bridgeCorridorGaps() {
 export function buildWorldGeometryDiagnostic() {
   const nodes = roadNodes();
   const authority = buildGeometryAuthority(CITY_ROADS);
+  const explicit = explicitIntersections(nodes);
   const { unmarked, allowed } = findSegmentIntersections(CITY_ROADS);
   return {
     metadata: {
@@ -124,6 +131,7 @@ export function buildWorldGeometryDiagnostic() {
       unmarkedIntersections: unmarked.length,
       allowedGradeSeparatedIntersections: allowed.length
     },
+    explicitIntersections: explicit,
     proximityCandidates: proximityCandidates(nodes),
     unmarkedIntersections: unmarked,
     allowedIntersections: allowed,
