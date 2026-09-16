@@ -9,6 +9,23 @@ function hash(x,y,n=0){const v=Math.sin(x*12.9898+y*78.233+n*37.719)*43758.5453;
 const CLASS_WIDTH={ARTERIAL:66,AVENUE:52,STREET:40,SERVICE:30};
 const BRIDGE_ROADS=new Set(['NORTH_BRIDGE_ROAD','HARBOR_LINK']);
 
+function blockPavement(ctx,iso){
+  const xs=[-1960,-760,-120,640,1020,1500,2100];
+  const ys=[-1160,-600,-360,80,600,1240];
+  ctx.save();
+  for(let i=0;i<xs.length-1;i++){
+    for(let j=0;j<ys.length-1;j++){
+      const x0=xs[i]+12,y0=ys[j]+12,x1=xs[i+1]-12,y1=ys[j+1]-12;
+      if(x1-x0<48||y1-y0<48)continue;
+      const p=[iso(x0,y0),iso(x1,y0),iso(x1,y1),iso(x0,y1)];
+      ctx.fillStyle='#14161a';
+      ctx.beginPath();p.forEach((q,n)=>n?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));ctx.closePath();ctx.fill();
+      ctx.strokeStyle='rgba(0,0,0,.4)';ctx.lineWidth=1;ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
 function buildingDetails(ctx,iso,b,t){
   const [x,y,w,h]=b;
   const seed=hash(x,y,w+h);
@@ -129,7 +146,8 @@ function destinationSigns(ctx,iso){
 }
 
 export function createCityVisuals(){
-  return {version:'CITY_NETWORK_5',draw(ctx,iso,buildings,lamps,t){
+  return {version:'CITY_NETWORK_6',draw(ctx,iso,buildings,lamps,t){
+    blockPavement(ctx,iso);
     roadGeometry(ctx,iso);
     junctionPlates(ctx,iso);
     for(const b of buildings)buildingDetails(ctx,iso,b,t);

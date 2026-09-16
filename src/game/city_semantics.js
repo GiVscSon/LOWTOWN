@@ -7,7 +7,7 @@ export const CITY_ROADS = Object.freeze([
   {id:'CENTRAL_AVENUE',name:'Central Avenue',class:ROAD.AVENUE,zone:'DOWNTOWN',speed:70,lanes:2,oneWay:false,points:[[-120,-1160],[-120,-600],[-120,-360],[-120,0],[-120,80],[-120,600],[-120,1240]]},
   {id:'EASTERN_AVENUE',name:'Eastern Avenue',class:ROAD.AVENUE,zone:'DOWNTOWN',speed:75,lanes:2,oneWay:false,points:[[640,-1160],[640,-900],[640,-600],[640,-360],[640,0],[640,80],[640,600],[640,1240]]},
   {id:'MARKET_STREET',name:'Market Street',class:ROAD.STREET,zone:'DOWNTOWN',speed:45,lanes:2,oneWay:false,points:[[-1960,80],[-1200,80],[-760,80],[-520,80],[-120,80],[200,80],[640,80],[900,80],[1500,80]]},
-  {id:'CANAL_STREET',name:'Canal Street',class:ROAD.STREET,zone:'DOWNTOWN',speed:45,lanes:2,oneWay:false,points:[[-760,0],[-120,0],[640,0]]},
+  {id:'CANAL_STREET',name:'Canal Street',class:ROAD.STREET,zone:'DOWNTOWN',speed:45,lanes:2,oneWay:false,points:[[-760,-600],[-120,-600],[640,-600]]},
   {id:'RIDGE_STREET',name:'Ridge Street',class:ROAD.STREET,zone:'RESIDENTIAL',speed:45,lanes:2,oneWay:false,points:[[-760,600],[-120,600],[640,600]]},
   {id:'HARBOR_LINK',name:'Harbor Link',class:ROAD.ARTERIAL,zone:'DOWNTOWN',speed:80,lanes:2,oneWay:false,points:[[640,80],[640,160],[1120,160],[1300,-900]]},
   {id:'DOCKSIDE_DRIVE',name:'Dockside Drive',class:ROAD.ARTERIAL,zone:'IRON_HARBOR',speed:85,lanes:4,oneWay:false,points:[[1300,-900],[1500,-900],[2100,-900]]},

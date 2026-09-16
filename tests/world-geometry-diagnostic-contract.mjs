@@ -10,4 +10,5 @@ const north = report.bridgeEndpointBindings.find(item => item.bridgeId === 'NORT
 assert.ok(east && north, 'both bridge binding reports are required');
 assert.ok(east.endpoints.every(item => item.nearest && item.nearest.distance <= 0.001), 'EAST_BRIDGE must sit on exact city-road nodes');
 assert.ok(north.endpoints.every(item => item.nearest && item.nearest.distance <= 0.001), 'NORTH_BRIDGE must sit on exact city-road nodes');
-console.log(JSON.stringify({ roads: report.counts.roads, junctions: report.explicitIntersections.length, bridges: report.bridgeEndpointBindings }, null, 2));
+assert.equal(report.buildingRoadConflicts.length, 0, 'buildings must stay out of carriageways');
+console.log(JSON.stringify({ roads: report.counts.roads, junctions: report.explicitIntersections.length, buildings: report.counts.buildings, conflicts: report.buildingRoadConflicts.length }, null, 2));
