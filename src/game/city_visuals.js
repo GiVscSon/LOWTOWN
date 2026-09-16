@@ -1,6 +1,7 @@
 import { CITY_ROADS, CITY_DISTRICTS, CITY_DESTINATIONS, roadPoint, buildCityGraph } from './city_semantics.js';
 import { buildJunctionGraph } from './city_graph_junctions.js';
 import { visualHalfWidth } from './road_geometry.js';
+import { WORLD } from './world.js';
 
 const CITY_GRAPH = buildCityGraph();
 if (typeof globalThis !== 'undefined') globalThis.__LOWTOWN_CITY_GRAPH = CITY_GRAPH;
@@ -9,17 +10,31 @@ function hash(x, y, n = 0) { const v = Math.sin(x * 12.9898 + y * 78.233 + n * 3
 const BRIDGE_ROADS = new Set(['NORTH_BRIDGE_ROAD', 'HARBOR_LINK']);
 
 function blockPavement(ctx, iso) {
-  const xs = [-1960, -760, -120, 640, 1020, 1500, 2100];
-  const ys = [-1160, -600, -360, 80, 600, 1240];
+  // 1. Solid monolithic ground under entire city
+  const groundPoly = [
+    iso(-2400, -1400),
+    iso(2400, -1400),
+    iso(2400, 1600),
+    iso(-2400, 1600)
+  ];
   ctx.save();
+  ctx.fillStyle = '#0f1114';
+  ctx.beginPath();
+  groundPoly.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+  ctx.closePath();
+  ctx.fill();
+
+  // 2. City block pavement slabs
+  const xs = [-2100, -1200, -760, -120, 640, 1060, 1500, 2100];
+  const ys = [-1200, -600, -360, 80, 600, 1240];
   for (let i = 0; i < xs.length - 1; i++) {
     for (let j = 0; j < ys.length - 1; j++) {
-      const x0 = xs[i] + 12, y0 = ys[j] + 12, x1 = xs[i + 1] - 12, y1 = ys[j + 1] - 12;
-      if (x1 - x0 < 48 || y1 - y0 < 48) continue;
+      const x0 = xs[i] + 4, y0 = ys[j] + 4, x1 = xs[i + 1] - 4, y1 = ys[j + 1] - 4;
+      if (x1 - x0 < 32 || y1 - y0 < 32) continue;
       const p = [iso(x0, y0), iso(x1, y0), iso(x1, y1), iso(x0, y1)];
-      ctx.fillStyle = '#14161a';
+      ctx.fillStyle = '#17191d';
       ctx.beginPath(); p.forEach((q, n) => n ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = 'rgba(0,0,0,.4)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1; ctx.stroke();
     }
   }
   ctx.restore();
@@ -166,35 +181,81 @@ function streetAtmosphere(ctx, iso, lamps, t) {
   ctx.restore();
 }
 
-function roadLabels(ctx, iso) {
-  ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  for (const road of CITY_ROADS) { const mid = Math.floor((road.points.length - 1) / 2), p = roadPoint(road.id, mid, road.lanes * 18 + 18); if (!p) continue; const q = iso(p.x, p.y); ctx.translate(q.x, q.y - 8); ctx.rotate(-p.heading * .55); ctx.font = road.class === 'ARTERIAL' ? 'bold 8px monospace' : '7px monospace'; ctx.fillStyle = 'rgba(224,154,62,.72)'; ctx.shadowColor = 'rgba(0,0,0,.9)'; ctx.shadowBlur = 3; ctx.fillText(road.name.toUpperCase(), 0, 0); ctx.setTransform(1, 0, 0, 1, 0, 0); }
+function missionBeacon(ctx, iso, t) {
+  const m = WORLD.mission;
+  if (!m) return;
+  const p = iso(m.x, m.y);
+  const pulse = 0.85 + 0.15 * Math.sin(t * 4);
+  const r = (m.radius || 70) * pulse;
+
+  ctx.save();
+  // Ground pulse ring
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y, r * 0.85, r * 0.45, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(224, 154, 62, 0.18)';
+  ctx.fill();
+  ctx.strokeStyle = '#e09a3e';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // Floating label
+  ctx.fillStyle = 'rgba(7, 9, 11, 0.88)';
+  ctx.fillRect(p.x - 30, p.y - 38, 60, 16);
+  ctx.strokeStyle = '#e09a3e';
+  ctx.strokeRect(p.x - 30, p.y - 38, 60, 16);
+  ctx.fillStyle = '#e09a3e';
+  ctx.font = 'bold 9px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('TARGET', p.x, p.y - 27);
   ctx.restore();
 }
 
-function districtLabels(ctx, iso) {
-  ctx.save(); ctx.textAlign = 'center';
-  for (const district of CITY_DISTRICTS) { const p = iso(district.center.x, district.center.y); ctx.fillStyle = 'rgba(7,9,11,.68)'; ctx.fillRect(p.x - 54, p.y - 11, 108, 20); ctx.strokeStyle = 'rgba(224,154,62,.26)'; ctx.strokeRect(p.x - 54, p.y - 11, 108, 20); ctx.fillStyle = 'rgba(154,160,168,.78)'; ctx.font = 'bold 7px monospace'; ctx.fillText(district.name.toUpperCase(), p.x, p.y + 2); }
-  ctx.restore();
-}
+function gpsIndicator(ctx, iso, t) {
+  const player = window.__LOWTOWN_TRANSPORT?.player?.state;
+  const target = WORLD.mission;
+  if (!player || !target) return;
 
-function destinationSigns(ctx, iso) {
-  for (const d of CITY_DESTINATIONS) { const p = roadPoint(d.roadId, d.index, (CITY_ROADS.find(r => r.id === d.roadId)?.lanes || 2) * 14 + 30); if (!p) continue; const q = iso(p.x, p.y); ctx.fillStyle = 'rgba(7,9,11,.86)'; ctx.fillRect(q.x - 31, q.y - 29, 62, 12); ctx.strokeStyle = 'rgba(224,154,62,.22)'; ctx.strokeRect(q.x - 31, q.y - 29, 62, 12); ctx.fillStyle = 'rgba(190,194,196,.78)'; ctx.font = '6px monospace'; ctx.textAlign = 'center'; ctx.fillText(d.name.toUpperCase(), q.x, q.y - 20); }
+  const dx = target.x - player.x;
+  const dy = target.y - player.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 80) return; // Arrived
+
+  const p = iso(player.x, player.y);
+  const targetScreen = iso(target.x, target.y);
+  const angle = Math.atan2(targetScreen.y - p.y, targetScreen.x - p.x);
+
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(angle);
+
+  // Arrow 55px away from car
+  const arrowDist = 55 + Math.sin(t * 5) * 4;
+  ctx.fillStyle = '#e09a3e';
+  ctx.beginPath();
+  ctx.moveTo(arrowDist + 12, 0);
+  ctx.lineTo(arrowDist - 6, -8);
+  ctx.lineTo(arrowDist - 2, 0);
+  ctx.lineTo(arrowDist - 6, 8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.restore();
 }
 
 export function createCityVisuals() {
   return {
-    version: 'CITY_NETWORK_8', draw(ctx, iso, buildings, lamps, t) {
+    version: 'CITY_NETWORK_9', draw(ctx, iso, buildings, lamps, t) {
       blockPavement(ctx, iso);
       roadGeometry(ctx, iso);
       junctionPlates(ctx, iso);
       const sortedBuildings = [...buildings].sort((a, b) => (a[1] + a[3]) - (b[1] + b[3]));
       for (const b of sortedBuildings) buildingDetails(ctx, iso, b, t);
       crosswalks(ctx, iso);
+      missionBeacon(ctx, iso, t);
       streetAtmosphere(ctx, iso, lamps, t);
-      roadLabels(ctx, iso);
-      districtLabels(ctx, iso);
-      destinationSigns(ctx, iso);
+      gpsIndicator(ctx, iso, t);
     }
   };
 }
