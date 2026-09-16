@@ -1,1 +1,48 @@
-.lowtown-mobile-controls{display:none;position:absolute;inset:0;z-index:20;pointer-events:none;user-select:none;-webkit-user-select:none}.mobile-arrow-pad{position:absolute;right:16px;bottom:18px;width:180px;height:150px;display:grid;grid-template-columns:repeat(3,56px);grid-template-rows:repeat(2,64px);gap:8px;pointer-events:none}.mobile-arrow{width:56px;height:64px;border:1px solid rgba(224,154,62,.72);border-radius:9px;background:rgba(12,13,16,.86);color:#e8b84a;font:bold 25px monospace;box-shadow:0 7px 18px rgba(0,0,0,.42);pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent}.mobile-arrow.up{grid-column:2;grid-row:1}.mobile-arrow.left{grid-column:1;grid-row:2}.mobile-arrow.down{grid-column:2;grid-row:2}.mobile-arrow.right{grid-column:3;grid-row:2}.mobile-arrow.pressed{background:rgba(224,154,62,.3);border-color:#e09a3e;transform:translateY(1px)}.mobile-actions{position:absolute;right:16px;top:16px;display:flex;gap:8px;pointer-events:auto}.mobile-btn{min-width:76px;height:52px;padding:0 12px;border:1px solid #55585d;border-radius:9px;background:rgba(12,13,16,.88);color:#e8b84a;font:bold 12px monospace;letter-spacing:.08em;box-shadow:0 7px 18px rgba(0,0,0,.4);touch-action:none;-webkit-tap-highlight-color:transparent}.mobile-btn.pressed{background:rgba(224,154,62,.3);border-color:#e09a3e;transform:translateY(1px)}.mobile-ai.pressed{box-shadow:0 0 18px rgba(224,154,62,.24)}html.mobile-controls-v2-ready .touch{display:none!important}@media(max-width:900px),(pointer:coarse){.lowtown-mobile-controls{display:block}}@media(max-width:600px){.mobile-arrow-pad{right:12px;bottom:14px;width:172px;height:142px;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(2,60px);gap:7px}.mobile-arrow{width:52px;height:60px;font-size:23px}.mobile-actions{right:12px;top:12px}.mobile-btn{min-width:68px;height:50px}}@media(orientation:landscape) and (max-height:560px){.mobile-arrow-pad{right:12px;bottom:12px;width:156px;height:112px;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(2,48px);gap:6px}.mobile-arrow{width:48px;height:48px;font-size:20px}.mobile-btn{height:44px}}
+.lowtown-mobile-pad {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 25;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.mobile-steer-cluster {
+  position: fixed;
+  left: 20px;
+  bottom: 24px;
+  display: flex;
+  gap: 14px;
+  pointer-events: auto;
+}
+
+.mobile-pedal-cluster {
+  position: fixed;
+  right: 20px;
+  bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+.mobile-btn {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  border: 1px solid rgba(224, 154, 62, 0.45);
+  background: rgba(12, 15, 18, 0.85);
+  color: #e09a3e;
+  font: bold 16px monospace;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  touch-action: manipulation;
+}
+
+.mobile-btn:active, .mobile-btn.active {
+  background: rgba(224, 154, 62, 0.35);
+  border-color: #e09a3e;
+  transform: scale(0.95);
+}
