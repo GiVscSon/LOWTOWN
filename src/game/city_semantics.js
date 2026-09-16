@@ -61,11 +61,35 @@ export function buildCityGraph(){
   for(const n of nodes)for(const road of CITY_ROADS)if(road.id!==n.roadId)for(let i=0;i<road.points.length;i++){const p=road.points[i];if(Math.hypot(p[0]-n.x,p[1]-n.y)<90){const other=byId.get(`${road.id}:${i}`);if(other&&!n.links.includes(other))n.links.push(other);}}
   return nodes;
 }
+
 export function shortestRoute(start,goal){
-  const nodes=buildCityGraph(),nearest=n=>nodes.reduce((a,b)=>!a||distance(n,b)<distance(n,a)?b:a,null),s=nearest(start),g=nearest(goal);if(!s||!g)return [];
-  const dist=new Map([[s.id,0]]),prev=new Map(),open=new Set(nodes.map(n=>n.id));
-  while(open.size){let current=null,best=Infinity;for(const id of open){const d=dist.get(id)??Infinity;if(d<best){best=d;current=id;}}if(current===null)break;open.delete(current);if(current===g.id)break;const n=nodes.find(v=>v.id===current);for(const v of n.links){if(!open.has(v.id))continue;const nd=best+distance(n,v);if(nd<(dist.get(v.id)??Infinity)){dist.set(v.id,nd);prev.set(v.id,current);}}}
-  if(!dist.has(g.id))return [];const path=[];for(let id=g.id;id!==undefined;id=prev.get(id)){const n=nodes.find(n=>n.id===id);if(n)path.unshift(n);if(id===s.id)break;}return path;
+  const nodes=buildCityGraph();
+  const byId=new Map(nodes.map(n=>[n.id,n]));
+  const nearest=n=>nodes.reduce((best,node)=>!best||distance(n,node)<distance(n,best)?node:best,null);
+  const source=nearest(start),target=nearest(goal);
+  if(!source||!target)return [];
+  if(source.id===target.id)return [source];
+
+  // The road graph is a connectivity graph, so BFS gives a deterministic route
+  // and avoids the previous weighted-search edge case around shared intersections.
+  const queue=[source.id];
+  const previous=new Map([[source.id,null]]);
+  let found=false;
+  while(queue.length){
+    const currentId=queue.shift();
+    if(currentId===target.id){found=true;break;}
+    const current=byId.get(currentId);
+    for(const next of current.links){
+      if(previous.has(next.id))continue;
+      previous.set(next.id,currentId);
+      queue.push(next.id);
+    }
+  }
+  if(!found)return [];
+
+  const path=[];
+  for(let id=target.id;id!==null;id=previous.get(id))path.unshift(byId.get(id));
+  return path;
 }
 export function pedestrianRoute(start,goal){return shortestRoute(start,goal).map((n,i)=>sidewalkPoint(n.roadId,n.index,i%2?1:-1)).filter(Boolean);}
 export function vehicleRoute(start,goal){return shortestRoute(start,goal).map((n,i)=>vehicleLanePoint(n.roadId,n.index,(i%2)*Math.max(1,(roadById(n.roadId)?.lanes||2)-1))).filter(Boolean);}
