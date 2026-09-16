@@ -9,11 +9,11 @@ export const CITY_ROADS = Object.freeze([
   {id:'MARKET_STREET',name:'Market Street',class:ROAD.STREET,zone:'DOWNTOWN',speed:45,lanes:2,oneWay:false,points:[[-1960,80],[-1200,80],[-760,80],[-520,80],[-120,80],[200,80],[640,80],[900,80],[1500,80]]},
   {id:'CANAL_STREET',name:'Canal Street',class:ROAD.STREET,zone:'DOWNTOWN',speed:45,lanes:2,oneWay:false,points:[[-760,-600],[-120,-600],[640,-600]]},
   {id:'RIDGE_STREET',name:'Ridge Street',class:ROAD.STREET,zone:'RESIDENTIAL',speed:45,lanes:2,oneWay:false,points:[[-760,600],[-120,600],[640,600]]},
-  {id:'HARBOR_LINK',name:'Harbor Link',class:ROAD.ARTERIAL,zone:'DOWNTOWN',speed:80,lanes:2,oneWay:false,points:[[640,80],[640,160],[1120,160],[1300,-900]]},
+  {id:'HARBOR_LINK',name:'Harbor Link',class:ROAD.ARTERIAL,zone:'DOWNTOWN',speed:80,lanes:2,oneWay:false,gradeSeparated:true,points:[[640,80],[640,160],[1120,160],[1300,-900]]},
   {id:'DOCKSIDE_DRIVE',name:'Dockside Drive',class:ROAD.ARTERIAL,zone:'IRON_HARBOR',speed:85,lanes:4,oneWay:false,points:[[1300,-900],[1500,-900],[2100,-900]]},
   {id:'FREIGHTER_ROW',name:'Freighter Row',class:ROAD.AVENUE,zone:'IRON_HARBOR',speed:55,lanes:2,oneWay:false,points:[[1020,-500],[1500,-500],[2050,-500]]},
   {id:'SHIPYARD_ROAD',name:'Shipyard Road',class:ROAD.STREET,zone:'IRON_HARBOR',speed:40,lanes:2,oneWay:false,points:[[1020,-100],[1500,-100],[2050,-100]]},
-  {id:'HARBOR_SPINE',name:'Harbor Spine',class:ROAD.AVENUE,zone:'IRON_HARBOR',speed:60,lanes:2,oneWay:false,points:[[1500,-900],[1500,-500],[1500,-100],[1500,80]]},
+  {id:'HARBOR_SPINE',name:'Harbor Spine',class:ROAD.AVENUE,zone:'IRON_HARBOR',speed:60,lanes:2,oneWay:false,points:[[1500,-900],[1500,-500],[1500,-360],[1500,-100],[1500,80]]},
   {id:'PINE_ROUTE',name:'Pine Route',class:ROAD.ARTERIAL,zone:'NORTH_RIDGE',speed:80,lanes:2,oneWay:false,points:[[-120,1240],[-520,1400],[-120,1700],[300,1900],[800,2050]]},
   {id:'NORTH_BRIDGE_ROAD',name:'North Bridge',class:ROAD.AVENUE,zone:'DOWNTOWN',speed:60,lanes:2,oneWay:false,points:[[-120,600],[-320,800],[-120,1240]]}
 ]);
@@ -42,7 +42,7 @@ const distance = (a,b) => Math.hypot(a.x-b.x,a.y-b.y);
 export function roadById(id){return CITY_ROADS.find(r=>r.id===id)||null;}
 export function districtById(id){return CITY_DISTRICTS.find(d=>d.id===id)||null;}
 export function destinationById(id){return CITY_DESTINATIONS.find(d=>d.id===id)||null;}
-export function destinationPoint(id,side=1){const d=destinationById(id),r=d&&roadById(d.roadId);if(!d||!r)return null;return {...roadPoint(d.roadId,d.index,side*(r.lanes*14+22)),destinationId:d.id,district:d.district,kind:d.kind};}
+export function destinationPoint(id,side=1){const d=destinationById(id),r=d&&roadById(d.roadId);if(!d||!r)return null;return {...roadPoint(d.roadId,d.index,side*sidewalkOffsetFallback(r)),destinationId:d.id,district:d.district,kind:d.kind};}
 
 export function nearestRoad(point,{use=USE.BOTH,zone=null}={}){
   const candidates=CITY_ROADS.filter(r=>!zone||r.zone===zone);let best=null;
@@ -54,8 +54,12 @@ export function roadPoint(roadId,index=0,offset=0){
   const a=road.points[Math.max(0,i-1)]||road.points[i],b=road.points[Math.min(road.points.length-1,i+1)]||road.points[i],dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy)||1;
   return {x:p.x-dy/len*offset,y:p.y+dx/len*offset,heading:Math.atan2(dy,dx),roadId:road.id};
 }
-export function vehicleLanePoint(roadId,index=0,lane=0){const road=roadById(roadId);if(!road)return null;const laneWidth=28,total=(road.lanes-1)*laneWidth;return roadPoint(roadId,index,lane*laneWidth-total/2);}
-export function sidewalkPoint(roadId,index=0,side=1){return roadPoint(roadId,index,side*(roadById(roadId)?.lanes||2)*14+22);}
+const LANE_WIDTH_FALLBACK = 23;
+const CLASS_MIN_FALLBACK = {ARTERIAL:66,AVENUE:52,STREET:40,SERVICE:30};
+function carriagewayHalfFallback(road){const lanes=road.lanes||2;return Math.max(lanes*LANE_WIDTH_FALLBACK,CLASS_MIN_FALLBACK[road.class]||40)/2;}
+function sidewalkOffsetFallback(road){return carriagewayHalfFallback(road)+6+14;}
+export function vehicleLanePoint(roadId,index=0,lane=0){const road=roadById(roadId);if(!road)return null;const lanes=road.lanes||2,total=(lanes-1)*LANE_WIDTH_FALLBACK;return roadPoint(roadId,index,lane*LANE_WIDTH_FALLBACK-total/2);}
+export function sidewalkPoint(roadId,index=0,side=1){const road=roadById(roadId);if(!road)return null;return roadPoint(roadId,index,side*sidewalkOffsetFallback(road));}
 
 export function buildCityGraph(){
   const nodes=[];for(const road of CITY_ROADS)for(let i=0;i<road.points.length;i++)nodes.push({id:`${road.id}:${i}`,roadId:road.id,index:i,x:road.points[i][0],y:road.points[i][1],links:[]});
