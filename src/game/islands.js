@@ -23,6 +23,8 @@ export const ISLANDS = [
   }
 ];
 
+// width is the total playable/rendered deck width. Geometry helpers use width / 2
+// as the corridor radius, and main.js uses the same value as canvas lineWidth.
 export const BRIDGES = [
   { id: 'EAST_BRIDGE', points: [[640, 80], [640, 160], [1120, 160]], a: { x: 640, y: 80 }, b: { x: 1120, y: 160 }, width: 70 },
   { id: 'NORTH_BRIDGE', points: [[-120, 600], [-320, 800], [-120, 1240]], a: { x: -120, y: 600 }, b: { x: -120, y: 1240 }, width: 90 }
@@ -40,7 +42,7 @@ const segmentDistance = (x, y, a, b) => {
   return Math.hypot(x - (a[0] + dx * t), y - (a[1] + dy * t));
 };
 
-const bridgePoints = (bridge) => {
+const bridgePoints = bridge => {
   if (Array.isArray(bridge?.points) && bridge.points.length >= 2) return bridge.points;
   if (bridge?.a && bridge?.b) return [[bridge.a.x, bridge.a.y], [bridge.b.x, bridge.b.y]];
   return [];
@@ -49,19 +51,16 @@ const bridgePoints = (bridge) => {
 const bridgeHit = (x, y, bridge) => {
   if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
   const pts = bridgePoints(bridge);
-  const width = bridge.width || 0;
+  const halfWidth = (bridge.width || 0) / 2;
   for (let i = 0; i < pts.length - 1; i += 1) {
-    if (segmentDistance(x, y, pts[i], pts[i + 1]) <= width) return true;
+    if (segmentDistance(x, y, pts[i], pts[i + 1]) <= halfWidth) return true;
   }
   return false;
 };
 
-// Support width for city-road ground is now derived per-road from the same
-// contract as physics/visuals (collisionHalfWidth + sidewalk), instead of one
-// flat CITY_GROUND_WIDTH=58 for every road class.
 const cityRoadHit = (x, y) => CITY_ROADS.some(road => {
   const half = supportHalfWidth(road);
-  for (let i = 0; i < road.points.length - 1; i++) {
+  for (let i = 0; i < road.points.length - 1; i += 1) {
     if (segmentDistance(x, y, road.points[i], road.points[i + 1]) <= half) return true;
   }
   return false;
