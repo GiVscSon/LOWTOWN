@@ -1,41 +1,24 @@
 import { CITY_ROADS } from './city_semantics.js';
-import { BRIDGES } from './islands.js';
+import { BRIDGES, isLand } from './islands.js';
 import { WORLD } from './world.js';
-import { CARRIAGEWAY_WIDTH, CURB_MARGIN } from './road_constants.js';
+import {
+  buildGeometryAuthority,
+  collisionHalfWidth,
+  sampleRoadCorridor,
+  sampleBridgeCorridor,
+  bridgePoints,
+  findSegmentIntersections,
+  buildingIntersectsRoad
+} from './road_geometry.js';
 
 const EPSILON = 0.001;
 const PROXIMITY_RADIUS = 90;
-
-const point = ([x, y]) => ({ x, y });
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-const samePoint = (a, b) => distance(a, b) <= EPSILON;
-
-function pointToSegmentDistance(p, a, b) {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const lengthSq = dx * dx + dy * dy;
-  if (lengthSq === 0) return distance(p, a);
-  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSq));
-  return distance(p, { x: a.x + dx * t, y: a.y + dy * t });
-}
 
 function roadNodes() {
   return CITY_ROADS.flatMap(road => road.points.map((raw, index) => ({
-    id: `${road.id}:${index}`, roadId: road.id, index, ...point(raw)
+    id: `${road.id}:${index}`, roadId: road.id, index, x: raw[0], y: raw[1]
   })));
-}
-
-function explicitIntersections(nodes) {
-  const groups = new Map();
-  for (const node of nodes) {
-    const key = `${node.x}:${node.y}`;
-    const group = groups.get(key) || [];
-    group.push(node);
-    groups.set(key, group);
-  }
-  return [...groups.values()]
-    .filter(group => new Set(group.map(node => node.roadId)).size > 1)
-    .map(group => ({ point: { x: group[0].x, y: group[0].y }, nodes: group.map(({ id, roadId, index }) => ({ id, roadId, index })) }));
 }
 
 function proximityCandidates(nodes) {
@@ -43,69 +26,110 @@ function proximityCandidates(nodes) {
   for (let i = 0; i < nodes.length; i += 1) {
     for (let j = i + 1; j < nodes.length; j += 1) {
       const a = nodes[i], b = nodes[j];
-      if (a.roadId === b.roadId || samePoint(a, b)) continue;
+      if (a.roadId === b.roadId) continue;
       const d = distance(a, b);
-      if (d < PROXIMITY_RADIUS) candidates.push({ a: a.id, b: b.id, aRoad: a.roadId, bRoad: b.roadId, distance: d });
+      if (d > EPSILON && d < PROXIMITY_RADIUS) candidates.push({
+        a: a.id, b: b.id, aRoad: a.roadId, bRoad: b.roadId, distance: d
+      });
     }
   }
   return candidates;
 }
 
-function bridgePolyline(bridge) {
-  if (Array.isArray(bridge.points) && bridge.points.length >= 2) return bridge.points;
-  return [[bridge.a.x, bridge.a.y], [bridge.b.x, bridge.b.y]];
-}
-
 function bridgeEndpointBindings(nodes) {
   return BRIDGES.map(bridge => {
-    const polyline = bridgePolyline(bridge);
+    const points = bridgePoints(bridge);
     const endpoints = [
-      { name: 'a', x: polyline[0][0], y: polyline[0][1] },
-      { name: 'b', x: polyline[polyline.length - 1][0], y: polyline[polyline.length - 1][1] }
+      { name: 'a', x: points[0]?.[0], y: points[0]?.[1] },
+      { name: 'b', x: points.at(-1)?.[0], y: points.at(-1)?.[1] }
     ];
     return {
       bridgeId: bridge.id,
       width: bridge.width,
       endpoints: endpoints.map(endpoint => {
-        const nearest = nodes.reduce((best, node) => !best || distance(endpoint, node) < best.distance
-          ? { nodeId: node.id, roadId: node.roadId, index: node.index, distance: distance(endpoint, node) }
-          : best, null);
-        return { endpoint: endpoint.name, x: endpoint.x, y: endpoint.y, nearest };
+        const nearest = nodes.reduce((best, node) => {
+          const d = distance(endpoint, node);
+          return !best || d < best.distance
+            ? { nodeId: node.id, roadId: node.roadId, index: node.index, distance: d }
+            : best;
+        }, null);
+        return { ...endpoint, nearest };
       })
     };
   });
 }
 
-function rectangleIntersectsRoad(building, road, halfWidth) {
-  const [x, y, width, height] = building;
-  const corners = [{ x, y }, { x: x + width, y }, { x, y: y + height }, { x: x + width, y: y + height }];
-  for (let i = 0; i < road.points.length - 1; i += 1) {
-    const a = point(road.points[i]);
-    const b = point(road.points[i + 1]);
-    if (corners.some(corner => pointToSegmentDistance(corner, a, b) <= halfWidth)) return true;
+function buildingRoadConflicts() {
+  const conflicts = [];
+  for (const [buildingIndex, building] of WORLD.buildings.entries()) {
+    for (const road of CITY_ROADS) {
+      if (buildingIntersectsRoad(building, road)) conflicts.push({
+        buildingIndex,
+        building,
+        roadId: road.id,
+        clearance: collisionHalfWidth(road)
+      });
+    }
   }
-  return false;
+  return conflicts;
 }
 
-function buildingRoadConflicts() {
-  const clearance = CARRIAGEWAY_WIDTH / 2 + CURB_MARGIN;
-  const conflicts = [];
-  WORLD.buildings.forEach((building, buildingIndex) => {
-    CITY_ROADS.forEach(road => {
-      if (rectangleIntersectsRoad(building, road, clearance)) conflicts.push({ buildingIndex, building, roadId: road.id, clearance });
-    });
-  });
-  return conflicts;
+function roadCorridorGaps() {
+  const gaps = [];
+  for (const road of CITY_ROADS) {
+    for (const sample of sampleRoadCorridor(road, { step: 20, edgeSamples: 3 })) {
+      if (!isLand(sample.x, sample.y)) gaps.push({
+        roadId: road.id,
+        x: sample.x,
+        y: sample.y,
+        offset: sample.offset
+      });
+    }
+  }
+  return gaps;
+}
+
+function bridgeCorridorGaps() {
+  const gaps = [];
+  for (const bridge of BRIDGES) {
+    for (const sample of sampleBridgeCorridor(bridge, { step: 20, edgeSamples: 3 })) {
+      if (!isLand(sample.x, sample.y)) gaps.push({
+        bridgeId: bridge.id,
+        x: sample.x,
+        y: sample.y,
+        offset: sample.offset
+      });
+    }
+  }
+  return gaps;
 }
 
 export function buildWorldGeometryDiagnostic() {
   const nodes = roadNodes();
+  const authority = buildGeometryAuthority(CITY_ROADS);
+  const { unmarked, allowed } = findSegmentIntersections(CITY_ROADS);
   return {
-    metadata: { proximityRadius: PROXIMITY_RADIUS, epsilon: EPSILON, roadClearance: CARRIAGEWAY_WIDTH / 2 + CURB_MARGIN },
-    counts: { roads: CITY_ROADS.length, roadNodes: nodes.length, bridges: BRIDGES.length, buildings: WORLD.buildings.length },
-    explicitIntersections: explicitIntersections(nodes),
+    metadata: {
+      proximityRadius: PROXIMITY_RADIUS,
+      epsilon: EPSILON,
+      geometryAuthority: 'CITY_ROADS → segments → intersections → corridor',
+      roadWidths: 'per-road from road_geometry.js'
+    },
+    counts: {
+      roads: CITY_ROADS.length,
+      roadNodes: nodes.length,
+      authorityNodes: authority.length,
+      bridges: BRIDGES.length,
+      buildings: WORLD.buildings.length,
+      unmarkedIntersections: unmarked.length,
+      allowedGradeSeparatedIntersections: allowed.length
+    },
     proximityCandidates: proximityCandidates(nodes),
-    bridgeEndpointBindings: bridgeEndpointBindings(nodes),
-    buildingRoadConflicts: buildingRoadConflicts()
+    unmarkedIntersections: unmarked,
+    allowedIntersections: allowed,
+    bridgeEndpointBindings: bridgeEndpointBindings(authority),
+    buildingRoadConflicts: buildingRoadConflicts(),
+    roadCorridorGaps: roadCorridorGaps(),
+    bridgeCorridorGaps: bridgeCorridorGaps()
   };
 }
