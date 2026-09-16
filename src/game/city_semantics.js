@@ -31,7 +31,7 @@ export const CITY_DISTRICTS = Object.freeze([
 export const CITY_DESTINATIONS = Object.freeze([
   {id:'LOWTOWN_APARTMENTS',name:'Lowtown Apartments',kind:'HOME',district:'RESIDENTIAL',roadId:'CENTRAL_AVENUE',index:5},
   {id:'MARKET_HALL',name:'Market Hall',kind:'SHOP',district:'DOWNTOWN',roadId:'MARKET_STREET',index:4},
-  {id:'CENTRAL_GARAGE',name:'Central Garage',kind:'GARAGE',district:'DOWNTOWN',roadId:'CENTRAL_AVENUE',index:3},
+  {id:'CENTRAL_GARAGE',name:'Central Garage',kind:'GARAGE',district:'DOWNTOWN',roadId:'CENTRAL_AVENUE',index:4},
   {id:'CITY_HALL',name:'City Hall',kind:'CIVIC',district:'DOWNTOWN',roadId:'LOWTOWN_BOULEVARD',index:4},
   {id:'OLD_FOUNDRY',name:'Old Foundry',kind:'JOB',district:'OLD_INDUSTRIAL',roadId:'EASTERN_AVENUE',index:6},
   {id:'DOCK_WORKS',name:'Dock Works',kind:'JOB',district:'IRON_HARBOR',roadId:'DOCKSIDE_DRIVE',index:1},
