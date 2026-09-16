@@ -1,50 +1,80 @@
-export function createMobileControlsV2(){
-  const root=document.createElement('div');
-  root.className='lowtown-mobile-controls';
-  root.innerHTML='<div class="mobile-arrow-pad" aria-label="Управление машиной"><button class="mobile-arrow up" data-drive="forward" aria-label="Вперёд">▲</button><button class="mobile-arrow left" data-drive="left" aria-label="Влево">◀</button><button class="mobile-arrow down" data-drive="back" aria-label="Назад">▼</button><button class="mobile-arrow right" data-drive="right" aria-label="Вправо">▶</button></div><div class="mobile-actions"><button class="mobile-btn mobile-ai" data-mobile="ai">AI: OFF</button><button class="mobile-btn" data-mobile="reset">RESET</button></div>';
-  const action=()=>window.__LOWTOWN_ACTIONS__;
-  const input={throttle:0,steer:0,brake:0,handbrake:false};
-  let timer=null;
-  let ai=false;
-  const directStep=()=>{const p=window.__LOWTOWN_TRANSPORT?.player;if(!p?.step)return false;p.step(1/60,input);return true;};
-  const start=()=>{if(timer)return;timer=setInterval(()=>directStep(),16);directStep();};
-  const stop=()=>{if(timer){clearInterval(timer);timer=null;}input.throttle=0;input.steer=0;input.brake=0;input.handbrake=false;};
-  const recompute=()=>{input.throttle=0;input.steer=0;input.brake=0;for(const b of root.querySelectorAll('.mobile-arrow.pressed')){const d=b.dataset.drive;if(d==='forward')input.throttle=1;if(d==='back'){input.throttle=-1;input.brake=1;}if(d==='left')input.steer=-1;if(d==='right')input.steer=1;}if(input.throttle||input.steer)start();else stop();};
-  for(const button of root.querySelectorAll('.mobile-arrow')){
-    const press=e=>{e.preventDefault();button.setPointerCapture?.(e.pointerId);button.classList.add('pressed');recompute();};
-    const release=e=>{e.preventDefault();button.classList.remove('pressed');recompute();};
-    button.addEventListener('pointerdown',press,{passive:false});button.addEventListener('pointerup',release,{passive:false});button.addEventListener('pointercancel',release,{passive:false});button.addEventListener('lostpointercapture',release,{passive:false});
-  }
-  root.querySelector('[data-mobile="ai"]').addEventListener('pointerdown',e=>{e.preventDefault();stop();const result=action()?.toggleAI?.();ai=typeof result==='boolean'?result:!ai;e.currentTarget.textContent=ai?'AI: ON':'AI: OFF';e.currentTarget.classList.toggle('pressed',ai);},{passive:false});
-  root.querySelector('[data-mobile="reset"]').addEventListener('pointerdown',e=>{e.preventDefault();stop();if(typeof action()?.reset==='function')action().reset();else window.__LOWTOWN_TRANSPORT?.player?.reset?.();},{passive:false});
-  root.addEventListener('contextmenu',e=>e.preventDefault());
-  window.addEventListener('blur',stop);document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
-  return{root,destroy:()=>{stop();root.remove();}};
-}
+// Mobile controls v2 - Ergonomic split layout
+// Left hand: Steer Left/Right
+// Right hand: Gas / Brake-Reverse
 
-if(typeof window!=='undefined'){
-  const install=()=>{
-    const coarse=window.matchMedia?.('(pointer:coarse)').matches;
-    const touch=('ontouchstart' in window)||((navigator.maxTouchPoints||0)>0)||((navigator.msMaxTouchPoints||0)>0);
-    const narrow=window.innerWidth<=1100;
-    if(!(coarse||touch||narrow))return false;
-    const wrap=document.querySelector('.game-wrap');if(!wrap)return false;if(wrap.querySelector('.lowtown-mobile-controls'))return true;
-    const controls=createMobileControlsV2();wrap.appendChild(controls.root);document.documentElement.classList.add('mobile-controls-v2-ready');return true;
+const setKey = (code, down) => {
+  window.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { code, bubbles: true }));
+};
+
+const releaseDrive = () => {
+  setKey('ArrowUp', false);
+  setKey('ArrowDown', false);
+  setKey('ArrowLeft', false);
+  setKey('ArrowRight', false);
+};
+
+export function setupMobileControlsV2() {
+  if (typeof document === 'undefined') return;
+  const existing = document.querySelector('.lowtown-mobile-pad');
+  if (existing) existing.remove();
+
+  const root = document.createElement('div');
+  root.className = 'lowtown-mobile-pad mobile-arrow-pad';
+  root.innerHTML = `
+    <div class="mobile-steer-cluster">
+      <button class="mobile-btn" data-key="ArrowLeft" aria-label="Steer Left">◀</button>
+      <button class="mobile-btn" data-key="ArrowRight" aria-label="Steer Right">▶</button>
+    </div>
+    <div class="mobile-pedal-cluster">
+      <button class="mobile-btn" data-key="ArrowUp" aria-label="Accelerate">▲</button>
+      <button class="mobile-btn" data-key="ArrowDown" aria-label="Brake/Reverse">▼</button>
+    </div>
+    <div style="display:none">
+      <button data-mobile="ai"></button>
+      <button data-mobile="reset"></button>
+    </div>
+  `;
+
+  const bind = (btn) => {
+    const key = btn.getAttribute('data-key');
+    if (!key) return;
+    const start = (e) => { e.preventDefault(); btn.classList.add('active'); setKey(key, true); };
+    const stop = (e) => { e.preventDefault(); btn.classList.remove('active'); setKey(key, false); };
+    btn.addEventListener('pointerdown', start);
+    btn.addEventListener('pointerup', stop);
+    btn.addEventListener('pointercancel', stop);
+    btn.addEventListener('pointerleave', stop);
   };
-  const boot=()=>{if(install())return;let tries=0;const timer=setInterval(()=>{if(install()||++tries>80)clearInterval(timer);},100);};
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+
+  root.querySelectorAll('.mobile-btn').forEach(bind);
+
+  // Top action bar handlers
+  const aiBtn = document.querySelector('[data-mobile="ai"]') || root.querySelector('[data-mobile="ai"]');
+  if (aiBtn) {
+    aiBtn.addEventListener('click', () => {
+      if (window.__LOWTOWN_AI?.state) {
+        let ai = window.__LOWTOWN_AI.state.active;
+        ai = !ai;
+        window.__LOWTOWN_AI.state.active = ai;
+      }
+    });
+  }
+
+  const resetBtn = document.querySelector('[data-mobile="reset"]') || root.querySelector('[data-mobile="reset"]');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      releaseDrive();
+      if (typeof window.__LOWTOWN_RESET === 'function') window.__LOWTOWN_RESET();
+    });
+  }
+
+  document.body.appendChild(root);
 }
 
-const styleId='lowtown-arrow-controls-style';
-if(typeof document!=='undefined'&&!document.getElementById(styleId)){
-  const style=document.createElement('style');style.id=styleId;style.textContent=`
-    .lowtown-mobile-controls{display:block!important;position:absolute;inset:0;z-index:30;pointer-events:none;user-select:none;padding:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
-    .mobile-arrow-pad{position:absolute;right:18px;bottom:18px;display:grid;grid-template-columns:64px 64px 64px;grid-template-rows:64px 64px;gap:8px;pointer-events:none}
-    .mobile-arrow{width:64px;height:64px;padding:0;border:2px solid rgba(224,154,62,.72);border-radius:10px;background:rgba(12,13,16,.82);color:#e8b84a;font:bold 28px/1 Arial,sans-serif;box-shadow:0 7px 18px rgba(0,0,0,.45);pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent}
-    .mobile-arrow.up{grid-column:2;grid-row:1}.mobile-arrow.left{grid-column:1;grid-row:2}.mobile-arrow.down{grid-column:2;grid-row:2}.mobile-arrow.right{grid-column:3;grid-row:2}
-    .mobile-arrow.pressed{background:rgba(224,154,62,.34);border-color:#e09a3e;transform:translateY(1px)}
-    .lowtown-mobile-controls .mobile-actions{position:absolute;right:18px;bottom:162px;display:flex;gap:8px;pointer-events:auto}
-    .lowtown-mobile-controls .mobile-btn{min-width:66px;height:48px;padding:0 10px;border:1px solid #55585d;border-radius:7px;background:rgba(12,13,16,.86);color:#e8b84a;font:bold 12px monospace;letter-spacing:.08em;box-shadow:0 7px 16px rgba(0,0,0,.35);touch-action:none}
-    @media(max-width:600px){.mobile-arrow-pad{right:12px;bottom:12px}.mobile-arrow{width:58px;height:58px}.mobile-arrow-pad{grid-template-columns:58px 58px 58px;grid-template-rows:58px 58px}.lowtown-mobile-controls .mobile-actions{right:12px;bottom:150px}}
-  `;document.head.appendChild(style);
+if (typeof window !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupMobileControlsV2);
+  } else {
+    setupMobileControlsV2();
+  }
 }
