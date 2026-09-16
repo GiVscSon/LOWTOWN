@@ -1,3 +1,5 @@
+import { LANE_WIDTH, SIDEWALK_WIDTH, CURB_MARGIN, CLASS_MIN_CARRIAGEWAY } from './road_constants.js';
+
 const ROAD = Object.freeze({ARTERIAL:'ARTERIAL', AVENUE:'AVENUE', STREET:'STREET', SERVICE:'SERVICE'});
 const USE = Object.freeze({VEHICLE:'VEHICLE', PEDESTRIAN:'PEDESTRIAN', BOTH:'BOTH'});
 
@@ -42,7 +44,9 @@ const distance = (a,b) => Math.hypot(a.x-b.x,a.y-b.y);
 export function roadById(id){return CITY_ROADS.find(r=>r.id===id)||null;}
 export function districtById(id){return CITY_DISTRICTS.find(d=>d.id===id)||null;}
 export function destinationById(id){return CITY_DESTINATIONS.find(d=>d.id===id)||null;}
-export function destinationPoint(id,side=1){const d=destinationById(id),r=d&&roadById(d.roadId);if(!d||!r)return null;return {...roadPoint(d.roadId,d.index,side*sidewalkOffsetFallback(r)),destinationId:d.id,district:d.district,kind:d.kind};}
+function carriagewayHalf(road){const lanes=road.lanes||2;return Math.max(lanes*LANE_WIDTH,CLASS_MIN_CARRIAGEWAY[road.class]||CLASS_MIN_CARRIAGEWAY.STREET)/2;}
+function sidewalkOffsetForRoad(road){return carriagewayHalf(road)+CURB_MARGIN+SIDEWALK_WIDTH;}
+export function destinationPoint(id,side=1){const d=destinationById(id),r=d&&roadById(d.roadId);if(!d||!r)return null;return {...roadPoint(d.roadId,d.index,side*sidewalkOffsetForRoad(r)),destinationId:d.id,district:d.district,kind:d.kind};}
 
 export function nearestRoad(point,{use=USE.BOTH,zone=null}={}){
   const candidates=CITY_ROADS.filter(r=>!zone||r.zone===zone);let best=null;
@@ -54,12 +58,8 @@ export function roadPoint(roadId,index=0,offset=0){
   const a=road.points[Math.max(0,i-1)]||road.points[i],b=road.points[Math.min(road.points.length-1,i+1)]||road.points[i],dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy)||1;
   return {x:p.x-dy/len*offset,y:p.y+dx/len*offset,heading:Math.atan2(dy,dx),roadId:road.id};
 }
-const LANE_WIDTH_FALLBACK = 23;
-const CLASS_MIN_FALLBACK = {ARTERIAL:66,AVENUE:52,STREET:40,SERVICE:30};
-function carriagewayHalfFallback(road){const lanes=road.lanes||2;return Math.max(lanes*LANE_WIDTH_FALLBACK,CLASS_MIN_FALLBACK[road.class]||40)/2;}
-function sidewalkOffsetFallback(road){return carriagewayHalfFallback(road)+6+14;}
-export function vehicleLanePoint(roadId,index=0,lane=0){const road=roadById(roadId);if(!road)return null;const lanes=road.lanes||2,total=(lanes-1)*LANE_WIDTH_FALLBACK;return roadPoint(roadId,index,lane*LANE_WIDTH_FALLBACK-total/2);}
-export function sidewalkPoint(roadId,index=0,side=1){const road=roadById(roadId);if(!road)return null;return roadPoint(roadId,index,side*sidewalkOffsetFallback(road));}
+export function vehicleLanePoint(roadId,index=0,lane=0){const road=roadById(roadId);if(!road)return null;const lanes=road.lanes||2,total=(lanes-1)*LANE_WIDTH;return roadPoint(roadId,index,lane*LANE_WIDTH-total/2);}
+export function sidewalkPoint(roadId,index=0,side=1){const road=roadById(roadId);if(!road)return null;return roadPoint(roadId,index,side*sidewalkOffsetForRoad(road));}
 
 export function buildCityGraph(){
   const nodes=[];for(const road of CITY_ROADS)for(let i=0;i<road.points.length;i++)nodes.push({id:`${road.id}:${i}`,roadId:road.id,index:i,x:road.points[i][0],y:road.points[i][1],links:[]});
