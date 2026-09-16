@@ -195,10 +195,8 @@ function segmentIntersectsRect(a, b, x, y, width, height) {
   let t0 = 0, t1 = 1;
   const dx = b.x - a.x, dy = b.y - a.y;
   const checks = [
-    [-dx, a.x - x],
-    [ dx, x + width - a.x],
-    [-dy, a.y - y],
-    [ dy, y + height - a.y]
+    [-dx, a.x - x], [dx, x + width - a.x],
+    [-dy, a.y - y], [dy, y + height - a.y]
   ];
   for (const [p, q] of checks) {
     if (Math.abs(p) <= EPSILON) {
@@ -212,23 +210,35 @@ function segmentIntersectsRect(a, b, x, y, width, height) {
   return t0 <= t1 + EPSILON;
 }
 
+function segmentSegmentDistance(a, b, c, d) {
+  if (segmentIntersection([a.x, a.y], [b.x, b.y], [c.x, c.y], [d.x, d.y])) return 0;
+  return Math.min(
+    pointToSegmentDistance(a.x, a.y, c.x, c.y, d.x, d.y).distance,
+    pointToSegmentDistance(b.x, b.y, c.x, c.y, d.x, d.y).distance,
+    pointToSegmentDistance(c.x, c.y, a.x, a.y, b.x, b.y).distance,
+    pointToSegmentDistance(d.x, d.y, a.x, a.y, b.x, b.y).distance
+  );
+}
+
 export function buildingIntersectsRoad(building, road, halfWidth = collisionHalfWidth(road)) {
   const [x, y, width, height] = building;
+  const corners = [
+    { x, y }, { x: x + width, y },
+    { x, y: y + height }, { x: x + width, y: y + height }
+  ];
+  const edges = [
+    [{ x, y }, { x: x + width, y }],
+    [{ x: x + width, y }, { x: x + width, y: y + height }],
+    [{ x: x + width, y: y + height }, { x, y: y + height }],
+    [{ x, y: y + height }, { x, y }]
+  ];
+
   for (const segment of roadSegments(road)) {
     if (segmentIntersectsRect(segment.a, segment.b, x, y, width, height)) return true;
-    const corners = [
-      { x, y }, { x: x + width, y },
-      { x, y: y + height }, { x: x + width, y: y + height }
-    ];
-    if (corners.some(c => pointToSegmentDistance(c.x, c.y, segment.a.x, segment.a.y, segment.b.x, segment.b.y).distance <= halfWidth)) return true;
-    const edges = [
-      [{ x, y }, { x: x + width, y }],
-      [{ x: x + width, y }, { x: x + width, y: y + height }],
-      [{ x: x + width, y: y + height }, { x, y: y + height }],
-      [{ x, y: y + height }, { x, y }]
-    ];
-    if (edges.some(([ea, eb]) => pointToSegmentDistance(ea.x, ea.y, segment.a.x, segment.a.y, segment.b.x, segment.b.y).distance <= halfWidth || pointToSegmentDistance(eb.x, eb.y, segment.a.x, segment.a.y, segment.b.x, segment.b.y).distance <= halfWidth)) return true;
-    if (pointToRectDistance(segment.a.x, segment.a.y, x, y, width, height) <= halfWidth || pointToRectDistance(segment.b.x, segment.b.y, x, y, width, height) <= halfWidth) return true;
+    if (corners.some(c => pointToSegmentDistance(c.x, c.y, segment.a.x, segment.a.y, segment.b.x, segment.b.y).distance <= halfWidth + EPSILON)) return true;
+    if (edges.some(([a, b]) => segmentSegmentDistance(a, b, segment.a, segment.b) <= halfWidth + EPSILON)) return true;
+    if (pointToRectDistance(segment.a.x, segment.a.y, x, y, width, height) <= halfWidth + EPSILON) return true;
+    if (pointToRectDistance(segment.b.x, segment.b.y, x, y, width, height) <= halfWidth + EPSILON) return true;
   }
   return false;
 }
@@ -267,7 +277,7 @@ export function buildGeometryAuthority(roads = CITY_ROADS) {
       for (const p of points) {
         const endpoint = p.t <= EPSILON || p.t >= 1 - EPSILON;
         const index = endpoint ? (p.t <= EPSILON ? i : i + 1) : `${i}x${p.t.toFixed(6)}`;
-        const id = endpoint ? `${road.id}:${index}` : `${road.id}:${index}`;
+        const id = `${road.id}:${index}`;
         const existing = chain.find(n => Math.abs(n.x - p.x) <= EPSILON && Math.abs(n.y - p.y) <= EPSILON);
         if (!existing) chain.push({ id, roadId: road.id, index, x: p.x, y: p.y, links: [] });
       }
@@ -294,14 +304,12 @@ export function buildGeometryAuthority(roads = CITY_ROADS) {
   }
 
   for (const group of byCoord.values()) {
-    const roadIds = new Set(group.map(n => n.roadId));
-    if (roadIds.size < 2) continue;
+    if (new Set(group.map(n => n.roadId)).size < 2) continue;
     for (const a of group) {
       const road = roads.find(r => r.id === a.roadId);
       for (const b of group) {
         if (a === b || a.roadId === b.roadId) continue;
-        addUniqueLink(a, b);
-        if (road?.oneWay) continue;
+        if (!road?.oneWay || road) addUniqueLink(a, b);
       }
     }
   }
