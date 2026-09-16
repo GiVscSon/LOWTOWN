@@ -3,9 +3,9 @@ import './game/mobile_controls_v3.js';
 import { WORLD } from './game/world.js';
 import { ISLANDS, BRIDGES, isLand, islandAt } from './game/islands.js';
 import { createTrafficSystem } from './game/traffic.js';
-import { createMissionSystem } from './game/missions.js';
 import { createPeopleSystem } from './game/people.js';
 import { createEventSystem } from './game/events.js';
+import { createMissionSystem } from './game/missions.js';
 import { createAIDriver } from './game/ai_driver.js';
 import { createTransportSystem } from './game/transport.js';
 import { createTransportController } from './game/transport_controller.js';
@@ -15,13 +15,12 @@ import { buildLayeredRoadTopology, layeredRoadSegments, nearestLayeredRoadPoint,
 
 const app=document.querySelector('#app');
 app.innerHTML=`<main class="shell"><header class="hud"><div class="brand"><span>LOW</span>TOWN <b>// NIGHT SHIFT</b></div><div class="status"><i></i> FREE ROAM <strong id="speed">000</strong> KM/H</div></header><section class="game-wrap"><canvas id="game"></canvas><div class="mission"><small id="job-id">JOB 01</small><strong id="job-title">SHAKE THE NIGHT</strong><span id="job-text">Drive to the amber marker.</span></div><div class="hint">WASD / ARROWS · SPACE HANDBRAKE · I AI DRIVE · R RESET · N NEXT JOB</div><div class="toast" id="toast">ENGINE READY</div></section></main>`;
-const canvas=document.querySelector('#game');
-const ctx=canvas.getContext('2d');
-const speedEl=document.querySelector('#speed');
+const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const toast=document.querySelector('#toast');
 const jobId=document.querySelector('#job-id');
 const jobTitle=document.querySelector('#job-title');
 const jobText=document.querySelector('#job-text');
+const speedEl=document.querySelector('#speed');
 const keys=new Set();
 addEventListener('keydown',e=>{const k=e.key.toLowerCase();keys.add(k);if(['arrowup','arrowdown','arrowleft','arrowright',' ','n','r','i'].includes(k))e.preventDefault();});
 addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
@@ -49,7 +48,8 @@ function resize(){const r=canvas.getBoundingClientRect(),d=Math.min(devicePixelR
 function iso(x,y,z=ROAD_LEVEL_Z[ROAD_LEVELS.STREET]){return{x:canvas.clientWidth/2+(x-S.cam.x)*.78+(y-S.cam.y)*.42,y:canvas.clientHeight/2+(y-S.cam.y)*.42-(x-S.cam.x)*.78-z*.72};}
 function poly(points,fill,stroke){ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.stroke();}}
 function ellipseWorld(island){const pts=[];for(let i=0;i<48;i++){const a=i/48*Math.PI*2;pts.push(iso(island.center.x+Math.cos(a)*island.rx,island.center.y+Math.sin(a)*island.ry,0));}return pts;}
-function terrain(){ctx.fillStyle='#0b171b';ctx.fillRect(0,0,canvas.clientWidth,canvas.clientHeight);for(const island of ISLANDS){poly(ellipseWorld(island),island.colors.land,'#0b0d0f');const inner={...island,rx:island.rx-42,ry:island.ry-42};poly(ellipseWorld(inner),island.biome==='FOREST_HIGHLAND'?'#263329':island.biome==='INDUSTRIAL_COAST'?'#292c2d':'#24272a');}for(const b of BRIDGES){const a=iso(b.a.x,b.a.y,ROAD_LEVEL_Z[ROAD_LEVELS.STREET]),z=iso(b.b.x,b.b.y,ROAD_LEVEL_Z[ROAD_LEVELS.STREET]);ctx.strokeStyle='#4b4035';ctx.lineWidth=b.width||40;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(z.x,z.y);ctx.stroke();ctx.strokeStyle='#d6a15a';ctx.lineWidth=2;ctx.setLineDash([10,10]);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(z.x,z.y);ctx.stroke();ctx.setLineDash([]);}}
+function bridgeEndpoints(b){if(Array.isArray(b.points)&&b.points.length>=2)return[{x:b.points[0][0],y:b.points[0][1]},{x:b.points[b.points.length-1][0],y:b.points[b.points.length-1][1]}];return[{x:b.a.x,y:b.a.y},{x:b.b.x,y:b.b.y}];}
+function terrain(){ctx.fillStyle='#0b171b';ctx.fillRect(0,0,canvas.clientWidth,canvas.clientHeight);for(const island of ISLANDS){poly(ellipseWorld(island),island.colors.land,'#0b0d0f');const inner={...island,rx:island.rx-42,ry:island.ry-42};poly(ellipseWorld(inner),island.biome==='FOREST_HIGHLAND'?'#263329':island.biome==='INDUSTRIAL_COAST'?'#292c2d':'#24272a');}for(const b of BRIDGES){const[ep0,ep1]=bridgeEndpoints(b);const a=iso(ep0.x,ep0.y,ROAD_LEVEL_Z[ROAD_LEVELS.STREET]),z=iso(ep1.x,ep1.y,ROAD_LEVEL_Z[ROAD_LEVELS.STREET]);ctx.strokeStyle='#4b4035';ctx.lineWidth=b.width||40;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(z.x,z.y);ctx.stroke();ctx.strokeStyle='#d6a15a';ctx.lineWidth=2;ctx.setLineDash([10,10]);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(z.x,z.y);ctx.stroke();ctx.setLineDash([]);}}
 function roads(){terrain();ctx.lineCap='round';for(const level of [ROAD_LEVELS.LOWER,ROAD_LEVELS.STREET,ROAD_LEVELS.UPPER]){const z=ROAD_LEVEL_Z[level];for(const [a,b] of roadLines){if(a.level!==level||b.level!==level)continue;const pa=iso(a.x,a.y,z),pb=iso(b.x,b.y,z);ctx.strokeStyle=level===ROAD_LEVELS.UPPER?'#35383d':level===ROAD_LEVELS.LOWER?'#22262a':'#292c30';ctx.lineWidth=ROAD_WIDTH;ctx.beginPath();ctx.moveTo(pa.x,pa.y);ctx.lineTo(pb.x,pb.y);ctx.stroke();ctx.strokeStyle='rgba(224,154,62,.38)';ctx.lineWidth=2;ctx.setLineDash([18,20]);ctx.beginPath();ctx.moveTo(pa.x,pa.y);ctx.lineTo(pb.x,pb.y);ctx.stroke();}ctx.setLineDash([]);}ctx.lineCap='butt';}
 function building(x,y,w,h){const island=islandAt(x+w/2,y+h/2);if(!island)return;const z=ROAD_LEVEL_Z[ROAD_LEVELS.STREET],top=[iso(x,y,z),iso(x+w,y,z),iso(x+w,y+h,z),iso(x,y+h,z)],f=top.map(p=>({x:p.x,y:p.y-(island.biome==='FOREST_HIGHLAND'?48:70)}));poly(f,island.biome==='INDUSTRIAL_COAST'?'#3a3b3b':'#34373c','#111317');poly([f[0],f[1],top[1],top[0]],'#292b2e');poly([f[1],f[2],top[2],top[1]],'#202226');for(let yy=18;yy<h;yy+=38)for(let xx=22;xx<w;xx+=48){if(((xx+yy)/38|0)%3===0)continue;const p=iso(x+xx,y+yy,z);ctx.fillStyle='rgba(224,154,62,.32)';ctx.fillRect(p.x-3,p.y-2,6,4);}}
 function lamp(x,y){if(!isLand(x,y))return;const p=iso(x,y,ROAD_LEVEL_Z[ROAD_LEVELS.STREET]);ctx.strokeStyle='#55585d';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x,p.y-35);ctx.stroke();ctx.fillStyle='#e09a3e';ctx.beginPath();ctx.arc(p.x,p.y-39,4,0,Math.PI*2);ctx.fill();}
