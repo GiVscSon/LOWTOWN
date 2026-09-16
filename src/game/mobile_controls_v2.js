@@ -1,12 +1,27 @@
 // Mobile controls v2 - Ergonomic split layout
-// Left hand: Steer Left/Right
-// Right hand: Gas / Brake-Reverse
+// Direct hardware bridge + multi-touch
 
 const setKey = (code, down) => {
-  window.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { code, bubbles: true }));
+  const direct = window.__LOWTOWN_DIRECT_INPUT__;
+  if (direct) {
+    direct.enabled = true;
+    if (code === 'ArrowUp') direct.throttle = down ? 1 : 0;
+    if (code === 'ArrowDown') direct.brake = down ? 1 : 0;
+    if (code === 'ArrowLeft') direct.steer = down ? -1 : (direct.steer === -1 ? 0 : direct.steer);
+    if (code === 'ArrowRight') direct.steer = down ? 1 : (direct.steer === 1 ? 0 : direct.steer);
+  }
+  const evtDown = new KeyboardEvent(down ? 'keydown' : 'keyup', { key: code, code, bubbles: true, cancelable: true });
+  window.dispatchEvent(evtDown);
+  document.dispatchEvent(evtDown);
 };
 
 const releaseDrive = () => {
+  const direct = window.__LOWTOWN_DIRECT_INPUT__;
+  if (direct) {
+    direct.throttle = 0;
+    direct.brake = 0;
+    direct.steer = 0;
+  }
   setKey('ArrowUp', false);
   setKey('ArrowDown', false);
   setKey('ArrowLeft', false);
@@ -44,6 +59,8 @@ export function setupMobileControlsV2() {
     btn.addEventListener('pointerup', stop);
     btn.addEventListener('pointercancel', stop);
     btn.addEventListener('pointerleave', stop);
+    btn.addEventListener('touchstart', start, { passive: false });
+    btn.addEventListener('touchend', stop, { passive: false });
   };
 
   root.querySelectorAll('.mobile-btn').forEach(bind);

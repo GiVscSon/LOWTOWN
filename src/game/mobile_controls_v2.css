@@ -2,47 +2,51 @@
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 25;
+  z-index: 99999;
   user-select: none;
   -webkit-user-select: none;
+  touch-action: none;
 }
 
 .mobile-steer-cluster {
   position: fixed;
-  left: 20px;
-  bottom: 24px;
+  left: 24px;
+  bottom: 28px;
   display: flex;
-  gap: 14px;
+  gap: 16px;
   pointer-events: auto;
+  touch-action: none;
 }
 
 .mobile-pedal-cluster {
   position: fixed;
-  right: 20px;
-  bottom: 24px;
+  right: 24px;
+  bottom: 28px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   pointer-events: auto;
+  touch-action: none;
 }
 
 .mobile-btn {
-  width: 64px;
-  height: 64px;
-  border-radius: 12px;
-  border: 1px solid rgba(224, 154, 62, 0.45);
-  background: rgba(12, 15, 18, 0.85);
+  width: 68px;
+  height: 68px;
+  border-radius: 14px;
+  border: 2px solid rgba(224, 154, 62, 0.6);
+  background: rgba(12, 15, 18, 0.9);
   color: #e09a3e;
-  font: bold 16px monospace;
+  font: bold 20px monospace;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  touch-action: manipulation;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.65);
+  touch-action: none;
+  cursor: pointer;
 }
 
 .mobile-btn:active, .mobile-btn.active {
-  background: rgba(224, 154, 62, 0.35);
-  border-color: #e09a3e;
-  transform: scale(0.95);
+  background: rgba(224, 154, 62, 0.45);
+  border-color: #ffd074;
+  transform: scale(0.92);
 }
