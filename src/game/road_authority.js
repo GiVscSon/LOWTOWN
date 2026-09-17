@@ -1,15 +1,9 @@
 import { buildGeometryAuthority, collisionHalfWidth } from './road_geometry.js';
 import { CITY_ROADS } from './city_semantics.js';
 
-// Thin runtime adapter. This module contains NO independent road geometry —
-// it exposes buildGeometryAuthority() (the single independent geometry
-// authority built directly from CITY_ROADS segments) under the names that
-// existing runtime callers (main.js, traffic, AI, vehicle_collision) expect.
+export const ROAD_GRID = 160;
+export const ROAD_LIMIT = 2720;
 
-export const ROAD_GRID = 160; // legacy export, unused by buildRoadNetwork
-export const ROAD_LIMIT = 2720; // legacy export, unused by buildRoadNetwork
-
-// Flat fallback width for callers not yet migrated to per-road widths.
 export const ROAD_WIDTH = collisionHalfWidth(CITY_ROADS[0]) * 2;
 export const ROAD_HALF_WIDTH = ROAD_WIDTH / 2;
 export const ROAD_EDGE_TOLERANCE = 8;
@@ -21,8 +15,6 @@ const distanceToSegment = (x, y, a, b) => {
   return { x: px, y: py, t, distance: Math.hypot(x - px, y - py) };
 };
 
-// buildRoadNetwork() takes NO arguments: it is not a procedural grid builder.
-// It returns the independent geometry authority graph.
 export function buildRoadNetwork() {
   const nodes = buildGeometryAuthority();
   globalThis.__LOWTOWN_CITY_GRAPH = nodes;
