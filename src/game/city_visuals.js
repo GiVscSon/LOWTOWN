@@ -246,7 +246,7 @@ function gpsIndicator(ctx, iso, t) {
 
 export function createCityVisuals() {
   return {
-    version: 'CITY_NETWORK_9', draw(ctx, iso, buildings, lamps, t) {
+    version: 'CITY_NETWORK_10', draw(ctx, iso, buildings, lamps, t) {
       blockPavement(ctx, iso);
       roadGeometry(ctx, iso);
       junctionPlates(ctx, iso);

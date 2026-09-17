@@ -25,7 +25,7 @@ export const ISLANDS = [
 
 export const BRIDGES = [
   { id: 'EAST_BRIDGE', points: [[640, 80], [640, 160], [1120, 160]], a: { x: 640, y: 80 }, b: { x: 1120, y: 160 }, width: 70 },
-  { id: 'NORTH_BRIDGE', points: [[-120, 600], [-320, 800], [-120, 1240]], a: { x: -120, y: 600 }, b: { x: -120, y: 1240 }, width: 90 }
+  { id: 'NORTH_BRIDGE', points: [[-120, 600], [-120, 800], [-120, 1240]], a: { x: -120, y: 600 }, b: { x: -120, y: 1240 }, width: 90 }
 ];
 
 const ellipse = (x, y, island) => {
@@ -56,9 +56,6 @@ const bridgeHit = (x, y, bridge) => {
   return false;
 };
 
-// Support width for city-road ground is now derived per-road from the same
-// contract as physics/visuals (collisionHalfWidth + sidewalk), instead of one
-// flat CITY_GROUND_WIDTH=58 for every road class.
 const cityRoadHit = (x, y) => CITY_ROADS.some(road => {
   const half = supportHalfWidth(road);
   for (let i = 0; i < road.points.length - 1; i++) {
