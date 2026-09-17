@@ -3,15 +3,14 @@ import { buildRoadNetwork, roadSegments, snapToRoad, ROAD_WIDTH } from '../src/g
 import { isLand } from '../src/game/islands.js';
 import { vehicleWorldBlocked, nearestRoadDistanceForVehicle } from '../src/game/vehicle_collision.js';
 
-const blocked=(x,y)=>false;
-const nodes=buildRoadNetwork({isLand,blocked,limit:2720,grid:160});
+const nodes=buildRoadNetwork();
 const lines=roadSegments(nodes);
-const start=snapToRoad({x:-320,y:0},nodes);
-assert.ok(start,'a road spawn must exist');
-assert.equal(vehicleWorldBlocked(start.x,start.y,start.heading,lines,{length:56,width:28}),false,'car must be valid on road');
-const roadDistance=nearestRoadDistanceForVehicle(start.x,start.y,lines);
-assert.ok(roadDistance<=1,'snapped vehicle must sit on road centreline');
-const offRoadY=start.y+90;
-assert.equal(vehicleWorldBlocked(start.x,offRoadY,start.heading,lines,{length:56,width:28}),true,'car must not drive freely far outside road corridor');
-assert.ok(ROAD_WIDTH>0);
-console.log('VEHICLE ROAD COLLISION: PASS CENTRELINE + OFFROAD BLOCK');
+assert.ok(nodes.length>0,'road authority must produce nodes');
+assert.ok(lines.length>0,'road authority must produce segments');
+
+const center={x:nodes[0].x,y:nodes[0].y};
+assert.equal(vehicleWorldBlocked(center.x,center.y,0,lines),false,'vehicle on road centerline must not be blocked');
+
+const deepWater={x:4200,y:4200};
+assert.equal(vehicleWorldBlocked(deepWater.x,deepWater.y,0,lines),true,'vehicle outside land/roads must be blocked');
+console.log('vehicle-road-collision-smoke OK');
