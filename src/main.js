@@ -39,7 +39,7 @@ function onRoadCorridor(x,y,level=ROAD_LEVELS.STREET){const hit=nearestLayeredRo
 const blocked=(x,y,level=ROAD_LEVELS.STREET)=>{if(level!==ROAD_LEVELS.STREET)return false;const r=18;if(buildings.some(([bx,by,bw,bh])=>x>bx-r&&x<bx+bw+r&&y>by-r&&y<by+bh+r))return true;return!onRoadCorridor(x,y,level);};
 function nearestRoadPoint(x,y,level=S.car?.roadLevel??ROAD_LEVELS.STREET){return nearestLayeredRoadPoint(x,y,roadNodes,level)||nearestAnyRoadPoint(x,y,roadNodes);}
 const start=nearestRoadPoint(-120,0,ROAD_LEVELS.STREET)||{x:-120,y:0,heading:0,level:ROAD_LEVELS.STREET};
-const playerTransport=createTransportController('sedan',{x:start.x,y:start.y,a:start.heading});
+const playerTransport=createTransportController('sedan',{x:start.x,y:start.y,a:start.heading,roadLines});
 playerTransport.state.roadLevel=ROAD_LEVELS.STREET;
 const traffic=createTrafficSystem({nodes:streetNodes,blocked});
 const people=createPeopleSystem({nodes:streetNodes,blocked});
