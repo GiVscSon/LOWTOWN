@@ -48,9 +48,14 @@ function carriagewayHalf(road){const lanes=road.lanes||2;return Math.max(lanes*L
 function sidewalkOffsetForRoad(road){return carriagewayHalf(road)+CURB_MARGIN+SIDEWALK_WIDTH;}
 export function destinationPoint(id,side=1){const d=destinationById(id),r=d&&roadById(d.roadId);if(!d||!r)return null;return {...roadPoint(d.roadId,d.index,side*sidewalkOffsetForRoad(r)),destinationId:d.id,district:d.district,kind:d.kind};}
 
-export function nearestRoad(point,{use=USE.BOTH,zone=null}={}){
+export function nearestRoad(point,{use=USE.BOTH,zone=null}={}) {
   const candidates=CITY_ROADS.filter(r=>!zone||r.zone===zone);let best=null;
-  for(const road of candidates)for(let i=0;i<road.points.length;i++){const p=copyPoint(road.points[i]),d=distance(point,p);if(!best||d<best.distance)best={road,point:p,index:i,distance:d,use};}
+  for(const road of candidates) for(let i=0;i<road.points.length-1;i++){
+    const a=road.points[i],b=road.points[i+1],dx=b[0]-a[0],dy=b[1]-a[1],len2=dx*dx+dy*dy||1;
+    const t=Math.max(0,Math.min(1,((point.x-a[0])*dx+(point.y-a[1])*dy)/len2));
+    const p={x:a[0]+dx*t,y:a[1]+dy*t},d=distance(point,p);
+    if(!best||d<best.distance)best={road,point:p,index:i,t,distance:d,heading:Math.atan2(dy,dx),use};
+  }
   return best;
 }
 export function roadPoint(roadId,index=0,offset=0){
