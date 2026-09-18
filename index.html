@@ -7,7 +7,6 @@
   <title>LOWTOWN // THREE ISLANDS // GTA 2 ARCADE</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@700;800&display=swap');
-
     :root {
       --bg-deep: #06090e;
       --glass-panel: rgba(12, 16, 24, 0.94);
@@ -24,577 +23,73 @@
       --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       --font-mono: 'JetBrains Mono', monospace;
     }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      user-select: none;
-      -webkit-user-select: none;
-      -webkit-touch-callout: none;
-    }
-
-    html, body {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: var(--bg-deep);
-      font-family: var(--font-ui);
-      color: var(--text-main);
-    }
-
-    #gameCanvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      display: block;
-      touch-action: none;
-      z-index: 1;
-    }
-
-    #hud {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 10;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      padding: max(env(safe-area-inset-top, 10px), 12px) max(env(safe-area-inset-right, 10px), 12px) max(env(safe-area-inset-bottom, 10px), 12px) max(env(safe-area-inset-left, 10px), 12px);
-    }
-
-    .hud-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 8px;
-      pointer-events: none;
-    }
-
-    .radar-wrapper {
-      position: relative;
-      width: 96px;
-      height: 96px;
-      border-radius: 50%;
-      background: rgba(11, 15, 23, 0.94);
-      border: 1.5px solid var(--glass-border);
-      backdrop-filter: blur(14px);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      pointer-events: auto;
-      cursor: pointer;
-    }
-
-    #radarCanvas {
-      width: 100%;
-      height: 100%;
-      display: block;
-      border-radius: 50%;
-    }
-
-    .radar-compass-ring {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      border-radius: 50%;
-      border: 1px dashed rgba(255, 255, 255, 0.16);
-      pointer-events: none;
-    }
-
-    .radar-north-mark {
-      position: absolute;
-      top: 3px;
-      font-size: 8px;
-      font-weight: 800;
-      color: var(--accent-amber);
-      pointer-events: none;
-    }
-
-    .header-center {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 5px;
-      pointer-events: none;
-    }
-
-    .district-pill {
-      background: var(--glass-panel);
-      border: 1px solid var(--glass-border);
-      backdrop-filter: blur(12px);
-      padding: 4px 10px;
-      border-radius: 20px;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-      color: #f1f5f9;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      box-shadow: 0 4px 18px rgba(0,0,0,0.4);
-    }
-
-    .district-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--accent-amber);
-    }
-
-    .wanted-pill {
-      background: var(--glass-panel);
-      border: 1px solid rgba(217, 56, 58, 0.3);
-      backdrop-filter: blur(12px);
-      padding: 3px 8px;
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      gap: 3px;
-      transition: all 0.3s ease;
-    }
-
-    .wanted-shield {
-      width: 12px;
-      height: 12px;
-      fill: var(--text-sub);
-      transition: fill 0.2s;
-    }
-    .wanted-shield.lit {
-      fill: var(--accent-red);
-      filter: drop-shadow(0 0 4px rgba(217, 56, 58, 0.8));
-    }
-    .wanted-shield.evade-lit {
-      fill: var(--accent-amber);
-      filter: drop-shadow(0 0 4px rgba(229, 157, 53, 0.8));
-    }
-
-    .header-right {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 6px;
-      pointer-events: auto;
-    }
-
-    .top-buttons-row {
-      display: flex;
-      gap: 6px;
-    }
-
-    .wallet-badge {
-      background: var(--glass-panel);
-      border: 1px solid var(--glass-border);
-      backdrop-filter: blur(12px);
-      padding: 4px 10px;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: 800;
-      color: var(--accent-white);
-      font-family: var(--font-mono);
-      box-shadow: 0 4px 18px rgba(0,0,0,0.4);
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-deep); font-family: var(--font-ui); color: var(--text-main); }
+    #gameCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; touch-action: none; z-index: 1; }
+    #hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; padding: max(env(safe-area-inset-top, 10px), 12px) max(env(safe-area-inset-right, 10px), 12px) max(env(safe-area-inset-bottom, 10px), 12px) max(env(safe-area-inset-left, 10px), 12px); }
+    .hud-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; pointer-events: none; }
+    .radar-wrapper { position: relative; width: 96px; height: 96px; border-radius: 50%; background: rgba(11, 15, 23, 0.94); border: 1.5px solid var(--glass-border); backdrop-filter: blur(14px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7); overflow: hidden; display: flex; align-items: center; justify-content: center; pointer-events: auto; cursor: pointer; }
+    #radarCanvas { width: 100%; height: 100%; display: block; border-radius: 50%; }
+    .radar-compass-ring { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 50%; border: 1px dashed rgba(255, 255, 255, 0.16); pointer-events: none; }
+    .radar-north-mark { position: absolute; top: 3px; font-size: 8px; font-weight: 800; color: var(--accent-amber); pointer-events: none; }
+    .header-center { display: flex; flex-direction: column; align-items: center; gap: 5px; pointer-events: none; }
+    .district-pill { background: var(--glass-panel); border: 1px solid var(--glass-border); backdrop-filter: blur(12px); padding: 4px 10px; border-radius: 20px; font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: #f1f5f9; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 18px rgba(0,0,0,0.4); }
+    .district-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-amber); }
+    .wanted-pill { background: var(--glass-panel); border: 1px solid rgba(217, 56, 58, 0.3); backdrop-filter: blur(12px); padding: 3px 8px; border-radius: 12px; display: flex; align-items: center; gap: 3px; }
+    .wanted-shield { width: 12px; height: 12px; fill: var(--text-sub); }
+    .wanted-shield.lit { fill: var(--accent-red); filter: drop-shadow(0 0 4px rgba(217, 56, 58, 0.8)); }
+    .wanted-shield.evade-lit { fill: var(--accent-amber); filter: drop-shadow(0 0 4px rgba(229, 157, 53, 0.8)); }
+    .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: auto; }
+    .top-buttons-row { display: flex; gap: 6px; }
+    .wallet-badge { background: var(--glass-panel); border: 1px solid var(--glass-border); backdrop-filter: blur(12px); padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 800; color: var(--accent-white); font-family: var(--font-mono); box-shadow: 0 4px 18px rgba(0,0,0,0.4); }
     .wallet-badge span { color: var(--accent-amber); }
-
-    .btn-top {
-      background: var(--glass-panel);
-      border: 1px solid var(--glass-border);
-      backdrop-filter: blur(12px);
-      color: var(--text-main);
-      padding: 5px 9px;
-      border-radius: 8px;
-      font-size: 10px;
-      font-weight: 700;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      transition: all 0.1s;
-      touch-action: manipulation;
-    }
-    .btn-top:active {
-      background: rgba(255, 255, 255, 0.2);
-      border-color: var(--glass-border-focus);
-      transform: scale(0.96);
-    }
-
-    .banner-container {
-      position: absolute;
-      top: 110px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      align-items: center;
-      width: 90%;
-      max-width: 400px;
-      pointer-events: none;
-    }
-
-    .evade-status-card {
-      background: rgba(20, 25, 36, 0.94);
-      border: 1px solid var(--accent-amber);
-      box-shadow: 0 6px 20px rgba(229, 157, 53, 0.3);
-      padding: 5px 14px;
-      border-radius: 16px;
-      font-size: 11px;
-      font-weight: 800;
-      color: var(--accent-amber);
-      letter-spacing: 0.5px;
-      display: none;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .toast-alert {
-      background: rgba(18, 22, 32, 0.96);
-      border: 1px solid var(--glass-border);
-      border-radius: 8px;
-      padding: 6px 14px;
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--accent-white);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .hud-bottom {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      gap: 6px;
-      width: 100%;
-      pointer-events: none;
-    }
-
-    .btn-drive {
-      touch-action: none;
-      user-select: none;
-      -webkit-user-select: none;
-      cursor: pointer;
-      border: 1px solid var(--glass-border);
-      backdrop-filter: blur(14px);
-      box-shadow: 0 6px 18px rgba(0,0,0,0.5);
-      transition: background 0.05s, transform 0.05s, border-color 0.05s;
-    }
-
-    .steering-container {
-      display: flex;
-      gap: 6px;
-      pointer-events: auto;
-    }
-
-    .btn-steer {
-      width: 58px;
-      height: 92px;
-      border-radius: 16px;
-      background: var(--glass-panel);
-      color: var(--accent-white);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .btn-steer svg {
-      width: 28px;
-      height: 28px;
-      fill: var(--text-main);
-    }
-    .btn-steer.active, .btn-steer:active {
-      background: rgba(255, 255, 255, 0.22);
-      border-color: var(--glass-border-focus);
-      transform: scale(0.94);
-    }
-    .btn-steer.active svg { fill: #fff; }
-
-    .cluster-container {
-      background: var(--glass-panel);
-      border: 1px solid var(--glass-border);
-      backdrop-filter: blur(20px);
-      border-radius: 14px;
-      padding: 6px 10px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 3px;
-      min-width: 98px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.6);
-      pointer-events: none;
-    }
-
-    .cluster-top-row {
-      display: flex;
-      align-items: baseline;
-      gap: 4px;
-    }
-
-    .speed-digits {
-      font-size: 26px;
-      font-weight: 900;
-      font-family: var(--font-mono);
-      line-height: 1;
-      color: var(--accent-white);
-      letter-spacing: -1px;
-    }
-
-    .speed-unit {
-      font-size: 8px;
-      font-weight: 700;
-      color: var(--text-muted);
-      letter-spacing: 0.5px;
-    }
-
-    .gear-indicator {
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      padding: 1px 5px;
-      border-radius: 4px;
-      font-size: 9px;
-      font-weight: 800;
-      font-family: var(--font-mono);
-      color: var(--accent-amber);
-    }
-
-    .rpm-track {
-      width: 100%;
-      height: 4px;
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .rpm-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #38bdf8 0%, #e59d35 70%, #d9383a 100%);
-      border-radius: 2px;
-      transition: width 0.06s linear;
-    }
-
-    .cluster-status-row {
-      display: flex;
-      justify-content: space-between;
-      width: 100%;
-      font-size: 7.5px;
-      color: var(--text-sub);
-      font-weight: 700;
-      text-transform: uppercase;
-    }
-
-    .car-health-bar {
-      width: 100%;
-      height: 3px;
-      background: rgba(255,255,255,0.08);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .car-health-fill {
-      height: 100%;
-      background: var(--accent-green);
-      transition: width 0.15s ease;
-    }
-
-    .pedals-grid {
-      display: grid;
-      grid-template-columns: 58px 64px;
-      grid-template-rows: 44px 44px;
-      gap: 6px;
-      pointer-events: auto;
-    }
-
-    .btn-nitro {
-      border-radius: 12px;
-      background: var(--glass-panel);
-      border-color: rgba(56, 189, 248, 0.35);
-      color: var(--accent-blue);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      font-size: 9px;
-      font-weight: 800;
-      position: relative;
-    }
-    .btn-nitro.active, .btn-nitro:active {
-      background: rgba(56, 189, 248, 0.35);
-      border-color: var(--accent-blue);
-      color: #fff;
-      transform: scale(0.95);
-    }
-    .nitro-gauge {
-      position: absolute;
-      bottom: 2px;
-      left: 6px;
-      right: 6px;
-      height: 2px;
-      background: rgba(255,255,255,0.1);
-      border-radius: 1px;
-      overflow: hidden;
-    }
-    .nitro-fill {
-      height: 100%;
-      background: var(--accent-blue);
-      width: 100%;
-    }
-
-    .btn-gas {
-      border-radius: 12px;
-      background: linear-gradient(180deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);
-      border: 1.5px solid rgba(255, 255, 255, 0.25);
-      color: var(--accent-white);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      font-size: 13px;
-      font-weight: 900;
-    }
-    .btn-gas.active, .btn-gas:active {
-      background: linear-gradient(180deg, rgba(56, 189, 248, 0.4) 0%, rgba(15, 23, 42, 0.98) 100%);
-      border-color: var(--accent-blue);
-      transform: scale(0.95);
-    }
-
-    .btn-handbrake {
-      border-radius: 12px;
-      background: var(--glass-panel);
-      color: var(--text-muted);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      font-size: 8px;
-      font-weight: 800;
-    }
-    .btn-handbrake.active, .btn-handbrake:active {
-      background: rgba(229, 157, 53, 0.3);
-      border-color: var(--accent-amber);
-      color: var(--accent-amber);
-      transform: scale(0.95);
-    }
-
-    .btn-brake {
-      border-radius: 12px;
-      background: var(--glass-panel);
-      color: var(--text-main);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      font-size: 9px;
-      font-weight: 800;
-    }
-    .btn-brake.active, .btn-brake:active {
-      background: rgba(217, 56, 58, 0.35);
-      border-color: var(--accent-red);
-      color: #fff;
-      transform: scale(0.95);
-    }
-
-    .modal-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(5, 7, 12, 0.88);
-      backdrop-filter: blur(16px);
-      z-index: 100;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 14px;
-      pointer-events: auto;
-    }
-    .modal-card {
-      background: #0f131c;
-      border: 1px solid var(--glass-border);
-      border-radius: 16px;
-      max-width: 440px;
-      width: 100%;
-      padding: 18px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.8);
-      pointer-events: auto;
-      max-height: 90vh;
-      overflow-y: auto;
-    }
-    .modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      padding-bottom: 8px;
-    }
-    .modal-title {
-      font-size: 13px;
-      font-weight: 800;
-      color: var(--accent-white);
-      letter-spacing: 0.5px;
-    }
-    .modal-close {
-      background: rgba(255, 255, 255, 0.08);
-      border: none;
-      color: var(--text-muted);
-      width: 30px;
-      height: 30px;
-      border-radius: 8px;
-      font-size: 18px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      touch-action: manipulation;
-    }
-
-    .parts-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 6px;
-    }
-    .part-card {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 8px;
-      padding: 8px 6px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-      gap: 3px;
-    }
-    .part-card.found {
-      border-color: var(--accent-amber);
-      background: rgba(229, 157, 53, 0.1);
-    }
+    .btn-top { background: var(--glass-panel); border: 1px solid var(--glass-border); backdrop-filter: blur(12px); color: var(--text-main); padding: 5px 9px; border-radius: 8px; font-size: 10px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+    .btn-top:active { background: rgba(255, 255, 255, 0.2); border-color: var(--glass-border-focus); transform: scale(0.96); }
+    .banner-container { position: absolute; top: 110px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; align-items: center; width: 90%; max-width: 400px; pointer-events: none; }
+    .evade-status-card { background: rgba(20, 25, 36, 0.94); border: 1px solid var(--accent-amber); box-shadow: 0 6px 20px rgba(229, 157, 53, 0.3); padding: 5px 14px; border-radius: 16px; font-size: 11px; font-weight: 800; color: var(--accent-amber); display: none; align-items: center; gap: 8px; }
+    .toast-alert { background: rgba(18, 22, 32, 0.96); border: 1px solid var(--glass-border); border-radius: 8px; padding: 6px 14px; font-size: 11px; font-weight: 700; color: var(--accent-white); box-shadow: 0 8px 24px rgba(0,0,0,0.6); display: flex; align-items: center; gap: 6px; }
+    .hud-bottom { display: flex; justify-content: space-between; align-items: flex-end; gap: 6px; width: 100%; pointer-events: none; }
+    .btn-drive { touch-action: none; cursor: pointer; border: 1px solid var(--glass-border); backdrop-filter: blur(14px); box-shadow: 0 6px 18px rgba(0,0,0,0.5); }
+    .steering-container { display: flex; gap: 6px; pointer-events: auto; }
+    .btn-steer { width: 58px; height: 92px; border-radius: 16px; background: var(--glass-panel); color: var(--accent-white); display: flex; align-items: center; justify-content: center; }
+    .btn-steer svg { width: 28px; height: 28px; fill: var(--text-main); }
+    .btn-steer.active, .btn-steer:active { background: rgba(255, 255, 255, 0.22); border-color: var(--glass-border-focus); transform: scale(0.94); }
+    .cluster-container { background: var(--glass-panel); border: 1px solid var(--glass-border); backdrop-filter: blur(20px); border-radius: 14px; padding: 6px 10px; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 98px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); pointer-events: none; }
+    .cluster-top-row { display: flex; align-items: baseline; gap: 4px; }
+    .speed-digits { font-size: 26px; font-weight: 900; font-family: var(--font-mono); line-height: 1; color: var(--accent-white); }
+    .speed-unit { font-size: 8px; font-weight: 700; color: var(--text-muted); }
+    .gear-indicator { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.12); padding: 1px 5px; border-radius: 4px; font-size: 9px; font-weight: 800; font-family: var(--font-mono); color: var(--accent-amber); }
+    .rpm-track { width: 100%; height: 4px; background: rgba(255, 255, 255, 0.08); border-radius: 2px; overflow: hidden; }
+    .rpm-fill { height: 100%; background: linear-gradient(90deg, #38bdf8 0%, #e59d35 70%, #d9383a 100%); border-radius: 2px; }
+    .cluster-status-row { display: flex; justify-content: space-between; width: 100%; font-size: 7.5px; color: var(--text-sub); font-weight: 700; text-transform: uppercase; }
+    .car-health-bar { width: 100%; height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+    .car-health-fill { height: 100%; background: var(--accent-green); }
+    .pedals-grid { display: grid; grid-template-columns: 58px 64px; grid-template-rows: 44px 44px; gap: 6px; pointer-events: auto; }
+    .btn-nitro { border-radius: 12px; background: var(--glass-panel); border-color: rgba(56, 189, 248, 0.35); color: var(--accent-blue); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; position: relative; }
+    .btn-nitro.active, .btn-nitro:active { background: rgba(56, 189, 248, 0.35); border-color: var(--accent-blue); color: #fff; }
+    .nitro-gauge { position: absolute; bottom: 2px; left: 6px; right: 6px; height: 2px; background: rgba(255,255,255,0.1); border-radius: 1px; overflow: hidden; }
+    .nitro-fill { height: 100%; background: var(--accent-blue); width: 100%; }
+    .btn-gas { border-radius: 12px; background: linear-gradient(180deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%); border: 1.5px solid rgba(255, 255, 255, 0.25); color: var(--accent-white); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 13px; font-weight: 900; }
+    .btn-gas.active, .btn-gas:active { background: linear-gradient(180deg, rgba(56, 189, 248, 0.4) 0%, rgba(15, 23, 42, 0.98) 100%); border-color: var(--accent-blue); }
+    .btn-handbrake { border-radius: 12px; background: var(--glass-panel); color: var(--text-muted); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; }
+    .btn-handbrake.active, .btn-handbrake:active { background: rgba(229, 157, 53, 0.3); border-color: var(--accent-amber); color: var(--accent-amber); }
+    .btn-brake { border-radius: 12px; background: var(--glass-panel); color: var(--text-main); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; }
+    .btn-brake.active, .btn-brake:active { background: rgba(217, 56, 58, 0.35); border-color: var(--accent-red); color: #fff; }
+    .modal-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 7, 12, 0.88); backdrop-filter: blur(16px); z-index: 100; display: none; align-items: center; justify-content: center; padding: 14px; pointer-events: auto; }
+    .modal-card { background: #0f131c; border: 1px solid var(--glass-border); border-radius: 16px; max-width: 440px; width: 100%; padding: 18px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); max-height: 90vh; overflow-y: auto; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 8px; }
+    .modal-title { font-size: 13px; font-weight: 800; color: var(--accent-white); }
+    .modal-close { background: rgba(255, 255, 255, 0.08); border: none; color: var(--text-muted); width: 30px; height: 30px; border-radius: 8px; font-size: 18px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .parts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .part-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 8px 6px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 3px; }
+    .part-card.found { border-color: var(--accent-amber); background: rgba(229, 157, 53, 0.1); }
     .part-title { font-size: 9px; font-weight: 800; color: #fff; }
     .part-bonus { font-size: 7.5px; color: var(--text-muted); }
-
-    #fullMapCanvas {
-      width: 100%;
-      height: 300px;
-      border-radius: 10px;
-      background: #06090e;
-      border: 1px solid var(--glass-border);
-      display: block;
-    }
+    #fullMapCanvas { width: 100%; height: 300px; border-radius: 10px; background: #06090e; border: 1px solid var(--glass-border); display: block; }
   </style>
 </head>
 <body>
   <canvas id="gameCanvas"></canvas>
-
   <div id="hud">
     <div class="hud-header">
       <div class="radar-wrapper" id="radarContainer" title="Карта (M)">
@@ -602,7 +97,6 @@
         <div class="radar-compass-ring"></div>
         <div class="radar-north-mark">N</div>
       </div>
-
       <div class="header-center">
         <div class="district-pill">
           <div class="district-dot"></div>
@@ -616,71 +110,44 @@
           <svg class="wanted-shield" id="star5" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
         </div>
       </div>
-
       <div class="header-right">
         <div class="wallet-badge"><span>$</span> <span id="hudCash">750</span></div>
         <div class="top-buttons-row">
-          <button class="btn-top" id="btnRadio">📻 R</button>
-          <button class="btn-top" id="btnOpenMap">🗺️ M</button>
-          <button class="btn-top" id="btnOpenGarage">🔧 G</button>
+          <button class="btn-top" id="btnRadio">R</button>
+          <button class="btn-top" id="btnOpenMap">M</button>
+          <button class="btn-top" id="btnOpenGarage">G</button>
         </div>
       </div>
     </div>
-
     <div class="banner-container" id="bannerContainer">
       <div class="evade-status-card" id="evadeStatusCard">
-        <span>⚠️ СБРОС РОЗЫСКА:</span>
+        <span>СБРОС РОЗЫСКА:</span>
         <span id="evadeCountdown" style="color:#fff; font-family:var(--font-mono);">5.0</span>
       </div>
     </div>
-
     <div class="hud-bottom">
       <div class="steering-container">
-        <button class="btn-drive btn-steer" id="btnLeft" aria-label="Влево">
-          <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
-        </button>
-        <button class="btn-drive btn-steer" id="btnRight" aria-label="Вправо">
-          <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
-        </button>
+        <button class="btn-drive btn-steer" id="btnLeft" aria-label="Влево"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button>
+        <button class="btn-drive btn-steer" id="btnRight" aria-label="Вправо"><svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></button>
       </div>
-
       <div class="cluster-container">
         <div class="cluster-top-row">
           <div class="speed-digits" id="hudSpeed">0</div>
           <div class="speed-unit">KM/H</div>
           <div class="gear-indicator" id="hudGear">D1</div>
         </div>
-        <div class="rpm-track">
-          <div class="rpm-fill" id="hudRpm" style="width: 10%;"></div>
-        </div>
-        <div class="cluster-status-row">
-          <span>HP</span>
-          <span id="hudHpVal">100%</span>
-        </div>
-        <div class="car-health-bar">
-          <div class="car-health-fill" id="hudHpBar" style="width: 100%;"></div>
-        </div>
+        <div class="rpm-track"><div class="rpm-fill" id="hudRpm" style="width: 10%;"></div></div>
+        <div class="cluster-status-row"><span>HP</span><span id="hudHpVal">100%</span></div>
+        <div class="car-health-bar"><div class="car-health-fill" id="hudHpBar" style="width: 100%;"></div></div>
       </div>
-
       <div class="pedals-grid">
-        <button class="btn-drive btn-nitro" id="btnNitro">
-          <span>N2O</span>
-          <div class="nitro-gauge"><div class="nitro-fill" id="nitroBar"></div></div>
-        </button>
-        <button class="btn-drive btn-gas" id="btnGas">
-          <span>▲</span>
-        </button>
-        <button class="btn-drive btn-handbrake" id="btnHandbrake">
-          <span>HB</span>
-        </button>
-        <button class="btn-drive btn-brake" id="btnBrake">
-          <span>▼</span>
-        </button>
+        <button class="btn-drive btn-nitro" id="btnNitro"><span>N2O</span><div class="nitro-gauge"><div class="nitro-fill" id="nitroBar"></div></div></button>
+        <button class="btn-drive btn-gas" id="btnGas"><span>▲</span></button>
+        <button class="btn-drive btn-handbrake" id="btnHandbrake"><span>HB</span></button>
+        <button class="btn-drive btn-brake" id="btnBrake"><span>▼</span></button>
       </div>
     </div>
   </div>
-
-  <!-- Map Modal -->
   <div class="modal-overlay" id="mapModal">
     <div class="modal-card">
       <div class="modal-header">
@@ -688,4 +155,19 @@
         <button class="modal-close" id="btnCloseMap">&times;</button>
       </div>
       <canvas id="fullMapCanvas" width="400" height="300"></canvas>
-      <div style="font-size: 10px; color: var(--text-muted); display:flex; justify-content:space-between;">\n        <span>🟡 Детали тюнинга (9 шт)</span>\n        <span>⚪ Ваша машина</span>\n      </div>\n    </div>\n  </div>\n\n  <!-- Garage Modal -->\n  <div class="modal-overlay" id="garageModal">\n    <div class="modal-card">\n      <div class="modal-header">\n        <div class="modal-title">ГАРАЖ И ТЮНИНГ</div>\n        <button class="modal-close" id="btnCloseGarage">&times;</button>\n      </div>\n      <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">\n        НАЙДЕНО ДЕТАЛЕЙ: <span id="partsFoundCount">0</span> / 9\n      </div>\n      <div class="parts-grid" id="partsContainer"></div>\n      <button class="btn-top" id="btnRepairCar" style="padding: 10px; justify-content: center; background: rgba(74, 222, 128, 0.15); border-color: var(--accent-green); color: var(--accent-green); font-weight:800;">\n        ПОЛНЫЙ РЕМОНТ И СБРОС РОЗЫСКА ($80)\n      </button>\n    </div>\n  </div>\n\n  <script type="module" src="/src/main.js"></script>\n</body>\n</html>\n
+    </div>
+  </div>
+  <div class="modal-overlay" id="garageModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">ГАРАЖ И ТЮНИНГ</div>
+        <button class="modal-close" id="btnCloseGarage">&times;</button>
+      </div>
+      <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">НАЙДЕНО ДЕТАЛЕЙ: <span id="partsFoundCount">0</span> / 9</div>
+      <div class="parts-grid" id="partsContainer"></div>
+      <button class="btn-top" id="btnRepairCar" style="padding: 10px; justify-content: center; background: rgba(74, 222, 128, 0.15); border-color: var(--accent-green); color: var(--accent-green); font-weight:800;">ПОЛНЫЙ РЕМОНТ И СБРОС РОЗЫСКА ($80)</button>
+    </div>
+  </div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
