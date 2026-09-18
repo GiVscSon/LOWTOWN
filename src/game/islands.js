@@ -10,13 +10,25 @@ export const ISLANDS = [
     ferry: { x: 640, y: 160 }, airfield: { x: 120, y: 640 }
   },
   {
-    id: 'IRON_HARBOR', name: 'IRON HARBOR', biome: 'INDUSTRIAL_COAST', center: { x: 1700, y: -100 }, rx: 740, ry: 1000,
+    id: 'IRON_HARBOR', name: 'IRON HARBOR', biome: 'INDUSTRIAL_COAST', center: { x: 1800, y: -120 }, rx: 1050, ry: 1120,
     colors: { land: '#25282a', shore: '#6b716f', accent: '#d4523a' },
     districts: ['docks', 'warehouses', 'shipyard'],
     ferry: { x: 1120, y: 160 }, airfield: { x: 1150, y: 260 }
   },
   {
-    id: 'NORTH_RIDGE', name: 'NORTH RIDGE', biome: 'FOREST_HIGHLAND', center: { x: 0, y: 1800 }, rx: 1080, ry: 600,
+    id: 'WEST_SIDE', name: 'WEST SIDE', biome: 'URBAN_OUTER', center: { x: -2380, y: 250 }, rx: 760, ry: 1050,
+    colors: { land: '#222426', shore: '#6f6257', accent: '#c08a4b' },
+    districts: ['west residential', 'terminal', 'rail yards'],
+    ferry: null, airfield: null
+  },
+  {
+    id: 'SOUTH_SIDE', name: 'SOUTH SIDE', biome: 'URBAN_OUTER', center: { x: -650, y: 1500 }, rx: 1050, ry: 720,
+    colors: { land: '#222528', shore: '#70665a', accent: '#b8864f' },
+    districts: ['south market', 'motels', 'outskirts'],
+    ferry: null, airfield: null
+  },
+  {
+    id: 'NORTH_RIDGE', name: 'NORTH RIDGE', biome: 'FOREST_HIGHLAND', center: { x: 0, y: 1900 }, rx: 1400, ry: 1050,
     colors: { land: '#202820', shore: '#6e765d', accent: '#b7a66a' },
     districts: ['pine road', 'hill town', 'reservoir'],
     ferry: null, airfield: { x: 300, y: 1360 }
