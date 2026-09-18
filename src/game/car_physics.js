@@ -2,7 +2,7 @@ import { normalizeTypeInput } from './transport_type_physics.js';
 import { TRANSPORT_TYPES } from './transport_constants.js';
 import { dynamicBlendWeight, dynamicHandlingActive, stepDynamicBicycle } from './dynamic_bicycle.js';
 import { applySurfacePhysics, surfaceTelemetry } from './surface_physics.js';
-import { limitDriveForce } from './axle_physics.js';
+import { limitDriveForce, axleLoads, drivetrainDistribution } from './axle_physics.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const finite=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
@@ -47,14 +47,26 @@ export function stepCarPhysics(state,dt,input,physics){
   const forward=state.vx*fx+state.vy*fy;
   const speed=Math.hypot(state.vx,state.vy);
   const mass=Math.max(1,p.mass||state.mass||1);
-  const requestedDrive=c.throttle>=0?p.engineForce:Math.abs(p.reverseForce||0);
-  const drive=limitDriveForce(c.throttle*requestedDrive,{drivetrain:p.drivetrain,mass,friction:p.friction,gravity:p.gravity,loads:{front:mass*(p.gravity||9.81)*.52,rear:mass*(p.gravity||9.81)*.48}});
-  // The controller exposes arcade acceleration explicitly. Use it for the
-  // player-car drive model instead of accidentally reducing it to the
-  // tyre-load traction cap (which made a 1-second throttle input barely move).
-  const arcadeAcceleration=c.throttle>=0?finite(p.arcadeAcceleration,0):finite(p.arcadeReverseAcceleration,0);
-  const forceAcceleration=drive.force/mass;
-  const driveAcceleration=arcadeAcceleration>0?c.throttle*arcadeAcceleration:forceAcceleration;
+  // Engine acceleration is a calibrated gameplay quantity, but tyres remain
+  // the authority on how much of it can reach the road. This prevents the
+  // previous "arcade acceleration bypass" from ignoring drivetrain traction.
+  const engineAcceleration=c.throttle>=0
+    ? finite(p.engineAcceleration,p.engineForce/mass)
+    : finite(p.reverseAcceleration,p.reverseForce/mass);
+  const requestedAcceleration=c.throttle*engineAcceleration;
+
+  // Estimate axle loads with the requested longitudinal acceleration, then
+  // cap driven-axle force. The result is the actual longitudinal tyre demand.
+  const loads=axleLoads({
+    mass, gravity:p.gravity||9.81, wheelbase:p.wheelbase||2.7,
+    frontWeight:p.frontWeight||.52,
+    longitudinalAcceleration:requestedAcceleration,
+    cgHeight:p.cgHeight||.55
+  });
+  const distribution=drivetrainDistribution(p.drivetrain,loads);
+  const longitudinalCapacity=Math.max(0,finite(p.friction,1)*distribution.drivenLoad/mass);
+  const driveAcceleration=clamp(requestedAcceleration,-longitudinalCapacity,longitudinalCapacity);
+
   state.vx+=fx*driveAcceleration*safeDt;
   state.vy+=fy*driveAcceleration*safeDt;
   if(c.brake){
