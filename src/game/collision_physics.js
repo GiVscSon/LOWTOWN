@@ -20,7 +20,7 @@ export function circleContact(a,b,{restitution=.12,friction=.45,damageScale=.002
   return {hit:true,penetration,normalX:nx,normalY:ny,impulse,frictionImpulse,damage,separating:false};
 }
 
-export function resolveWallContact(state,normalX,normalY,{restitution=.08,friction=.35,damageScale=.0015,maxImpulse=120}={}){
+export function resolveWallContact(state,normalX,normalY,{restitution=.08,friction=.35,damageScale=.0015,maxImpulse=50000}={}){
   const nx=finite(normalX),ny=finite(normalY);const nLen=Math.hypot(nx,ny)||1;const nxx=nx/nLen,nyy=ny/nLen;
   const vn=finite(state.vx)*nxx+finite(state.vy)*nyy;
   if(vn>=0)return {hit:false,impulse:0,damage:0};
