@@ -593,86 +593,87 @@
   </style>
 </head>
 <body>
-  <canvas id="gameCanvas"></canvas>
+  <canvas id=\"gameCanvas\"></canvas>
 
-  <div id="hud">
-    <div class="hud-header">
-      <div class="radar-wrapper" id="radarContainer" title="Карта (M)">
-        <canvas id="radarCanvas" width="180" height="180"></canvas>
-        <div class="radar-compass-ring"></div>
-        <div class="radar-north-mark">N</div>
+  <div id=\"hud\">
+    <div class=\"hud-header\">
+      <div class=\"radar-wrapper\" id=\"radarContainer\" title=\"Карта (M)\">
+        <canvas id=\"radarCanvas\" width=\"180\" height=\"180\"></canvas>
+        <div class=\"radar-compass-ring\"></div>
+        <div class=\"radar-north-mark\">N</div>
       </div>
 
-      <div class="header-center">
-        <div class="district-pill">
-          <div class="district-dot"></div>
-          <span id="hudDistrict">LOWTOWN DOWNTOWN</span>
+      <div class=\"header-center\">
+        <div class=\"district-pill\">
+          <div class=\"district-dot\"></div>
+          <span id=\"hudDistrict\">LOWTOWN DOWNTOWN</span>
         </div>
-        <div class="wanted-pill" id="wantedBadge">
-          <svg class="wanted-shield" id="star1" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
-          <svg class="wanted-shield" id="star2" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
-          <svg class="wanted-shield" id="star3" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
-          <svg class="wanted-shield" id="star4" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
-          <svg class="wanted-shield" id="star5" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+        <div class=\"wanted-pill\" id=\"wantedBadge\">
+          <svg class=\"wanted-shield\" id=\"star1\" viewBox=\"0 0 24 24\"><path d=\"M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z\"/></svg>
+          <svg class=\"wanted-shield\" id=\"star2\" viewBox=\"0 0 24 24\"><path d=\"M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z\"/></svg>
+          <svg class=\"wanted-shield\" id=\"star3\" viewBox=\"0 0 24 24\"><path d=\"M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z\"/></svg>
+          <svg class=\"wanted-shield\" id=\"star4\" viewBox=\"0 0 24 24\"><path d=\"M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z\"/></svg>
+          <svg class=\"wanted-shield\" id=\"star5\" viewBox=\"0 0 24 24\"><path d=\"M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z\"/></svg>
         </div>
       </div>
 
-      <div class="header-right">
-        <div class="wallet-badge"><span>$</span> <span id="hudCash">750</span></div>
-        <div class="top-buttons-row">
-          <button class="btn-top" id="btnOpenMap">🗺️ M</button>
-          <button class="btn-top" id="btnOpenGarage">🔧 G</button>
+      <div class=\"header-right\">
+        <div class=\"wallet-badge\"><span>$</span> <span id=\"hudCash\">750</span></div>
+        <div class=\"top-buttons-row\">
+          <button class=\"btn-top\" id=\"btnRadio\">📻 R</button>
+          <button class=\"btn-top\" id=\"btnOpenMap\">🗺️ M</button>
+          <button class=\"btn-top\" id=\"btnOpenGarage\">🔧 G</button>
         </div>
       </div>
     </div>
 
-    <div class="banner-container" id="bannerContainer">
-      <div class="evade-status-card" id="evadeStatusCard">
+    <div class=\"banner-container\" id=\"bannerContainer\">
+      <div class=\"evade-status-card\" id=\"evadeStatusCard\">
         <span>⚠️ СБРОС РОЗЫСКА:</span>
-        <span id="evadeCountdown" style="color:#fff; font-family:var(--font-mono);">5.0</span>
+        <span id=\"evadeCountdown\" style=\"color:#fff; font-family:var(--font-mono);\">5.0</span>
       </div>
     </div>
 
-    <div class="hud-bottom">
-      <div class="steering-container">
-        <button class="btn-drive btn-steer" id="btnLeft" aria-label="Влево">
-          <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+    <div class=\"hud-bottom\">
+      <div class=\"steering-container\">
+        <button class=\"btn-drive btn-steer\" id=\"btnLeft\" aria-label=\"Влево\">
+          <svg viewBox=\"0 0 24 24\"><path d=\"M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z\"/></svg>
         </button>
-        <button class="btn-drive btn-steer" id="btnRight" aria-label="Вправо">
-          <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+        <button class=\"btn-drive btn-steer\" id=\"btnRight\" aria-label=\"Вправо\">
+          <svg viewBox=\"0 0 24 24\"><path d=\"M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z\"/></svg>
         </button>
       </div>
 
-      <div class="cluster-container">
-        <div class="cluster-top-row">
-          <div class="speed-digits" id="hudSpeed">0</div>
-          <div class="speed-unit">KM/H</div>
-          <div class="gear-indicator" id="hudGear">D1</div>
+      <div class=\"cluster-container\">
+        <div class=\"cluster-top-row\">
+          <div class=\"speed-digits\" id=\"hudSpeed\">0</div>
+          <div class=\"speed-unit\">KM/H</div>
+          <div class=\"gear-indicator\" id=\"hudGear\">D1</div>
         </div>
-        <div class="rpm-track">
-          <div class="rpm-fill" id="hudRpm" style="width: 10%;"></div>
+        <div class=\"rpm-track\">
+          <div class=\"rpm-fill\" id=\"hudRpm\" style=\"width: 10%;\"></div>
         </div>
-        <div class="cluster-status-row">
+        <div class=\"cluster-status-row\">
           <span>HP</span>
-          <span id="hudHpVal">100%</span>
+          <span id=\"hudHpVal\">100%</span>
         </div>
-        <div class="car-health-bar">
-          <div class="car-health-fill" id="hudHpBar" style="width: 100%;"></div>
+        <div class=\"car-health-bar\">
+          <div class=\"car-health-fill\" id=\"hudHpBar\" style=\"width: 100%;\"></div>
         </div>
       </div>
 
-      <div class="pedals-grid">
-        <button class="btn-drive btn-nitro" id="btnNitro">
+      <div class=\"pedals-grid\">
+        <button class=\"btn-drive btn-nitro\" id=\"btnNitro\">
           <span>N2O</span>
-          <div class="nitro-gauge"><div class="nitro-fill" id="nitroBar"></div></div>
+          <div class=\"nitro-gauge\"><div class=\"nitro-fill\" id=\"nitroBar\"></div></div>
         </button>
-        <button class="btn-drive btn-gas" id="btnGas">
+        <button class=\"btn-drive btn-gas\" id=\"btnGas\">
           <span>▲</span>
         </button>
-        <button class="btn-drive btn-handbrake" id="btnHandbrake">
+        <button class=\"btn-drive btn-handbrake\" id=\"btnHandbrake\">
           <span>HB</span>
         </button>
-        <button class="btn-drive btn-brake" id="btnBrake">
+        <button class=\"btn-drive btn-brake\" id=\"btnBrake\">
           <span>▼</span>
         </button>
       </div>
@@ -680,37 +681,11 @@
   </div>
 
   <!-- Map Modal -->
-  <div class="modal-overlay" id="mapModal">
-    <div class="modal-card">
-      <div class="modal-header">
-        <div class="modal-title">КАРТА АРХИПЕЛАГА (3 ОСТРОВА)</div>
-        <button class="modal-close" id="btnCloseMap">&times;</button>
+  <div class=\"modal-overlay\" id=\"mapModal\">
+    <div class=\"modal-card\">
+      <div class=\"modal-header\">
+        <div class=\"modal-title\">КАРТА АРХИПЕЛАГА (3 ОСТРОВА)</div>
+        <button class=\"modal-close\" id=\"btnCloseMap\">&times;</button>
       </div>
-      <canvas id="fullMapCanvas" width="400" height="300"></canvas>
-      <div style="font-size: 10px; color: var(--text-muted); display:flex; justify-content:space-between;">
-        <span>🟡 Детали тюнинга (9 шт)</span>
-        <span>⚪ Ваша машина</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Garage Modal -->
-  <div class="modal-overlay" id="garageModal">
-    <div class="modal-card">
-      <div class="modal-header">
-        <div class="modal-title">ГАРАЖ И ТЮНИНГ</div>
-        <button class="modal-close" id="btnCloseGarage">&times;</button>
-      </div>
-      <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">
-        НАЙДЕНО ДЕТАЛЕЙ: <span id="partsFoundCount">0</span> / 9
-      </div>
-      <div class="parts-grid" id="partsContainer"></div>
-      <button class="btn-top" id="btnRepairCar" style="padding: 10px; justify-content: center; background: rgba(74, 222, 128, 0.15); border-color: var(--accent-green); color: var(--accent-green); font-weight:800;">
-        ПОЛНЫЙ РЕМОНТ И СБРОС РОЗЫСКА ($80)
-      </button>
-    </div>
-  </div>
-
-  <script type="module" src="/src/main.js"></script>
-</body>
-</html>
+      <canvas id=\"fullMapCanvas\" width=\"400\" height=\"300\"></canvas>
+      <div style=\"font-size: 10px; color: var(--text-muted); display:flex; justify-content:space-between;\">\n        <span>🟡 Детали тюнинга (9 шт)</span>\n        <span>⚪ Ваша машина</span>\n      </div>\n    </div>\n  </div>\n\n  <!-- Garage Modal -->\n  <div class=\"modal-overlay\" id=\"garageModal\">\n    <div class=\"modal-card\">\n      <div class=\"modal-header\">\n        <div class=\"modal-title\">ГАРАЖ И ТЮНИНГ</div>\n        <button class=\"modal-close\" id=\"btnCloseGarage\">&times;</button>\n      </div>\n      <div style=\"font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;\">\n        НАЙДЕНО ДЕТАЛЕЙ: <span id=\"partsFoundCount\">0</span> / 9\n      </div>\n      <div class=\"parts-grid\" id=\"partsContainer\"></div>\n      <button class=\"btn-top\" id=\"btnRepairCar\" style=\"padding: 10px; justify-content: center; background: rgba(74, 222, 128, 0.15); border-color: var(--accent-green); color: var(--accent-green); font-weight:800;\">\n        ПОЛНЫЙ РЕМОНТ И СБРОС РОЗЫСКА ($80)\n      </button>\n    </div>\n  </div>\n\n  <script type=\"module\" src=\"/src/main.js\"></script>\n</body>\n</html>\n

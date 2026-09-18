@@ -1,12 +1,16 @@
-// LOWTOWN // THREE ISLANDS INTEGRITY ENGINE // GTA 2 ARCADE PHYSICS
-// Monolithic architecture, seamless 3-island topology, police AI, tuning parts and audio
+// LOWTOWN // THREE ISLANDS INTEGRITY ENGINE // GTA 2 ARCADE PHYSICS + RADIO + CITY LIFE
+// Monolithic architecture, seamless 3-island topology, police AI, radio stations, pedestrians and audio
 
-class VehicleAudio {
+class SynthAudio {
   constructor() {
     this.ctx = null;
     this.motorOsc = null;
     this.motorGain = null;
+    this.radioGain = null;
+    this.radioInterval = null;
     this.enabled = false;
+    this.stationIdx = 0;
+    this.stations = ['📻 OFF', '📻 90s RETROWAVE', '📻 NOIR ELECTRO', '📻 SYNTH ROCK'];
   }
   init() {
     if (this.ctx) return;
@@ -16,6 +20,10 @@ class VehicleAudio {
       if (this.ctx.state === 'suspended') this.ctx.resume();
       this.motorOsc = this.ctx.createOscillator();
       this.motorGain = this.ctx.createGain();
+      this.radioGain = this.ctx.createGain();
+      this.radioGain.gain.setValueAtTime(0.04, this.ctx.currentTime);
+      this.radioGain.connect(this.ctx.destination);
+
       this.motorOsc.type = 'sawtooth';
       this.motorOsc.frequency.setValueAtTime(45, this.ctx.currentTime);
       this.motorGain.gain.setValueAtTime(0.035, this.ctx.currentTime);
@@ -33,6 +41,35 @@ class VehicleAudio {
     if (!this.enabled || !this.ctx) return;
     const targetFreq = 42 + rpmRatio * 110 + Math.abs(speed) * 3;
     this.motorOsc.frequency.setTargetAtTime(targetFreq, this.ctx.currentTime, 0.05);
+  }
+  nextStation() {
+    this.stationIdx = (this.stationIdx + 1) % this.stations.length;
+    if (this.radioInterval) clearInterval(this.radioInterval);
+    if (this.stationIdx === 0) return this.stations[0];
+    this.startSynthRadio();
+    return this.stations[this.stationIdx];
+  }
+  startSynthRadio() {
+    if (!this.ctx) return;
+    const notes = this.stationIdx === 1 ? [130, 164, 196, 246, 261, 329] : this.stationIdx === 2 ? [110, 138, 165, 220, 277] : [98, 123, 147, 196, 220];
+    let step = 0;
+    this.radioInterval = setInterval(() => {
+      if (!this.ctx || this.stationIdx === 0) return;
+      try {
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = this.stationIdx === 1 ? 'sawtooth' : this.stationIdx === 2 ? 'sine' : 'square';
+        const freq = notes[step % notes.length];
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+        g.gain.setValueAtTime(0.03, this.ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.22);
+        osc.connect(g);
+        g.connect(this.radioGain);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.24);
+        step++;
+      } catch (e) {}
+    }, 240);
   }
   playSplash() {
     if (!this.enabled || !this.ctx) return;
@@ -87,7 +124,7 @@ class VehicleAudio {
   }
 }
 
-const sound = new VehicleAudio();
+const sound = new SynthAudio();
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -169,6 +206,7 @@ const breakableProps = [];
 const bridgeRails = [];
 const trafficCars = [];
 const policeCars = [];
+const pedestrians = [];
 const skidmarks = [];
 const waterSplashes = [];
 
@@ -188,6 +226,7 @@ function initTopology() {
   bridgeRails.length = 0;
   trafficCars.length = 0;
   policeCars.length = 0;
+  pedestrians.length = 0;
 
   // Main Expressway
   roads.push(
@@ -249,17 +288,31 @@ function initTopology() {
   const dumpsters = [{ x: 620, y: 1100 }, { x: 1370, y: 1100 }, { x: 3120, y: 1100 }, { x: 5470, y: 1100 }];
   dumpsters.forEach(d => breakableProps.push({ x: d.x, y: d.y, type: 'dumpster', intact: true, w: 26, h: 18 }));
 
-  // Civ Traffic
-  const civColors = ['#2b3547', '#3b4759', '#4c5a6f', '#362f2d', '#232b38'];
-  for (let i = 0; i < 7; i++) {
+  // Dynamic High-Density Traffic
+  const civColors = ['#2b3547', '#3b4759', '#4c5a6f', '#362f2d', '#232b38', '#52433b', '#2c3e50', '#7f8c8d'];
+  for (let i = 0; i < 16; i++) {
+    const isEast = i % 2 === 0;
     trafficCars.push({
-      x: 600 + i * 900,
-      y: 1165,
-      angle: 0,
-      speed: 1.8 + Math.random() * 0.4,
+      x: 500 + i * 400,
+      y: isEast ? 1165 : 1205,
+      angle: isEast ? 0 : Math.PI,
+      speed: (isEast ? 1 : -1) * (2.0 + Math.random() * 0.6),
       color: civColors[i % civColors.length],
       minX: 450,
-      maxX: 6800
+      maxX: 6850
+    });
+  }
+
+  // Pedestrians on sidewalks
+  const pedPants = ['#3b82f6', '#1e293b', '#64748b', '#047857', '#b91c1c'];
+  for (let i = 0; i < 24; i++) {
+    pedestrians.push({
+      x: 500 + i * 260,
+      y: 1120 + (i % 2 === 0 ? -16 : ROAD_W + 16),
+      vx: (Math.random() - 0.5) * 0.8,
+      vy: 0,
+      pantsColor: pedPants[i % pedPants.length],
+      walkPhase: Math.random() * Math.PI * 2
     });
   }
 }
@@ -446,13 +499,28 @@ function updatePhysics(dt) {
   // Traffic update
   trafficCars.forEach(c => {
     c.x += c.speed;
-    if (c.x > c.maxX) c.x = c.minX;
+    if (c.speed > 0 && c.x > c.maxX) c.x = c.minX;
+    if (c.speed < 0 && c.x < c.minX) c.x = c.maxX;
     if (Math.hypot(c.x - player.x, c.y - player.y) < 32) {
       player.speed *= 0.5;
       if (state.invulnTimer === 0) {
         player.hp = Math.max(0, player.hp - 8);
         sound.playImpact();
         if (state.wanted === 0) setWanted(1);
+      }
+    }
+  });
+
+  // Pedestrians update
+  pedestrians.forEach(p => {
+    p.x += p.vx;
+    p.walkPhase += 0.08;
+    if (p.x < 450 || p.x > 6850) p.vx *= -1;
+    if (Math.hypot(p.x - player.x, p.y - player.y) < 22) {
+      p.y += (p.y > player.y ? 18 : -18);
+      if (state.invulnTimer === 0 && Math.abs(player.speed) > 2) {
+        if (state.wanted < 2) setWanted(state.wanted + 1);
+        showToast('🚨 НАЕЗД НА ПЕШЕХОДА!');
       }
     }
   });
@@ -692,7 +760,24 @@ function renderWorld() {
     ctx.fillText(b.sign, b.x + b.w / 2, b.y + 32);
   });
 
-  // 8. Traffic & Cops
+  // 8. Pedestrians
+  pedestrians.forEach(ped => {
+    ctx.save();
+    ctx.translate(ped.x, ped.y);
+    const legOffset = Math.sin(ped.walkPhase) * 2;
+    ctx.fillStyle = ped.pantsColor;
+    ctx.fillRect(-2 + legOffset, -2, 2, 4);
+    ctx.fillRect(0 - legOffset, -2, 2, 4);
+    ctx.fillStyle = '#f1f5f9';
+    ctx.fillRect(-3, -6, 6, 4);
+    ctx.fillStyle = '#fed7aa';
+    ctx.beginPath();
+    ctx.arc(0, -8, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+
+  // 9. Traffic & Cops
   trafficCars.forEach(c => drawCarSprite(c.x, c.y, c.angle, c.color));
   policeCars.forEach(cop => {
     drawCarSprite(cop.x, cop.y, cop.angle, '#0f172a');
@@ -701,7 +786,7 @@ function renderWorld() {
     ctx.fillRect(cop.x - 3, cop.y - 6, 6, 12);
   });
 
-  // 9. Water splashes
+  // 10. Water splashes
   waterSplashes.forEach((sp, idx) => {
     ctx.fillStyle = `rgba(180, 210, 240, ${sp.alpha})`;
     ctx.beginPath();
@@ -713,7 +798,7 @@ function renderWorld() {
     if (sp.alpha <= 0) waterSplashes.splice(idx, 1);
   });
 
-  // 10. Player Car
+  // 11. Player Car
   ctx.save();
   ctx.translate(player.x, player.y);
   if (state.isDrowning) {
@@ -925,8 +1010,8 @@ function updateGaragePartsUI() {
     const card = document.createElement('div');
     card.className = 'part-card' + (p.found ? ' found' : '');
     card.innerHTML = `
-      <div class="part-title">${p.found ? p.name : '???'}</div>
-      <div class="part-bonus">${p.found ? p.bonus : 'Не найдено'}</div>
+      <div class=\"part-title\">${p.found ? p.name : '???'}</div>
+      <div class=\"part-bonus\">${p.found ? p.bonus : 'Не найдено'}</div>
     `;
     container.appendChild(card);
   });
@@ -967,6 +1052,10 @@ function setupInputListeners() {
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') state.keys.nitro = true;
     if (e.code === 'KeyM') toggleMap();
     if (e.code === 'KeyG') toggleGarage();
+    if (e.code === 'KeyR') {
+      const st = sound.nextStation();
+      showToast(st);
+    }
   });
 
   window.addEventListener('keyup', e => {
@@ -1023,6 +1112,11 @@ function setupInputListeners() {
   document.getElementById('btnCloseMap')?.addEventListener('click', toggleMap);
   document.getElementById('btnOpenGarage')?.addEventListener('click', toggleGarage);
   document.getElementById('btnCloseGarage')?.addEventListener('click', toggleGarage);
+  document.getElementById('btnRadio')?.addEventListener('click', () => {
+    sound.init();
+    const st = sound.nextStation();
+    showToast(st);
+  });
 
   document.getElementById('btnRepairCar')?.addEventListener('click', () => {
     if (state.cash >= 80) {
