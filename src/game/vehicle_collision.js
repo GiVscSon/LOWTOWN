@@ -10,6 +10,13 @@ function pointInBuilding(x, y, margin = 0) {
   );
 }
 
+export function vehicleHitsBuilding(x, y, a, options = {}) {
+  const length = Math.max(30, Number(options.length) || 56);
+  const width = Math.max(18, Number(options.width) || 28);
+  const margin = Math.max(0, Number(options.buildingMargin) || 4);
+  return footprintPoints(x, y, a, length, width).some(p => pointInBuilding(p.x, p.y, margin));
+}
+
 function nearestRoadHit(x, y, roadLines = []) {
   let best = null;
   for (const [a, b] of roadLines) {
