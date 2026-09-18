@@ -2,7 +2,7 @@ import { normalizeTypeInput } from './transport_type_physics.js';
 import { TRANSPORT_TYPES } from './transport_constants.js';
 import { dynamicBlendWeight, dynamicHandlingActive, stepDynamicBicycle } from './dynamic_bicycle.js';
 import { applySurfacePhysics, surfaceTelemetry } from './surface_physics.js';
-import { limitDriveForce, axleLoads, drivetrainDistribution } from './axle_physics.js';
+import { axleLoads, drivetrainDistribution } from './axle_physics.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const finite=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
