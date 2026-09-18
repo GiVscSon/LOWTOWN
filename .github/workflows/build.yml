@@ -74,6 +74,8 @@ jobs:
         run: node tests/global-geometry-contract.mjs
       - name: Test vehicle road collision
         run: node tests/vehicle-road-collision-smoke.mjs
+      - name: Test road transport integration
+        run: node tests/road-transport-integration-smoke.mjs
       - name: Test mobile arrow controls
         run: node tests/mobile-controls-v2-contract.mjs
       - name: Test semantic city routing
