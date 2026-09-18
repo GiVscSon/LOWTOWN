@@ -1,7 +1,8 @@
 import { VEHICLE_ASSETS } from './assets.js';
+import { vehicleWorldBlocked } from './vehicle_collision.js';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const angleDelta=(target,current)=>{let d=target-current;while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;return d;};
-export function createTrafficSystem({nodes,blocked,seed=1337}){
+export function createTrafficSystem({nodes,blocked,roadLines=[],seed=1337}){
  let state=seed>>>0;const cars=[],images={};Object.entries(VEHICLE_ASSETS).forEach(([k,src])=>{const i=new Image();i.src=src;images[k]=i});
  const params=new URLSearchParams(location.search);let scenario=null;try{const raw=params.get('scenario');if(raw)scenario=JSON.parse(raw)}catch{}
  const density=Number.isFinite(Number(scenario?.trafficDensity))?clamp(Number(scenario.trafficDensity),0,1):null;
@@ -31,7 +32,8 @@ export function createTrafficSystem({nodes,blocked,seed=1337}){
    if(c.yield>0){c.yield=Math.max(0,c.yield-dt);want=Math.min(want,8);}
    c.v+=(want-c.v)*Math.min(1,dt*(want<c.v?9:2.2));
    const nx=c.x+Math.cos(c.a)*c.v*dt,ny=c.y+Math.sin(c.a)*c.v*dt;
-   if(!blocked(nx,ny)){c.x=nx;c.y=ny;c.stuck=Math.max(0,c.stuck-dt*.8);}else{c.v*=.35;c.stuck+=dt;}
+   const vehicleBlocked=vehicleWorldBlocked(nx,ny,c.a,roadLines,{length:56,width:28,roadTolerance:8});
+   if(!vehicleBlocked){c.x=nx;c.y=ny;c.stuck=Math.max(0,c.stuck-dt*.8);}else{c.v*=.35;c.stuck+=dt;}
    if(c.type==='police'&&player&&dist(c,player)<420){c.siren=1;const chase=angleDelta(Math.atan2(player.y-c.y,player.x-c.x),c.a);c.a+=clamp(chase,-.65*dt,.65*dt);}else c.siren=0;
    if(c.stuck>1.0){c.v=0;c.brake=1;c.recovery++;c.stuck=0;const reverse=c.route[Math.max(0,c.index-1)];if(reverse&&!blocked(reverse.x,reverse.y)){c.a=Math.atan2(reverse.y-c.y,reverse.x-c.x);c.route=buildRoute(reverse);c.index=1;}else{const free=pickFree(c,120);if(free){c.route=buildRoute(free);c.index=1;c.a=Math.atan2(free.y-c.y,free.x-c.x);}}}
   }
