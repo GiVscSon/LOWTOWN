@@ -38,6 +38,8 @@ jobs:
         run: node tests/calibration-acceptance-smoke.mjs
       - name: Test dynamic bicycle
         run: node tests/dynamic-bicycle-smoke.mjs
+      - name: Test unified tyre model
+        run: node tests/tyre-model-smoke.mjs
       - name: Test transport contact chain
         run: node tests/transport-contact-trace-smoke.mjs
       - name: Test surface physics
