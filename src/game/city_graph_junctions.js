@@ -30,15 +30,25 @@ export function buildJunctionGraph(roads) {
 // Kept as a diagnostic helper for old graph comparisons. It deliberately
 // reports links that cannot be explained by exact shared geometry.
 export function proximityOnlyEdges(legacyNodes, explicitNodes) {
-  const explicitIds = new Set();
+  // Compare links by geometry, not generated node IDs. The independent
+  // authority may split a legacy segment at a true intersection and mint
+  // different node IDs. The contract is about real geometric edges.
+  const explicitEdges = new Set();
+  const edgeKey = (a, b) => {
+    const ak = String(Math.round(a.x / EPSILON)) + ':' + String(Math.round(a.y / EPSILON));
+    const bk = String(Math.round(b.x / EPSILON)) + ':' + String(Math.round(b.y / EPSILON));
+    return ak < bk ? ak + '|' + bk : bk + '|' + ak;
+  };
   for (const node of explicitNodes) {
-    for (const link of node.links) explicitIds.add(`${node.id}->${link.id}`);
+    for (const link of node.links) explicitEdges.add(edgeKey(node, link));
   }
+
   const extra = [];
   for (const node of legacyNodes) {
     for (const link of node.links) {
-      const id = `${node.id}->${link.id}`;
-      if (!explicitIds.has(id) && distance(node, link) > EPSILON) {
+      if (distance(node, link) <= EPSILON) continue;
+      const key = edgeKey(node, link);
+      if (!explicitEdges.has(key)) {
         extra.push({ from: node.id, to: link.id, distance: distance(node, link) });
       }
     }
