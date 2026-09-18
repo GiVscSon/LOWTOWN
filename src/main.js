@@ -1,5 +1,5 @@
-// LOWTOWN // THREE ISLANDS INTEGRITY ENGINE // GTA 2 ARCADE PHYSICS + RADIO + CITY LIFE
-// Monolithic architecture, seamless 3-island topology, police AI, radio stations, pedestrians and audio
+// LOWTOWN // THREE ISLANDS VISUAL OVERHAUL // GTA 2 RETRO-NOIR ENGINE
+// High-detail procedural pedestrian sprites, isometric vehicle chassis, wet road reflections, neon glow & audio
 
 class SynthAudio {
   constructor() {
@@ -138,29 +138,30 @@ const WORLD_H = 3400;
 const ROAD_W = 130;
 
 const PALETTE = {
-  waterDark: '#080d16',
-  waterShore: '#111722',
-  asphalt: '#1a1f29',
-  roadMarkingYellow: '#c79c4a',
-  roadMarkingWhite: 'rgba(235, 240, 250, 0.65)',
-  sidewalk: '#171c26',
-  curb: '#2d3748',
-  buildingWall: '#141822',
-  buildingRoof: '#1d2432',
-  bridgeAsphalt: '#222938',
-  bridgeRail: '#94a3b8'
+  waterDark: '#060a12',
+  waterShore: '#0c121e',
+  asphalt: '#171b22',
+  asphaltWet: '#1c212a',
+  roadMarkingYellow: '#d4a34b',
+  roadMarkingWhite: 'rgba(240, 244, 255, 0.75)',
+  sidewalk: '#151922',
+  curb: '#252b38',
+  buildingWall: '#11151e',
+  buildingRoof: '#181e2b',
+  bridgeAsphalt: '#1e2533',
+  bridgeRail: '#64748b'
 };
 
 const CARPARTS = [
-  { id: 'turbo', name: 'Турбина Garrett', bonus: '+15% макс. скорость', x: 850, y: 1550, found: false },
-  { id: 'diff', name: 'Блокировка 2-Way', bonus: '+20% сцепление в заносе', x: 1750, y: 850, found: false },
-  { id: 'exhaust', name: 'Прямоток HKS', bonus: 'Звук выхлопа', x: 2150, y: 1950, found: false },
-  { id: 'nitro', name: 'Баллон N2O (Закись)', bonus: '+50% объем N2O', x: 3350, y: 850, found: false },
-  { id: 'brakes', name: 'Суппорты Brembo', bonus: '+30% торможение', x: 4250, y: 1550, found: false },
-  { id: 'tires', name: 'Полуслики Toyo', bonus: '+15% разгон', x: 3850, y: 2250, found: false },
-  { id: 'cams', name: 'Распредвалы Stage 2', bonus: '+10% тяга на верхах', x: 5350, y: 850, found: false },
-  { id: 'ecu', name: 'Чип-тюнинг ECU', bonus: '+8% макс. RPM', x: 6250, y: 1550, found: false },
-  { id: 'coilovers', name: 'Винтовая подвеска Tein', bonus: '-20% крен кузова', x: 5750, y: 2250, found: false }
+  { id: 'turbo', name: 'Турбина Garrett T28', bonus: '+15% макс. скорость', x: 850, y: 1550, found: false },
+  { id: 'diff', name: 'Дифференциал 2-Way LSD', bonus: '+20% сцепление в заносе', x: 1750, y: 850, found: false },
+  { id: 'exhaust', name: 'Выхлоп HKS Hi-Power', bonus: 'Звук прямотока', x: 2150, y: 1950, found: false },
+  { id: 'nitro', name: 'Баллон NOS Nitrous', bonus: '+50% объем N2O', x: 3350, y: 850, found: false },
+  { id: 'brakes', name: 'Суппорты Brembo 4-Pot', bonus: '+30% торможение', x: 4250, y: 1550, found: false },
+  { id: 'tires', name: 'Шины Toyo Proxes R888', bonus: '+15% разгон', x: 3850, y: 2250, found: false },
+  { id: 'cams', name: 'Валы Tomei Poncam', bonus: '+10% тяга', x: 5350, y: 850, found: false },
+  { id: 'ecu', name: 'Прошивка Apexi PowerFC', bonus: '+8% макс. RPM', x: 6250, y: 1550, found: false },
+  { id: 'coilovers', name: 'Койловеры Tein Flex-Z', bonus: '-20% крен', x: 5750, y: 2250, found: false }
 ];
 
 const state = {
@@ -185,7 +186,7 @@ const player = {
   angle: 0, speed: 0,
   rpm: 0, gear: 'D1',
   hp: 100, maxHp: 100,
-  width: 44, height: 22,
+  width: 48, height: 24,
   bodyColor: '#e59d35'
 };
 
@@ -228,14 +229,14 @@ function initTopology() {
   policeCars.length = 0;
   pedestrians.length = 0;
 
-  // Main Expressway
+  // Expressway
   roads.push(
     { x: 450, y: 1135, w: 2050, h: ROAD_W, dir: 'h', name: 'Центральный Проспект' },
     { x: 2850, y: 1135, w: 2000, h: ROAD_W, dir: 'h', name: 'Портовая Магистраль' },
     { x: 5200, y: 1135, w: 1650, h: ROAD_W, dir: 'h', name: 'Фонарный Бульвар' }
   );
 
-  // Downtown Grid
+  // Downtown
   roads.push(
     { x: 450, y: 450, w: 1900, h: ROAD_W, dir: 'h' },
     { x: 450, y: 1850, w: 1900, h: ROAD_W, dir: 'h' },
@@ -244,7 +245,7 @@ function initTopology() {
     { x: 2000, y: 450, w: ROAD_W, h: 1530, dir: 'v' }
   );
 
-  // Docks Grid
+  // Docks
   roads.push(
     { x: 2950, y: 450, w: 1750, h: ROAD_W, dir: 'h' },
     { x: 2950, y: 1850, w: 1750, h: ROAD_W, dir: 'h' },
@@ -253,7 +254,7 @@ function initTopology() {
     { x: 4600, y: 450, w: ROAD_W, h: 1530, dir: 'v' }
   );
 
-  // Lantern Bay Grid
+  // Lantern Bay
   roads.push(
     { x: 5300, y: 450, w: 1550, h: ROAD_W, dir: 'h' },
     { x: 5300, y: 1850, w: 1550, h: ROAD_W, dir: 'h' },
@@ -267,18 +268,18 @@ function initTopology() {
     bridgeRails.push({ x: br.x, y: br.y + br.h - 2, w: br.w, h: 14 });
   });
 
-  // Buildings
+  // Buildings with neon & AC units
   buildings.push(
-    { x: 630, y: 630, w: 520, h: 450, sign: 'BAR "THE WHISKEY CAT"', roof: '#1a2230' },
-    { x: 1380, y: 630, w: 570, h: 450, sign: 'PAWN SHOP & LOANS', roof: '#1d2636' },
-    { x: 630, y: 1320, w: 520, h: 480, sign: 'HOTEL ST. CLAIR', roof: '#1b2333' },
-    { x: 1380, y: 1320, w: 570, h: 480, sign: 'CENTRAL POLICE PRECINCT', roof: '#202a3c' },
-    { x: 3130, y: 630, w: 670, h: 450, sign: 'DOCK WAREHOUSE 04', roof: '#1f2738' },
-    { x: 4030, y: 630, w: 520, h: 450, sign: 'CARGO TERMINAL B', roof: '#1c2432' },
-    { x: 3130, y: 1320, w: 670, h: 480, sign: 'COLD STORAGE CORP', roof: '#222c3d' },
-    { x: 4030, y: 1320, w: 520, h: 480, sign: 'PORT AUTHORITY', roof: '#1b2331' },
-    { x: 5480, y: 630, w: 670, h: 450, sign: 'LANTERN BAY TAVERN', roof: '#26221c' },
-    { x: 5480, y: 1320, w: 670, h: 480, sign: 'HARBOR OVERLOOK MOTEL', roof: '#24201a' }
+    { x: 630, y: 630, w: 520, h: 450, sign: '🍸 BAR "WHISKEY CAT"', neon: '#f59e0b', roof: '#17202f' },
+    { x: 1380, y: 630, w: 570, h: 450, sign: '💰 PAWN & LOANS', neon: '#10b981', roof: '#1b2434' },
+    { x: 630, y: 1320, w: 520, h: 480, sign: '🏨 HOTEL ST. CLAIR', neon: '#ec4899', roof: '#182130' },
+    { x: 1380, y: 1320, w: 570, h: 480, sign: '🚓 POLICE PRECINCT', neon: '#3b82f6', roof: '#1d273a' },
+    { x: 3130, y: 630, w: 670, h: 450, sign: '⚓ DOCK WAREHOUSE 04', neon: '#06b6d4', roof: '#1c2535' },
+    { x: 4030, y: 630, w: 520, h: 450, sign: '📦 CARGO TERMINAL B', neon: '#eab308', roof: '#192231' },
+    { x: 3130, y: 1320, w: 670, h: 480, sign: '❄️ COLD STORAGE CORP', neon: '#38bdf8', roof: '#1e293c' },
+    { x: 4030, y: 1320, w: 520, h: 480, sign: '🚢 PORT AUTHORITY', neon: '#f97316', roof: '#1a2332' },
+    { x: 5480, y: 630, w: 670, h: 450, sign: '🏮 LANTERN BAY TAVERN', neon: '#ef4444', roof: '#221f1a' },
+    { x: 5480, y: 1320, w: 670, h: 480, sign: '🌴 OVERLOOK MOTEL', neon: '#a855f7', roof: '#201d18' }
   );
 
   // Props
@@ -288,31 +289,56 @@ function initTopology() {
   const dumpsters = [{ x: 620, y: 1100 }, { x: 1370, y: 1100 }, { x: 3120, y: 1100 }, { x: 5470, y: 1100 }];
   dumpsters.forEach(d => breakableProps.push({ x: d.x, y: d.y, type: 'dumpster', intact: true, w: 26, h: 18 }));
 
-  // Dynamic High-Density Traffic
-  const civColors = ['#2b3547', '#3b4759', '#4c5a6f', '#362f2d', '#232b38', '#52433b', '#2c3e50', '#7f8c8d'];
-  for (let i = 0; i < 16; i++) {
+  // Diverse Traffic Roster (Sedans, Taxis, Vans)
+  const carTypes = [
+    { type: 'sedan', color: '#334155', w: 46, h: 22 },
+    { type: 'taxi', color: '#eab308', w: 46, h: 22 },
+    { type: 'sports', color: '#dc2626', w: 48, h: 23 },
+    { type: 'coupe', color: '#2563eb', w: 44, h: 21 },
+    { type: 'wagon', color: '#475569', w: 50, h: 23 },
+    { type: 'black', color: '#0f172a', w: 46, h: 22 }
+  ];
+
+  for (let i = 0; i < 18; i++) {
     const isEast = i % 2 === 0;
+    const model = carTypes[i % carTypes.length];
     trafficCars.push({
-      x: 500 + i * 400,
+      x: 500 + i * 360,
       y: isEast ? 1165 : 1205,
       angle: isEast ? 0 : Math.PI,
-      speed: (isEast ? 1 : -1) * (2.0 + Math.random() * 0.6),
-      color: civColors[i % civColors.length],
+      speed: (isEast ? 1 : -1) * (2.0 + Math.random() * 0.5),
+      color: model.color,
+      type: model.type,
+      width: model.w,
+      height: model.h,
       minX: 450,
       maxX: 6850
     });
   }
 
-  // Pedestrians on sidewalks
-  const pedPants = ['#3b82f6', '#1e293b', '#64748b', '#047857', '#b91c1c'];
-  for (let i = 0; i < 24; i++) {
+  // Stylish Pedestrians
+  const pedStyles = [
+    { shirt: '#ef4444', pants: '#1e293b', hair: '#78350f', skin: '#fcd34d' },
+    { shirt: '#3b82f6', pants: '#334155', hair: '#1c1917', skin: '#fed7aa' },
+    { shirt: '#10b981', pants: '#0f172a', hair: '#d97706', skin: '#fcd34d' },
+    { shirt: '#f59e0b', pants: '#1e293b', hair: '#451a03', skin: '#ffedd5' },
+    { shirt: '#ec4899', pants: '#475569', hair: '#172554', skin: '#fed7aa' },
+    { shirt: '#64748b', pants: '#090d16', hair: '#52525b', skin: '#fde047' }
+  ];
+
+  for (let i = 0; i < 28; i++) {
+    const style = pedStyles[i % pedStyles.length];
     pedestrians.push({
-      x: 500 + i * 260,
+      x: 480 + i * 230,
       y: 1120 + (i % 2 === 0 ? -16 : ROAD_W + 16),
-      vx: (Math.random() - 0.5) * 0.8,
+      vx: (Math.random() - 0.5) * 0.9,
       vy: 0,
-      pantsColor: pedPants[i % pedPants.length],
-      walkPhase: Math.random() * Math.PI * 2
+      shirt: style.shirt,
+      pants: style.pants,
+      hair: style.hair,
+      skin: style.skin,
+      walkPhase: Math.random() * Math.PI * 2,
+      fleeTimer: 0
     });
   }
 }
@@ -378,8 +404,8 @@ function updatePhysics(dt) {
     }
   }
 
-  let maxSpeed = 8.5;
-  let accel = 0.16;
+  let maxSpeed = 8.8;
+  let accel = 0.17;
 
   if (CARPARTS.find(p => p.id === 'turbo')?.found) maxSpeed *= 1.2;
   if (CARPARTS.find(p => p.id === 'cams')?.found) accel += 0.04;
@@ -480,7 +506,7 @@ function updatePhysics(dt) {
           });
         }
       } else {
-        showToast('🗑️ БАК СБИТ!');
+        showToast('🗑️ МУСОРНЫЙ БАК СБИТ!');
       }
       player.speed *= 0.88;
     }
@@ -501,7 +527,7 @@ function updatePhysics(dt) {
     c.x += c.speed;
     if (c.speed > 0 && c.x > c.maxX) c.x = c.minX;
     if (c.speed < 0 && c.x < c.minX) c.x = c.maxX;
-    if (Math.hypot(c.x - player.x, c.y - player.y) < 32) {
+    if (Math.hypot(c.x - player.x, c.y - player.y) < 34) {
       player.speed *= 0.5;
       if (state.invulnTimer === 0) {
         player.hp = Math.max(0, player.hp - 8);
@@ -511,15 +537,22 @@ function updatePhysics(dt) {
     }
   });
 
-  // Pedestrians update
+  // Pedestrians AI & Flee
   pedestrians.forEach(p => {
     p.x += p.vx;
     p.walkPhase += 0.08;
     if (p.x < 450 || p.x > 6850) p.vx *= -1;
-    if (Math.hypot(p.x - player.x, p.y - player.y) < 22) {
-      p.y += (p.y > player.y ? 18 : -18);
+
+    const d = Math.hypot(p.x - player.x, p.y - player.y);
+    if (d < 120 && Math.abs(player.speed) > 3) {
+      p.fleeTimer = 30;
+      p.y += (p.y > player.y ? 2.5 : -2.5); // Flee away from road
+    }
+
+    if (d < 22) {
+      p.y += (p.y > player.y ? 20 : -20);
       if (state.invulnTimer === 0 && Math.abs(player.speed) > 2) {
-        if (state.wanted < 2) setWanted(state.wanted + 1);
+        if (state.wanted < 3) setWanted(state.wanted + 1);
         showToast('🚨 НАЕЗД НА ПЕШЕХОДА!');
       }
     }
@@ -645,20 +678,22 @@ function renderWorld() {
   const leadY = Math.sin(player.angle) * player.speed * 6;
   ctx.translate(w / 2 - player.x - leadX, h / 2 - player.y - leadY);
 
-  // 1. Islands
+  // 1. Island Bases with Dark Shoreline
   islands.forEach(isl => {
+    ctx.fillStyle = '#0c1017';
+    ctx.fillRect(isl.x - 8, isl.y - 8, isl.w + 16, isl.h + 16);
     ctx.fillStyle = '#141822';
     ctx.fillRect(isl.x, isl.y, isl.w, isl.h);
-    ctx.strokeStyle = '#2b3648';
-    ctx.lineWidth = 6;
+    ctx.strokeStyle = '#252c3b';
+    ctx.lineWidth = 4;
     ctx.strokeRect(isl.x, isl.y, isl.w, isl.h);
   });
 
-  // 2. Bridges
+  // 2. Bridges with Steel Rails
   bridges.forEach(br => {
     ctx.fillStyle = PALETTE.bridgeAsphalt;
     ctx.fillRect(br.x, br.y, br.w, br.h);
-    ctx.fillStyle = '#475569';
+    ctx.fillStyle = '#334155';
     ctx.fillRect(br.x, br.y - 8, br.w, 8);
     ctx.fillRect(br.x, br.y + br.h, br.w, 8);
     ctx.strokeStyle = PALETTE.roadMarkingYellow;
@@ -671,13 +706,24 @@ function renderWorld() {
     ctx.setLineDash([]);
   });
 
-  // 3. Roads
+  // 3. Wet Asphalt Roads with Sidewalks & Crosswalks
   roads.forEach(r => {
+    // Sidewalk border
+    ctx.fillStyle = PALETTE.sidewalk;
+    ctx.fillRect(r.x - 12, r.y - 12, r.w + 24, r.h + 24);
+    ctx.strokeStyle = PALETTE.curb;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(r.x - 12, r.y - 12, r.w + 24, r.h + 24);
+
+    // Asphalt
     ctx.fillStyle = PALETTE.asphalt;
     ctx.fillRect(r.x, r.y, r.w, r.h);
+
+    // Markings
     ctx.strokeStyle = PALETTE.roadMarkingWhite;
     ctx.lineWidth = 2;
     ctx.strokeRect(r.x, r.y, r.w, r.h);
+
     ctx.strokeStyle = PALETTE.roadMarkingYellow;
     ctx.lineWidth = 2.5;
     ctx.setLineDash([16, 20]);
@@ -693,100 +739,152 @@ function renderWorld() {
     ctx.setLineDash([]);
   });
 
-  // 4. Skidmarks
+  // 4. Tire Skidmarks
   skidmarks.forEach(sm => {
     ctx.save();
     ctx.translate(sm.x, sm.y);
     ctx.rotate(sm.angle);
-    ctx.fillStyle = `rgba(5, 7, 10, ${sm.alpha})`;
-    ctx.fillRect(-12, -7, 8, 3.5);
-    ctx.fillRect(-12, 5, 8, 3.5);
+    ctx.fillStyle = `rgba(5, 7, 10, ${sm.alpha * 1.2})`;
+    ctx.fillRect(-14, -8, 10, 4);
+    ctx.fillRect(-14, 6, 10, 4);
     ctx.restore();
   });
 
-  // 5. Props
+  // 5. Breakable Hydrants & Dumpsters
   breakableProps.forEach(prop => {
     if (prop.intact) {
       if (prop.type === 'hydrant') {
-        ctx.fillStyle = '#ef4444';
+        ctx.fillStyle = '#dc2626';
         ctx.beginPath();
-        ctx.arc(prop.x, prop.y, 6, 0, Math.PI * 2);
+        ctx.arc(prop.x, prop.y, 7, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = '#b91c1c';
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        ctx.fillStyle = '#fca5a5';
+        ctx.fillRect(prop.x - 3, prop.y - 3, 6, 6);
       } else {
         ctx.fillStyle = '#1e3a29';
         ctx.fillRect(prop.x - prop.w / 2, prop.y - prop.h / 2, prop.w, prop.h);
         ctx.strokeStyle = '#0f2419';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.5;
         ctx.strokeRect(prop.x - prop.w / 2, prop.y - prop.h / 2, prop.w, prop.h);
       }
     }
   });
 
-  // 6. Tuning parts
-  const pulse = Math.sin(performance.now() * 0.005) * 4;
+  // 6. Tuning Parts Glow
+  const pulse = Math.sin(performance.now() * 0.005) * 5;
   CARPARTS.forEach(p => {
     if (!p.found) {
-      ctx.fillStyle = 'rgba(229, 157, 53, 0.2)';
+      const g = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, 28 + pulse);
+      g.addColorStop(0, 'rgba(245, 158, 11, 0.45)');
+      g.addColorStop(1, 'rgba(245, 158, 11, 0)');
+      ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 22 + pulse, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, 28 + pulse, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = '#e59d35';
-      ctx.fillRect(p.x - 9, p.y - 9, 18, 18);
+
+      ctx.fillStyle = '#f59e0b';
+      ctx.fillRect(p.x - 10, p.y - 10, 20, 20);
       ctx.fillStyle = '#fff';
-      ctx.font = '800 10px Inter, sans-serif';
+      ctx.font = '900 11px Inter, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('⭐', p.x, p.y + 4);
     }
   });
 
-  // 7. Buildings
+  // 7. Detailed Buildings & Rooftops
   buildings.forEach(b => {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-    ctx.fillRect(b.x + 8, b.y + 8, b.w, b.h);
+    // Drop shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+    ctx.fillRect(b.x + 12, b.y + 12, b.w, b.h);
+
+    // Roof
     ctx.fillStyle = b.roof;
     ctx.fillRect(b.x, b.y, b.w, b.h);
-    ctx.strokeStyle = '#334155';
+    ctx.strokeStyle = '#2b3648';
     ctx.lineWidth = 3;
     ctx.strokeRect(b.x, b.y, b.w, b.h);
 
-    ctx.fillStyle = '#1e293b';
-    ctx.fillRect(b.x + 15, b.y + 15, b.w - 30, 26);
-    ctx.fillStyle = '#f0c774';
-    ctx.font = '800 10px Inter, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(b.sign, b.x + b.w / 2, b.y + 32);
-  });
+    // AC units & Roof vents
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(b.x + 30, b.y + 30, 45, 25);
+    ctx.fillRect(b.x + b.w - 80, b.y + 40, 50, 30);
 
-  // 8. Pedestrians
-  pedestrians.forEach(ped => {
+    // Neon Billboard with Glow
     ctx.save();
-    ctx.translate(ped.x, ped.y);
-    const legOffset = Math.sin(ped.walkPhase) * 2;
-    ctx.fillStyle = ped.pantsColor;
-    ctx.fillRect(-2 + legOffset, -2, 2, 4);
-    ctx.fillRect(0 - legOffset, -2, 2, 4);
-    ctx.fillStyle = '#f1f5f9';
-    ctx.fillRect(-3, -6, 6, 4);
-    ctx.fillStyle = '#fed7aa';
-    ctx.beginPath();
-    ctx.arc(0, -8, 2.5, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillStyle = 'rgba(10, 14, 22, 0.95)';
+    ctx.fillRect(b.x + 20, b.y + 15, b.w - 40, 28);
+    ctx.strokeStyle = b.neon || '#f59e0b';
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = b.neon || '#f59e0b';
+    ctx.shadowBlur = 12;
+    ctx.strokeRect(b.x + 20, b.y + 15, b.w - 40, 28);
+
+    ctx.fillStyle = b.neon || '#f59e0b';
+    ctx.font = '800 11px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(b.sign, b.x + b.w / 2, b.y + 33);
     ctx.restore();
   });
 
-  // 9. Traffic & Cops
-  trafficCars.forEach(c => drawCarSprite(c.x, c.y, c.angle, c.color));
-  policeCars.forEach(cop => {
-    drawCarSprite(cop.x, cop.y, cop.angle, '#0f172a');
-    const strobe = Math.sin(cop.strobePhase) > 0;
-    ctx.fillStyle = strobe ? '#ef4444' : '#3b82f6';
-    ctx.fillRect(cop.x - 3, cop.y - 6, 6, 12);
+  // 8. Detailed Pedestrians
+  pedestrians.forEach(ped => {
+    ctx.save();
+    ctx.translate(ped.x, ped.y);
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.beginPath();
+    ctx.ellipse(0, 4, 6, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    const leg = Math.sin(ped.walkPhase) * 3;
+
+    // Legs
+    ctx.fillStyle = ped.pants;
+    ctx.fillRect(-3 + leg, 0, 2.5, 6);
+    ctx.fillRect(1 - leg, 0, 2.5, 6);
+
+    // Torso / Jacket
+    ctx.fillStyle = ped.shirt;
+    ctx.fillRect(-4, -7, 8, 7);
+
+    // Arms with swing
+    ctx.fillStyle = ped.skin;
+    ctx.fillRect(-6 - leg * 0.5, -6, 2, 5);
+    ctx.fillRect(4 + leg * 0.5, -6, 2, 5);
+
+    // Head & Hair
+    ctx.fillStyle = ped.hair;
+    ctx.beginPath();
+    ctx.arc(0, -11, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = ped.skin;
+    ctx.beginPath();
+    ctx.arc(0, -9.5, 2.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
   });
 
-  // 10. Water splashes
+  // 9. Traffic Vehicles (Chassis, Cabin, Glass & Lights)
+  trafficCars.forEach(c => drawDetailedCar(ctx, c.x, c.y, c.angle, c.color, c.width || 46, c.height || 22, false));
+
+  // 10. Police Squad Cars
+  policeCars.forEach(cop => {
+    drawDetailedCar(ctx, cop.x, cop.y, cop.angle, '#0f172a', 48, 24, true);
+    const strobe = Math.sin(cop.strobePhase) > 0;
+    ctx.save();
+    ctx.translate(cop.x, cop.y);
+    ctx.rotate(cop.angle);
+    ctx.fillStyle = strobe ? '#ef4444' : '#3b82f6';
+    ctx.shadowColor = strobe ? '#ef4444' : '#3b82f6';
+    ctx.shadowBlur = 15;
+    ctx.fillRect(-4, -7, 8, 14);
+    ctx.restore();
+  });
+
+  // 11. Water Splashes
   waterSplashes.forEach((sp, idx) => {
     ctx.fillStyle = `rgba(180, 210, 240, ${sp.alpha})`;
     ctx.beginPath();
@@ -798,7 +896,7 @@ function renderWorld() {
     if (sp.alpha <= 0) waterSplashes.splice(idx, 1);
   });
 
-  // 11. Player Car
+  // 12. Player Vehicle with Volumetric Headlights
   ctx.save();
   ctx.translate(player.x, player.y);
   if (state.isDrowning) {
@@ -808,37 +906,63 @@ function renderWorld() {
   }
   ctx.rotate(player.angle);
 
+  // Dynamic Headlights Cone
   if (!state.isDrowning) {
-    const headGrad = ctx.createRadialGradient(22, 0, 10, 100, 0, 130);
-    headGrad.addColorStop(0, 'rgba(255, 250, 235, 0.45)');
-    headGrad.addColorStop(1, 'rgba(255, 250, 235, 0)');
+    const headGrad = ctx.createRadialGradient(24, 0, 10, 120, 0, 140);
+    headGrad.addColorStop(0, 'rgba(255, 245, 210, 0.45)');
+    headGrad.addColorStop(0.5, 'rgba(255, 230, 160, 0.18)');
+    headGrad.addColorStop(1, 'rgba(255, 230, 160, 0)');
     ctx.fillStyle = headGrad;
     ctx.beginPath();
-    ctx.moveTo(22, -8);
-    ctx.lineTo(125, -42);
-    ctx.lineTo(125, 42);
-    ctx.lineTo(22, 8);
+    ctx.moveTo(24, -9);
+    ctx.lineTo(140, -48);
+    ctx.lineTo(140, 48);
+    ctx.lineTo(24, 9);
     ctx.closePath();
     ctx.fill();
   }
 
+  // Shadow
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+  ctx.beginPath();
+  ctx.ellipse(0, 6, player.width * 0.55, player.height * 0.48, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Wheels
+  ctx.fillStyle = '#0a0d14';
+  ctx.fillRect(-18, -player.height / 2 - 2, 10, 4);
+  ctx.fillRect(10, -player.height / 2 - 2, 10, 4);
+  ctx.fillRect(-18, player.height / 2 - 2, 10, 4);
+  ctx.fillRect(10, player.height / 2 - 2, 10, 4);
+
+  // Main Body
   ctx.fillStyle = player.bodyColor;
   ctx.fillRect(-player.width / 2, -player.height / 2, player.width, player.height);
-  ctx.strokeStyle = '#1e293b';
+  ctx.strokeStyle = '#111827';
   ctx.lineWidth = 1.5;
   ctx.strokeRect(-player.width / 2, -player.height / 2, player.width, player.height);
 
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(-4, -6, 8, 12);
-  ctx.fillStyle = '#000';
-  ctx.fillRect(-2, -4, 4, 8);
+  // Roof & Glass Cabin
   ctx.fillStyle = '#0f172a';
-  ctx.fillRect(-6, -player.height / 2 + 2, 16, player.height - 4);
-  ctx.restore();
+  ctx.fillRect(-8, -player.height / 2 + 3, 20, player.height - 6);
+  ctx.fillStyle = '#1e293b';
+  ctx.fillRect(-4, -player.height / 2 + 5, 14, player.height - 10);
+
+  // Headlights
+  ctx.fillStyle = '#fffbeb';
+  ctx.fillRect(player.width / 2 - 3, -player.height / 2 + 2, 3, 5);
+  ctx.fillRect(player.width / 2 - 3, player.height / 2 - 7, 3, 5);
+
+  // Taillights
+  ctx.fillStyle = state.keys.down ? '#ff2222' : '#dc2626';
+  ctx.fillRect(-player.width / 2, -player.height / 2 + 2, 3, 5);
+  ctx.fillRect(-player.width / 2, player.height / 2 - 7, 3, 5);
 
   ctx.restore();
 
-  // Radar & HUD updates
+  ctx.restore();
+
+  // Radar & HUD
   renderRadar();
   const speedEl = document.getElementById('hudSpeed');
   if (speedEl) speedEl.innerText = Math.round(Math.abs(player.speed) * 12);
@@ -871,14 +995,47 @@ function renderWorld() {
   }
 }
 
-function drawCarSprite(x, y, ang, color) {
+function drawDetailedCar(ctx, x, y, ang, color, w, h, isPolice = false) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(ang);
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+  ctx.beginPath();
+  ctx.ellipse(0, 4, w * 0.55, h * 0.45, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Wheels
+  ctx.fillStyle = '#090d16';
+  ctx.fillRect(-w * 0.38, -h * 0.5 - 2, 8, 3.5);
+  ctx.fillRect(w * 0.22, -h * 0.5 - 2, 8, 3.5);
+  ctx.fillRect(-w * 0.38, h * 0.5 - 1.5, 8, 3.5);
+  ctx.fillRect(w * 0.22, h * 0.5 - 1.5, 8, 3.5);
+
+  // Body
   ctx.fillStyle = color;
-  ctx.fillRect(-20, -10, 40, 20);
+  ctx.fillRect(-w / 2, -h / 2, w, h);
+  ctx.strokeStyle = '#0f172a';
+  ctx.lineWidth = 1.2;
+  ctx.strokeRect(-w / 2, -h / 2, w, h);
+
+  // Cabin
   ctx.fillStyle = '#0f172a';
-  ctx.fillRect(-5, -8, 12, 16);
+  ctx.fillRect(-w * 0.18, -h * 0.38, w * 0.42, h * 0.76);
+  ctx.fillStyle = '#1e293b';
+  ctx.fillRect(-w * 0.08, -h * 0.28, w * 0.26, h * 0.56);
+
+  // Headlights
+  ctx.fillStyle = '#fef08a';
+  ctx.fillRect(w / 2 - 2.5, -h / 2 + 2, 2.5, 4);
+  ctx.fillRect(w / 2 - 2.5, h / 2 - 6, 2.5, 4);
+
+  // Taillights
+  ctx.fillStyle = '#dc2626';
+  ctx.fillRect(-w / 2, -h / 2 + 2, 2.5, 4);
+  ctx.fillRect(-w / 2, h / 2 - 6, 2.5, 4);
+
   ctx.restore();
 }
 
@@ -1010,8 +1167,8 @@ function updateGaragePartsUI() {
     const card = document.createElement('div');
     card.className = 'part-card' + (p.found ? ' found' : '');
     card.innerHTML = `
-      <div class=\"part-title\">${p.found ? p.name : '???'}</div>
-      <div class=\"part-bonus\">${p.found ? p.bonus : 'Не найдено'}</div>
+      <div class="part-title">${p.found ? p.name : '???'}</div>
+      <div class="part-bonus">${p.found ? p.bonus : 'Не найдено'}</div>
     `;
     container.appendChild(card);
   });
