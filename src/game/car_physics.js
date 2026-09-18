@@ -66,6 +66,15 @@ export function stepCarPhysics(state,dt,input,physics){
   const distribution=drivetrainDistribution(p.drivetrain,loads);
   const longitudinalCapacity=Math.max(0,finite(p.friction,1)*distribution.drivenLoad/mass);
   const driveAcceleration=clamp(requestedAcceleration,-longitudinalCapacity,longitudinalCapacity);
+  state.driveLimit={
+    requestedForce:requestedAcceleration*mass,
+    force:driveAcceleration*mass,
+    capacity:longitudinalCapacity*mass,
+    drivetrain:distribution.type,
+    frontLoad:loads.front,
+    rearLoad:loads.rear,
+    limited:Math.abs(driveAcceleration-requestedAcceleration)>1e-9
+  };
 
   state.vx+=fx*driveAcceleration*safeDt;
   state.vy+=fy*driveAcceleration*safeDt;
