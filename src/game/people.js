@@ -1,14 +1,124 @@
-import { PED_ASSETS } from './assets.js';
-const wrapAngle=a=>{while(a>Math.PI)a-=Math.PI*2;while(a<-Math.PI)a+=Math.PI*2;return a;};
-export function createPeopleSystem({nodes,blocked,seed=4242}){
- let state=seed>>>0;const people=[],activeNodes=nodes||[];const rand=()=>{state=(state*1664525+1013904223)>>>0;return state/4294967296};const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);const sprite=k=>{const i=new Image();i.src=PED_ASSETS[k];return i};const sprites={civilian:sprite('civilian'),runner:sprite('runner')};
- function sidewalkPoint(a,b,side=1,extra=0){const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,nx=-dy/len,ny=dx/len,offset=49+extra;return{x:a.x+nx*offset*side,y:a.y+ny*offset*side};}
- const validPoint=p=>!!p&&!blocked(p.x,p.y),pickNode=()=>activeNodes.length?activeNodes[(rand()*activeNodes.length)|0]:null;
- function pickNeighbor(n){const links=(n?.links||[]).filter(q=>q&&q!==n);return links.length?links[(rand()*links.length)|0]:null;}
- function makeSegment(from,to,side){for(const extra of [0,-6,7]){const a=sidewalkPoint(from,to,side,extra),b=sidewalkPoint(to,from,side,extra);if(validPoint(a)&&validPoint(b))return[a,b];}return null;}
- function chooseSegment(p,cars=[]){let from=p.node||pickNode(),to=pickNeighbor(from);if(!from||!to){p.state='idle';p.timer=1+rand()*2;return false;}const side=rand()<.5?-1:1,segment=makeSegment(from,to,side);if(!segment){p.node=to;return false;}const[a,b]=segment;if(people.some(q=>q!==p&&dist(q,a)<26)||cars.some(c=>dist(c,a)<58)){p.node=to;return false;}p.node=to;p.target=b;p.path=[a,b];p.waypoint=1;p.a=Math.atan2(b.y-a.y,b.x-a.x);p.timer=5+rand()*8;p.state=rand()<.08?'idle':'walk';if(dist(p,a)>2){p.x=a.x;p.y=a.y;}return true;}
- for(let i=0;i<Math.min(18,activeNodes.length);i++){const n=pickNode(),to=pickNeighbor(n),seg=n&&to?makeSegment(n,to,rand()<.5?-1:1):null;if(!seg)continue;const[a,b]=seg;people.push({x:a.x,y:a.y,a:Math.atan2(b.y-a.y,b.x-a.x),v:15+rand()*7,state:'walk',timer:3+rand()*4,tone:rand(),target:b,node:to,path:seg,waypoint:1,panic:0,stuck:0});}
- function update(dt,player,danger=0,cars=[]){const h=Math.min(Math.max(Number(dt)||0,0),.05);for(const p of people){p.timer-=h;const pd=player?dist(player,p):Infinity,threat=danger>0||cars.some(c=>dist(c,p)<62);if(threat&&pd<230)p.panic=Math.min(1,p.panic+h*2.2);else p.panic=Math.max(0,p.panic-h*.9);if(p.timer<=0||!p.target||dist(p,p.target)<10){if(p.path&&p.waypoint<p.path.length-1)p.waypoint++;else if(!chooseSegment(p,cars))continue;p.target=p.path[p.waypoint]||p.target;}if(p.state==='idle'&&p.panic<.2)continue;let desired=Math.atan2(p.target.y-p.y,p.target.x-p.x);if(p.panic>.2&&player&&pd<230)desired=Math.atan2(p.y-player.y,p.x-player.x);const d=wrapAngle(desired-p.a),turn=1-Math.exp(-9*h);p.a=wrapAngle(p.a+d*turn);const targetSpeed=p.v*(p.panic>.2?1.35:1),nx=p.x+Math.cos(p.a)*targetSpeed*h,ny=p.y+Math.sin(p.a)*targetSpeed*h,nearCar=cars.some(c=>dist(c,{x:nx,y:ny})<40),nearPed=people.some(q=>q!==p&&dist(q,{x:nx,y:ny})<18),nearPlayer=player&&dist(player,{x:nx,y:ny})<30;if(!blocked(nx,ny)&&!nearCar&&!nearPed&&!nearPlayer){p.x=nx;p.y=ny;p.stuck=Math.max(0,p.stuck-h);}else{p.stuck+=h;if(p.panic>.2)p.a=wrapAngle(p.a+1.5*h*(rand()<.5?-1:1));if(p.stuck>.6){p.path=null;p.target=null;p.stuck=0;chooseSegment(p,cars);}}}}
- function draw(ctx,iso){const ordered=[...people].sort((a,b)=>(a.x+a.y)-(b.x+b.y));for(const p of ordered){const q=iso(p.x,p.y),f=iso(p.x+Math.cos(p.a)*8,p.y+Math.sin(p.a)*8),ang=Math.atan2(f.y-q.y,f.x-q.x),image=sprites[p.panic>.2?'runner':'civilian'];ctx.save();ctx.translate(q.x,q.y);ctx.rotate(ang);if(image.complete&&image.naturalWidth)ctx.drawImage(image,-12,-16,24,18);else{ctx.fillStyle='#596068';ctx.beginPath();ctx.arc(0,-8,4,0,Math.PI*2);ctx.fill();ctx.fillRect(-3,-4,6,11);}ctx.restore();}}
- return{people,update,draw};
+import { CITY_ROADS, roadById } from './city_semantics.js';
+import { sidewalkOffset } from './road_geometry.js';
+
+const PEDESTRIAN_COLORS = [
+  { shirt: '#94a3b8', pants: '#1e293b' },
+  { shirt: '#f59e0b', pants: '#334155' },
+  { shirt: '#38bdf8', pants: '#0f172a' },
+  { shirt: '#ef4444', pants: '#1e293b' },
+  { shirt: '#10b981', pants: '#1e293b' }
+];
+
+function randomChoice(arr, rng = Math.random) {
+  return arr[Math.floor(rng() * arr.length)];
+}
+
+export function createPeopleSystem({ count = 28, seed = 101 } = {}) {
+  let seedVal = seed;
+  const rng = () => {
+    seedVal = (seedVal * 9301 + 49297) % 233280;
+    return seedVal / 233280;
+  };
+
+  const people = [];
+  const validRoads = CITY_ROADS.filter(r => Array.isArray(r.points) && r.points.length >= 2);
+
+  function spawnPerson(id) {
+    const road = randomChoice(validRoads, rng);
+    const segIdx = Math.floor(rng() * (road.points.length - 1));
+    const side = rng() > 0.5 ? 1 : -1;
+    const direction = rng() > 0.5 ? 1 : -1;
+    const speed = 12 + rng() * 14;
+    const colors = randomChoice(PEDESTRIAN_COLORS, rng);
+
+    return {
+      id: `ped_${id}`,
+      roadId: road.id,
+      segIdx,
+      t: rng(),
+      side,
+      direction,
+      speed,
+      x: 0,
+      y: 0,
+      animTime: rng() * 10,
+      state: 'WALK',
+      colors
+    };
+  }
+
+  const totalPeople = Math.max(1, count || 28);
+  for (let i = 0; i < totalPeople; i++) {
+    const p = spawnPerson(i);
+    updatePersonPosition(p);
+    people.push(p);
+  }
+
+  function updatePersonPosition(p) {
+    const road = roadById(p.roadId) || validRoads[0];
+    const p1 = road.points[p.segIdx];
+    const p2 = road.points[p.segIdx + 1];
+    if (!p1 || !p2) return;
+
+    const dx = p2[0] - p1[0];
+    const dy = p2[1] - p1[1];
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len;
+    const ny = dx / len;
+    const offset = sidewalkOffset(road) * p.side;
+
+    p.x = p1[0] + dx * p.t + nx * offset;
+    p.y = p1[1] + dy * p.t + ny * offset;
+  }
+
+  function step(dt = 1 / 60) {
+    const safeDt = Math.max(0.001, Math.min(dt, 0.1));
+
+    for (let i = 0; i < people.length; i++) {
+      const p = people[i];
+      const road = roadById(p.roadId) || validRoads[0];
+      if (!road || road.points.length < 2) continue;
+
+      const p1 = road.points[p.segIdx];
+      const p2 = road.points[p.segIdx + 1];
+      if (!p1 || !p2) {
+        p.segIdx = 0;
+        p.t = 0;
+        continue;
+      }
+
+      const dx = p2[0] - p1[0];
+      const dy = p2[1] - p1[1];
+      const segLen = Math.hypot(dx, dy) || 1;
+
+      p.t += (p.speed * p.direction * safeDt) / segLen;
+      p.animTime += safeDt * (p.speed / 10);
+
+      if (p.t >= 1) {
+        p.t = 0;
+        p.segIdx++;
+        if (p.segIdx >= road.points.length - 1) {
+          p.direction = -1;
+          p.segIdx = road.points.length - 2;
+          p.t = 1;
+        }
+      } else if (p.t <= 0) {
+        p.t = 1;
+        p.segIdx--;
+        if (p.segIdx < 0) {
+          p.direction = 1;
+          p.segIdx = 0;
+          p.t = 0;
+        }
+      }
+
+      updatePersonPosition(p);
+    }
+  }
+
+  return {
+    people,
+    step,
+    update: step
+  };
 }
