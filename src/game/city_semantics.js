@@ -19,7 +19,7 @@ export const CITY_ROADS = Object.freeze([
   {id:'PINE_ROUTE',name:'Pine Route',class:ROAD.ARTERIAL,zone:'NORTH_RIDGE',speed:80,lanes:2,oneWay:false,points:[[-120,1240],[-520,1400],[-120,1700],[300,1900],[800,2050]]},
   {id:'NORTH_BRIDGE_ROAD',name:'North Bridge',class:ROAD.AVENUE,zone:'DOWNTOWN',speed:60,lanes:2,oneWay:false,points:[[-120,600],[-320,800],[-120,1240]]}
 
-{id:'WESTERN_BOULEVARD',name:'Western Boulevard',class:ROAD.ARTERIAL,zone:'WEST_SIDE',speed:80,lanes:4,oneWay:false,points:[[-1960,-360],[-2360,-360],[-2760,-180],[-3040,160]]},
+  {id:'WESTERN_BOULEVARD',name:'Western Boulevard',class:ROAD.ARTERIAL,zone:'WEST_SIDE',speed:80,lanes:4,oneWay:false,points:[[-1960,-360],[-2360,-360],[-2760,-180],[-3040,160]]},
   {id:'WEST_RESIDENTIAL',name:'West Residential',class:ROAD.AVENUE,zone:'WEST_SIDE',speed:55,lanes:2,oneWay:false,points:[[-2360,-360],[-2360,160],[-2360,620],[-2080,900]]},
   {id:'SOUTH_RING',name:'South Ring Road',class:ROAD.ARTERIAL,zone:'SOUTH_SIDE',speed:75,lanes:4,oneWay:false,points:[[-1960,80],[-1960,1100],[-1500,1460],[-900,1560]]},
   {id:'SOUTH_MARKET',name:'South Market Road',class:ROAD.STREET,zone:'SOUTH_SIDE',speed:45,lanes:2,oneWay:false,points:[[-120,1240],[-120,1560],[-500,1820],[-900,1560]]},
@@ -29,14 +29,6 @@ export const CITY_ROADS = Object.freeze([
   {id:'NORTH_RESERVOIR',name:'Reservoir Road',class:ROAD.STREET,zone:'NORTH_RIDGE',speed:40,lanes:2,oneWay:false,points:[[-180,2360],[-520,2200],[-720,1880],[-520,1700]]},
 ]);
 
-  {id:'WESTERN_BOULEVARD',name:'Western Boulevard',class:ROAD.ARTERIAL,zone:'WEST_SIDE',speed:80,lanes:4,oneWay:false,points:[[-1960,-360],[-2360,-360],[-2760,-180],[-3040,160]]},
-  {id:'WEST_RESIDENTIAL',name:'West Residential',class:ROAD.AVENUE,zone:'WEST_SIDE',speed:55,lanes:2,oneWay:false,points:[[-2360,-360],[-2360,160],[-2360,620],[-2080,900]]},
-  {id:'SOUTH_RING',name:'South Ring Road',class:ROAD.ARTERIAL,zone:'SOUTH_SIDE',speed:75,lanes:4,oneWay:false,points:[[-1960,80],[-1960,1100],[-1500,1460],[-900,1560]]},
-  {id:'SOUTH_MARKET',name:'South Market Road',class:ROAD.STREET,zone:'SOUTH_SIDE',speed:45,lanes:2,oneWay:false,points:[[-120,1240],[-120,1560],[-500,1820],[-900,1560]]},
-  {id:'HARBOR_EASTERN',name:'Eastern Harbor Road',class:ROAD.ARTERIAL,zone:'IRON_HARBOR',speed:75,lanes:4,oneWay:false,points:[[2100,-900],[2500,-900],[2820,-620],[2820,-100]]},
-  {id:'HARBOR_SOUTH',name:'South Docks Road',class:ROAD.AVENUE,zone:'IRON_HARBOR',speed:55,lanes:2,oneWay:false,points:[[2050,-100],[2400,180],[2820,300]]},
-  {id:'NORTH_RIDGE_LOOP',name:'North Ridge Loop',class:ROAD.ARTERIAL,zone:'NORTH_RIDGE',speed:65,lanes:2,oneWay:false,points:[[800,2050],[1120,2220],[760,2480],[240,2520],[-180,2360]]},
-  {id:'NORTH_RESERVOIR',name:'Reservoir Road',class:ROAD.STREET,zone:'NORTH_RIDGE',speed:40,lanes:2,oneWay:false,points:[[-180,2360],[-520,2200],[-720,1880],[-520,1700]]},
 export const CITY_DISTRICTS = Object.freeze([
   {id:'DOWNTOWN',name:'Downtown',center:{x:-560,y:-180},roadIds:['LOWTOWN_BOULEVARD','RIVER_AVENUE','CENTRAL_AVENUE','EASTERN_AVENUE','MARKET_STREET','CANAL_STREET','HARBOR_LINK','NORTH_BRIDGE_ROAD'],pedestrianDensity:1.35,vehicleDensity:1.2},
   {id:'RESIDENTIAL',name:'Residential',center:{x:-520,y:620},roadIds:['CENTRAL_AVENUE','RIVER_AVENUE','RIDGE_STREET'],pedestrianDensity:1.1,vehicleDensity:.75},
