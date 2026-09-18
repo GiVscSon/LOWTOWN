@@ -1,8 +1,15 @@
 import assert from 'node:assert/strict';
-import { CITY_ROADS, CITY_DISTRICTS, buildCityGraph, shortestRoute, pedestrianRoute, vehicleRoute, vehicleLanePoint, sidewalkPoint } from '../src/game/city_semantics.js';
+import { CITY_ROADS, CITY_DISTRICTS, buildCityGraph, shortestRoute, pedestrianRoute, vehicleRoute, vehicleLanePoint, sidewalkPoint, nearestRoad } from '../src/game/city_semantics.js';
 
 assert.ok(CITY_ROADS.length >= 8, 'city needs named roads');
 assert.ok(CITY_DISTRICTS.length >= 5, 'city needs meaningful districts');
+{
+  const hit=nearestRoad({x:-980,y:-330});
+  assert.equal(hit.road.id,'LOWTOWN_BOULEVARD','nearest road must identify the containing segment');
+  assert.ok(Math.abs(hit.point.x+980)<0.001 && Math.abs(hit.point.y+360)<0.001,'nearest road must project onto the segment, not snap to a vertex');
+  assert.ok(Math.abs(hit.distance-30)<0.001,'nearest road segment distance must be exact');
+  assert.ok(hit.t>0 && hit.t<1,'nearest road result must retain segment interpolation');
+}
 for (const road of CITY_ROADS) {
   assert.ok(road.name && road.id && road.points.length >= 2, `invalid road ${road.id}`);
   assert.ok(road.lanes >= 2 && road.speed > 0, `invalid traffic definition ${road.id}`);
