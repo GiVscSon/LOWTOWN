@@ -4,10 +4,62 @@ import { roadById } from './city_semantics.js';
 import { collisionHalfWidth } from './road_geometry.js';
 import { ROAD_EDGE_TOLERANCE } from './road_authority.js';
 
-function pointInBuilding(x, y, margin = 0) {
+export function pointInBuilding(x, y, margin = 0) {
   return WORLD.buildings.some(([bx, by, bw, bh]) =>
     x > bx - margin && x < bx + bw + margin && y > by - margin && y < by + bh + margin
   );
+}
+
+export function resolveVehicleOverlap(a, b) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const dist = Math.hypot(dx, dy);
+  const minDist = ((a.radius || (a.width ? a.width * 0.7 : 18)) + (b.radius || (b.width ? b.width * 0.7 : 18)));
+
+  if (dist < minDist && dist > 0.001) {
+    const overlap = minDist - dist;
+    const nx = dx / dist;
+    const ny = dy / dist;
+
+    // Push away equally
+    a.x -= nx * overlap * 0.5;
+    a.y -= ny * overlap * 0.5;
+    b.x += nx * overlap * 0.5;
+    b.y += ny * overlap * 0.5;
+
+    // Exchange / dampen velocities
+    if (Number.isFinite(a.v) && Number.isFinite(b.v)) {
+      const avgV = (a.v + b.v) * 0.45;
+      a.v = avgV;
+      b.v = avgV;
+    }
+    return true;
+  }
+  return false;
+}
+
+export function handlePoliceBuildingSlide(cop, dt = 1 / 60) {
+  const margin = 8;
+  if (pointInBuilding(cop.x, cop.y, margin)) {
+    // Slide / push out of nearest building edge
+    for (const [bx, by, bw, bh] of WORLD.buildings) {
+      if (cop.x > bx - margin && cop.x < bx + bw + margin && cop.y > by - margin && cop.y < by + bh + margin) {
+        const leftDist = Math.abs(cop.x - (bx - margin));
+        const rightDist = Math.abs(cop.x - (bx + bw + margin));
+        const topDist = Math.abs(cop.y - (by - margin));
+        const bottomDist = Math.abs(cop.y - (by + bh + margin));
+
+        const min = Math.min(leftDist, rightDist, topDist, bottomDist);
+        if (min === leftDist) cop.x = bx - margin;
+        else if (min === rightDist) cop.x = bx + bw + margin;
+        else if (min === topDist) cop.y = by - margin;
+        else if (min === bottomDist) cop.y = by + bh + margin;
+
+        cop.v = Math.max(0, (cop.v || 0) * 0.4);
+        break;
+      }
+    }
+  }
 }
 
 function nearestRoadHit(x, y, roadLines = []) {
@@ -32,7 +84,7 @@ function footprintPoints(x, y, a, length = 56, width = 28) {
     { x, y },
     { x: x + fx * hl + rx * hw, y: y + fy * hl + ry * hw },
     { x: x + fx * hl - rx * hw, y: y + fy * hl - ry * hw },
-    { x: x - fx * hl + rx * hw, y: y - fy * hl + ry * hw },
+    { x: x - fx * hl + rx * hw, y: y - fy * hl - ry * hw },
     { x: x - fx * hl - rx * hw, y: y - fy * hl - ry * hw }
   ];
 }
