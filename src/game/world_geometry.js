@@ -1,10 +1,14 @@
 import { WORLD } from './world.js';
 import { isLand } from './islands.js';
-import { ROAD_WIDTH } from './road_authority.js';
+import { collisionHalfWidth, nearestRoadSegment } from './road_geometry.js';
 
 export const VEHICLE_RADIUS = 20;
 export const CURB_MARGIN = 6;
-export const ROAD_HALF_WIDTH = ROAD_WIDTH / 2;
+
+// Legacy compatibility adapter. Runtime geometry is owned by road_geometry.js.
+// Keep this module only for older callers while preventing a second road-width
+// or nearest-point implementation from drifting away from the new engine.
+export const ROAD_HALF_WIDTH = 46;
 
 export function pointInBuilding(x, y, margin = 0) {
   return WORLD.buildings.some(([bx, by, bw, bh]) =>
@@ -21,15 +25,18 @@ export function pointBlocked(x, y, margin = VEHICLE_RADIUS) {
 }
 
 export function nearestRoadDistance(x, y, roadLines = []) {
-  let best = Infinity;
-  for (const [a, b] of roadLines) {
-    const dx = b.x - a.x, dy = b.y - a.y;
-    const len2 = dx * dx + dy * dy || 1;
-    const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / len2));
-    const px = a.x + dx * t, py = a.y + dy * t;
-    best = Math.min(best, Math.hypot(x - px, y - py));
+  if (roadLines.length) {
+    let best = Infinity;
+    for (const [a, b] of roadLines) {
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len2 = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / len2));
+      const px = a.x + dx * t, py = a.y + dy * t;
+      best = Math.min(best, Math.hypot(x - px, y - py));
+    }
+    return best;
   }
-  return best;
+  return nearestRoadSegment(x, y)?.distance ?? Infinity;
 }
 
 export function vehicleOnRoad(x, y, roadLines = [], clearance = VEHICLE_RADIUS + CURB_MARGIN) {
