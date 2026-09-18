@@ -3,7 +3,7 @@ import { WORLD } from '../src/game/world.js';
 import { ISLANDS, BRIDGES, isLand } from '../src/game/islands.js';
 import { buildLayeredRoadTopology, layeredRoadSegments, nearestAnyRoadPoint, ROAD_LEVELS } from '../src/game/road_topology.js';
 import { collisionHalfWidth } from '../src/game/road_geometry.js';
-import { roadById } from '../src/game/city_semantics.js';
+import { roadById, shortestRoute } from '../src/game/city_semantics.js';
 
 const nodes = buildLayeredRoadTopology();
 const segments = layeredRoadSegments(nodes);
@@ -61,6 +61,25 @@ for (const bridge of BRIDGES) {
   const startHit = nearestAnyRoadPoint(bridge.a.x, bridge.a.y, nodes);
   const endHit = nearestAnyRoadPoint(bridge.b.x, bridge.b.y, nodes);
   assert.ok(startHit && endHit, `${bridge.id} endpoints must have runtime road context`);
+}
+
+const routeChecks = [
+  ['WEST_SIDE', {x:-2900,y:80}, 'LOWTOWN', {x:-560,y:-360}],
+  ['LOWTOWN', {x:-560,y:-360}, 'IRON_HARBOR', {x:2400,y:-900}],
+  ['LOWTOWN', {x:-120,y:600}, 'NORTH_RIDGE', {x:300,y:1900}],
+  ['NORTH_RIDGE', {x:300,y:1900}, 'SOUTH_SIDE', {x:-900,y:1560}]
+];
+for (const [fromName, from, toName, to] of routeChecks) {
+  const route = shortestRoute(from, to);
+  assert(route.length >= 2, `expanded world route ${fromName} -> ${toName} must be connected`);
+}
+
+const requiredRoads = [
+  'WESTERN_BOULEVARD','WEST_RESIDENTIAL','SOUTH_RING','SOUTH_MARKET',
+  'HARBOR_EASTERN','HARBOR_SOUTH','NORTH_RIDGE_LOOP','NORTH_RESERVOIR'
+];
+for (const id of requiredRoads) {
+  assert.ok(roadById(id), `expanded skeleton road ${id} must exist`);
 }
 
 const boulevard = roadById('LOWTOWN_BOULEVARD');
