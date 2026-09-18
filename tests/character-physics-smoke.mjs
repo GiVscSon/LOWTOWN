@@ -1,16 +1,23 @@
 import assert from 'node:assert/strict';
-import { createCharacterState, stepCharacterPhysics } from '../src/game/character_physics.js';
+import { createPlayerCharacter, PLAYER_MODES } from '../src/game/character_physics.js';
 
-const c=createCharacterState({x:0,y:0,a:0,walkSpeed:34});
-for(let i=0;i<60;i++)stepCharacterPhysics(c,1/60,{x:1,y:0});
-assert(c.x>10,'character must move using character physics');
-assert(Math.hypot(c.vx,c.vy)>1,'character must build walking velocity');
-const before=c.x;
-for(let i=0;i<30;i++)stepCharacterPhysics(c,1/60,{x:0,y:1});
-assert(c.y>1,'character must move in a different direction');
-assert(c.distance>before,'character distance must be independent of transport');
-const blocked=()=>true;
-const stuck=createCharacterState({x:5,y:7});
-stepCharacterPhysics(stuck,1/60,{x:1,y:0},blocked);
-assert.equal(stuck.x,5,'blocked character must not pass obstacle');
-console.log('CHARACTER PHYSICS: PASS WALKING + TURNING + COLLISION + INDEPENDENT STATE');
+const car = { x: 100, y: 100, a: 0 };
+const player = createPlayerCharacter({ x: 100, y: 100, heading: 0 });
+
+assert.equal(player.state.mode, PLAYER_MODES.DRIVING, 'player starts in driving mode');
+
+// Test exit vehicle
+player.toggleVehicle(car);
+assert.equal(player.state.mode, PLAYER_MODES.ON_FOOT, 'player must switch to on-foot mode');
+assert.ok(Math.hypot(player.state.x - car.x, player.state.y - car.y) > 10, 'character must spawn near car door');
+
+// Test on-foot movement
+const startX = player.state.x;
+player.step(1 / 60, { right: true });
+assert.ok(player.state.x > startX, 'character must move right on input');
+
+// Test enter vehicle back
+player.state.cooldown = 0;
+player.toggleVehicle(car);
+assert.equal(player.state.mode, PLAYER_MODES.DRIVING, 'player must return to driving mode when near car');
+console.log('character-physics smoke OK');
