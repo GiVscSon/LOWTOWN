@@ -24,8 +24,13 @@ export function resolveWallContact(state,normalX,normalY,{restitution=.08,fricti
   const nx=finite(normalX),ny=finite(normalY);const nLen=Math.hypot(nx,ny)||1;const nxx=nx/nLen,nyy=ny/nLen;
   const vn=finite(state.vx)*nxx+finite(state.vy)*nyy;
   if(vn>=0)return {hit:false,impulse:0,damage:0};
-  const invMass=1/Math.max(1,finite(state.mass,1000));
-  const rawImpulse=-(1+clamp(finite(restitution,.08),0,1))*vn/invMass,impulse=Math.min(Math.max(0,finite(maxImpulse,120)),rawImpulse);
+  const mass=Math.max(1,finite(state.mass,1000)),invMass=1/mass;
+  const rawImpulse=-(1+clamp(finite(restitution,.08),0,1))*vn/invMass;
+  // maxImpulse is interpreted as a maximum normal delta-v for wall impacts,
+  // then converted to physical impulse. This prevents heavy vehicles from
+  // receiving an almost-zero bounce because of a mass-independent impulse cap.
+  const impulseCap=Math.max(0,finite(maxImpulse,120))*mass;
+  const impulse=Math.min(impulseCap,rawImpulse);
   state.vx+=nxx*impulse*invMass;state.vy+=nyy*impulse*invMass;
   const tx=-nyy,ty=nxx,vt=state.vx*tx+state.vy*ty;
   const tangentScale=clamp(1-finite(friction,.35),0,1);
