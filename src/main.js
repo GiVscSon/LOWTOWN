@@ -1,4 +1,5 @@
 import { createTransportController } from './game/transport_controller.js';
+import { createTransportSystem } from './game/transport.js';
 
 // LOWTOWN // THREE ISLANDS VISUAL OVERHAUL // GTA 2 RETRO-NOIR ENGINE
 // High-detail procedural pedestrian sprites, isometric vehicle chassis, wet road reflections, neon glow & audio
@@ -197,6 +198,7 @@ const player = {
 const playerTransport = createTransportController('sedan', {
   x: player.x, y: player.y, a: player.angle, vx: 0, vy: 0
 });
+const worldTransport = createTransportSystem();
 
 const islands = [
   { id: 'core', name: 'Lowtown Downtown', x: 300, y: 300, w: 2200, h: 2200 },
@@ -560,6 +562,7 @@ function updatePhysics(dt) {
   });
 
   updatePoliceAI(dt);
+  worldTransport.update(dt);
 
   const speedKmh = Math.abs(player.speed) * 0.24;
   player.gear = player.speed < -0.1 ? 'R' : speedKmh < 30 ? 'D1' : speedKmh < 60 ? 'D2' : speedKmh < 95 ? 'D3' : speedKmh < 130 ? 'D4' : 'D5';
@@ -739,6 +742,10 @@ function renderWorld() {
     ctx.stroke();
     ctx.setLineDash([]);
   });
+
+  // 3b. Shared world transport layer: ferries are now simulated by the modular system.
+  // The current Three Islands renderer uses world-space coordinates, so the projection is identity.
+  worldTransport.draw(ctx, p => p, performance.now());
 
   // 4. Tire Skidmarks
   skidmarks.forEach(sm => {
