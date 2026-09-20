@@ -1,3 +1,5 @@
+import { createTransportController } from './game/transport_controller.js';
+
 // LOWTOWN // THREE ISLANDS VISUAL OVERHAUL // GTA 2 RETRO-NOIR ENGINE
 // High-detail procedural pedestrian sprites, isometric vehicle chassis, wet road reflections, neon glow & audio
 
@@ -189,6 +191,12 @@ const player = {
   width: 48, height: 24,
   bodyColor: '#e59d35'
 };
+
+// Unified runtime: keep the richer Three Islands world, but drive the player
+// through the tested modular transport physics used by LOWTOWN's AI/tests.
+const playerTransport = createTransportController('sedan', {
+  x: player.x, y: player.y, a: player.angle, vx: 0, vy: 0
+});
 
 const islands = [
   { id: 'core', name: 'Lowtown Downtown', x: 300, y: 300, w: 2200, h: 2200 },
@@ -404,56 +412,49 @@ function updatePhysics(dt) {
     }
   }
 
-  let maxSpeed = 8.8;
-  let accel = 0.17;
-
-  if (CARPARTS.find(p => p.id === 'turbo')?.found) maxSpeed *= 1.2;
-  if (CARPARTS.find(p => p.id === 'cams')?.found) accel += 0.04;
+  // Modular player physics. The world/collisions below remain authoritative,
+  // while acceleration, steering, grip and handbrake come from transport_controller.
+  const transportState = playerTransport.state;
+  transportState.x = player.x;
+  transportState.y = player.y;
+  transportState.a = player.angle;
+  transportState.vx = player.vx;
+  transportState.vy = player.vy;
+  transportState.v = player.speed;
 
   const isBoosting = state.keys.nitro && state.nitroAmount > 5;
-  if (isBoosting) {
-    maxSpeed *= 1.35;
-    accel *= 1.8;
-    state.nitroAmount = Math.max(0, state.nitroAmount - 0.7);
-  } else if (state.nitroAmount < 100) {
-    state.nitroAmount = Math.min(100, state.nitroAmount + 0.2);
-  }
+  if (isBoosting) state.nitroAmount = Math.max(0, state.nitroAmount - 28 * dt);
+  else if (state.nitroAmount < 100) state.nitroAmount = Math.min(100, state.nitroAmount + 8 * dt);
   const nitroBarEl = document.getElementById('nitroBar');
   if (nitroBarEl) nitroBarEl.style.width = Math.round(state.nitroAmount) + '%';
 
-  if (state.keys.up) {
-    player.speed = Math.min(maxSpeed, player.speed + accel);
-  } else if (state.keys.down) {
-    player.speed = Math.max(-maxSpeed * 0.45, player.speed - accel * 1.3);
-  } else {
-    player.speed *= 0.97;
+  const steer = (state.keys.right ? 1 : 0) - (state.keys.left ? 1 : 0);
+  const throttle = state.keys.up ? 1 : (state.keys.down ? -0.65 : 0);
+  const telemetry = playerTransport.step(dt, {
+    throttle,
+    brake: 0,
+    steer,
+    handbrake: state.keys.handbrake
+  });
+
+  // N2O stays an arcade layer on top of the shared physical kernel.
+  if (isBoosting) {
+    const boost = Math.min(1.22, 1 + 1.6 * dt);
+    transportState.vx *= boost;
+    transportState.vy *= boost;
   }
 
-  let lateralGrip = 0.92;
-  if (state.keys.handbrake) {
-    player.speed *= 0.96;
-    lateralGrip = 0.76;
-  }
+  player.x = transportState.x;
+  player.y = transportState.y;
+  player.angle = transportState.a;
+  player.vx = transportState.vx;
+  player.vy = transportState.vy;
+  player.speed = Number.isFinite(transportState.v) ? transportState.v : telemetry.forwardSpeed;
 
-  if (Math.abs(player.speed) > 2) {
+  if (Math.abs(player.speed) > 70 && state.keys.handbrake) {
     skidmarks.push({ x: player.x, y: player.y, angle: player.angle, alpha: 0.5 });
     if (skidmarks.length > 200) skidmarks.shift();
   }
-
-  if (Math.abs(player.speed) > 0.2) {
-    const dir = player.speed >= 0 ? 1 : -1;
-    const turnSpeed = state.keys.handbrake ? 0.065 : 0.046;
-    if (state.keys.left) player.angle -= turnSpeed * dir;
-    if (state.keys.right) player.angle += turnSpeed * dir;
-  }
-
-  const forwardX = Math.cos(player.angle) * player.speed;
-  const forwardY = Math.sin(player.angle) * player.speed;
-  player.vx = player.vx * lateralGrip + forwardX * (1 - lateralGrip);
-  player.vy = player.vy * lateralGrip + forwardY * (1 - lateralGrip);
-
-  player.x += player.vx;
-  player.y += player.vy;
 
   // Collision: Buildings
   buildings.forEach(b => {
