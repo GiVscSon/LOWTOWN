@@ -90,22 +90,21 @@ function footprintPoints(x, y, a, length = 56, width = 28) {
 }
 
 export function vehicleWorldBlocked(x, y, a, roadLines = [], options = {}) {
-  if (!roadLines.length) return false;
-
   const length = Math.max(30, Number(options.length) || 56);
   const width = Math.max(18, Number(options.width) || 28);
   const buildingMargin = Math.max(0, Number(options.buildingMargin) || 4);
   const rawTolerance = Number(options.roadTolerance);
   const roadTolerance = Number.isFinite(rawTolerance) ? Math.max(0, rawTolerance) : ROAD_EDGE_TOLERANCE;
   const points = footprintPoints(x, y, a, length, width);
-
-  for (const p of points) {
-    if (!isLand(p.x, p.y) || pointInBuilding(p.x, p.y, buildingMargin)) return true;
-  }
-
+  if (!roadLines.length) return points.some(p => !isLand(p.x, p.y));
   const hit = nearestRoadHit(x, y, roadLines);
   if (!hit) return true;
   const road = roadById(hit.roadId);
   const corridor = road ? collisionHalfWidth(road) + roadTolerance : 46 + roadTolerance;
+  const onDrivableRoad = hit.distance <= corridor;
+
+  for (const p of points) {
+    if (!isLand(p.x, p.y) || (!onDrivableRoad && pointInBuilding(p.x, p.y, buildingMargin))) return true;
+  }
   return hit.distance > corridor;
 }

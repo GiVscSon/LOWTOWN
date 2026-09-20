@@ -12,7 +12,7 @@ function randomChoice(arr, rng = Math.random) {
   return arr[Math.floor(rng() * arr.length)];
 }
 
-export function createTrafficSystem({ nodes = [], count = 16, seed = 42 } = {}) {
+export function createTrafficSystem({ nodes = [], count = 12, seed = 42, blocked = () => false } = {}) {
   let seedVal = seed;
   const rng = () => {
     seedVal = (seedVal * 9301 + 49297) % 233280;
@@ -58,7 +58,7 @@ export function createTrafficSystem({ nodes = [], count = 16, seed = 42 } = {}) 
     };
   }
 
-  const totalCars = Math.max(1, count || 16);
+  const totalCars = Math.max(1, count || 12);
   for (let i = 0; i < totalCars; i++) {
     cars.push(spawnCar(i));
   }
@@ -66,8 +66,15 @@ export function createTrafficSystem({ nodes = [], count = 16, seed = 42 } = {}) 
   function step(dt = 1 / 60) {
     const safeDt = Math.max(0.001, Math.min(dt, 0.1));
 
+    // Deterministic separation prevents stacked NPCs without random teleports.
+    for(let i=0;i<cars.length;i++)for(let j=i+1;j<cars.length;j++){
+      const a=cars[i],b=cars[j],dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy),minimum=(a.width+b.width)*.7;
+      if(d<minimum){const nx=d>.001?dx/d:1,ny=d>.001?dy/d:0,push=(minimum-d)/2+.01;a.x-=nx*push;a.y-=ny*push;b.x+=nx*push;b.y+=ny*push;a.v=b.v=0;}
+    }
+
     for (let i = 0; i < cars.length; i++) {
       const car = cars[i];
+      if(blocked(car.x,car.y,car)){car.v=0;car.braking=true;continue;}
       const road = roadById(car.roadId) || validRoads[0];
       if (!road || road.points.length < 2) continue;
 
