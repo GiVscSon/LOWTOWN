@@ -13,7 +13,7 @@ initTopology();
 const overlap=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
 this.report={
   width:WORLD_W,height:WORLD_H,islands:islands.length,bridges:bridges.length,
-  roads:roads.length,buildings:buildings.length,traffic:trafficCars.length,pedestrians:pedestrians.length,
+  roads:roads.length,buildings:buildings.length,traffic:trafficCars.length,pedestrians:pedestrians.length,parks:parkZones.length,
   outOfBounds:[...roads,...buildings].filter(r=>r.x<0||r.y<0||r.x+r.w>WORLD_W||r.y+r.h>WORLD_H).length,
   roadBuildingConflicts:buildings.flatMap((b,buildingIndex)=>roads.map((r,roadIndex)=>({b,r,buildingIndex,roadIndex})).filter(hit=>overlap(hit.b,hit.r))).map(({b,r,buildingIndex,roadIndex})=>({buildingIndex,roadIndex,b,r})),
   bridgeLandfalls:bridges.every(br=>{
@@ -29,8 +29,9 @@ assert.equal(sandbox.report.islands,16);
 assert.equal(sandbox.report.bridges,20);
 assert.ok(sandbox.report.roads>=90);
 assert.ok(sandbox.report.buildings>=220);
-assert.ok(sandbox.report.traffic>=80);
+assert.ok(sandbox.report.traffic>=55);
 assert.ok(sandbox.report.pedestrians>=100);
+assert.ok(sandbox.report.parks>=8);
 assert.equal(sandbox.report.outOfBounds,0);
 assert.equal(sandbox.report.roadBuildingConflicts.length,0);
 assert.equal(sandbox.report.bridgeLandfalls,true);
