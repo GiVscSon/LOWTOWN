@@ -445,6 +445,34 @@ function initUnifiedTraffic() {
   });
 }
 
+
+function installUnifiedTestHooks() {
+  const lead = modularTraffic[0];
+  if (!lead) return;
+  const controller = lead.controller;
+  const ai = lead.ai;
+  window.__LOWTOWN_TRANSPORT = controller;
+  window.__LOWTOWN_AI = ai;
+  window.__LOWTOWN_TEST = {
+    state() {
+      const s = controller.state;
+      const speed = Math.hypot(s.vx || 0, s.vy || 0);
+      return {
+        x: s.x,
+        y: s.y,
+        speed,
+        maxSpeed: controller.physics?.maxForwardSpeed || 0,
+        distance: s.distance || 0,
+        objectiveDistance: Infinity,
+        money: state.cash,
+        missionReward: 0,
+        missionComplete: false,
+        objectiveTrace: []
+      };
+    }
+  };
+}
+
 function updateUnifiedTraffic(dt) {
   for (const car of modularTraffic) {
     const control = car.ai.update(car.controller.state,dt) || {throttle:.4,brake:0,steer:0};
@@ -1421,6 +1449,7 @@ function toggleGarage() {
 window.addEventListener('DOMContentLoaded', () => {
   initTopology();
   initUnifiedTraffic();
+  installUnifiedTestHooks();
   loadProgress();
   setupInputListeners();
   requestAnimationFrame(gameLoop);
