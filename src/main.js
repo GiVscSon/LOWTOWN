@@ -1,3 +1,10 @@
+import { drawArchitecture, drawRoundedJunction } from './game/architecture.js';
+import { velocityForHeading, projectIso, routeInput } from './game/test_drive_core.js';
+import { createDriveLab } from './game/test_drive_lab.js';
+import { resolveContact, resolveScenery } from './game/solid_contacts.js';
+import { coastPath, pointInCoast } from './game/coastline.js';
+import { createFreeRoam, drawTransport } from './game/free_roam.js';
+import './game/test_drive.css';
 // LOWTOWN // THREE ISLANDS VISUAL OVERHAUL // GTA 2 RETRO-NOIR ENGINE
 // High-detail procedural pedestrian sprites, isometric vehicle chassis, wet road reflections, neon glow & audio
 
@@ -133,8 +140,8 @@ const radarCtx = radarCanvas.getContext('2d');
 const fullMapCanvas = document.getElementById('fullMapCanvas');
 const fullMapCtx = fullMapCanvas.getContext('2d');
 
-const WORLD_W = 7400;
-const WORLD_H = 3400;
+const WORLD_W = 10100;
+const WORLD_H = 11700;
 const ROAD_W = 130;
 
 const PALETTE = {
@@ -181,6 +188,7 @@ const state = {
 };
 
 const player = {
+  entityType: 'vehicle',
   x: 1200, y: 1200,
   vx: 0, vy: 0,
   angle: 0, speed: 0,
@@ -193,12 +201,53 @@ const player = {
 const islands = [
   { id: 'core', name: 'Lowtown Downtown', x: 300, y: 300, w: 2200, h: 2200 },
   { id: 'docks', name: 'Ironworks Docks', x: 2850, y: 300, w: 2000, h: 2200 },
-  { id: 'lantern', name: 'Lantern Bay Heights', x: 5200, y: 300, w: 1800, h: 2200 }
+  { id: 'lantern', name: 'Lantern Bay Heights', x: 5200, y: 300, w: 1800, h: 2200 },
+  { id: 'oldmill', name: 'Old Mill Ward', x: 300, y: 3200, w: 2200, h: 2200 },
+  { id: 'redhook', name: 'Red Hook Market', x: 2850, y: 3200, w: 2000, h: 2200 },
+  { id: 'blackwood', name: 'Blackwood Hills', x: 5200, y: 3200, w: 1800, h: 2200 }
+  ,{ id: 'marrow', name: 'Marrow Point', x: 300, y: 6200, w: 2200, h: 2200 }
+  ,{ id: 'southport', name: 'Southport Works', x: 2850, y: 6200, w: 2000, h: 2200 }
+  ,{ id: 'velvet', name: 'Velvet Coast', x: 5200, y: 6200, w: 1800, h: 2200 }
+  ,{ id: 'eastgate', name: 'Eastgate', x: 7350, y: 300, w: 2200, h: 2200 }
+  ,{ id: 'cinder', name: 'Cinder Park', x: 7350, y: 3200, w: 2200, h: 2200 }
+  ,{ id: 'aerodrome', name: 'Kingsway Aerodrome', x: 7350, y: 6200, w: 2200, h: 2200 }
+  ,{ id: 'saints', name: 'All Saints', x: 300, y: 9200, w: 2200, h: 2200 }
+  ,{ id: 'refinery', name: 'Ashcroft Refinery', x: 2850, y: 9200, w: 2000, h: 2200 }
+  ,{ id: 'campus', name: 'Northstar Campus', x: 5200, y: 9200, w: 1800, h: 2200 }
+  ,{ id: 'marina', name: 'Kingsport Marina', x: 7350, y: 9200, w: 2200, h: 2200 }
+];
+
+const expansionDistricts = [
+  { id:'eastgate', x:7350, y:300, w:2200, main:8500, far:9220, signs:['EASTGATE RECORDS','MIDNIGHT DINER'], neon:'#e09a3e', roof:'#26231f' },
+  { id:'cinder', x:7350, y:3200, w:2200, main:8500, far:9220, signs:['CINDER PARK ARENA','CITY BUS DEPOT'], neon:'#d4523a', roof:'#242125' },
+  { id:'aerodrome', x:7350, y:6200, w:2200, main:8500, far:9220, signs:['KINGSWAY TERMINAL','SKYFREIGHT 90'], neon:'#e8b84a', roof:'#20272a' },
+  { id:'saints', x:300, y:9200, w:2200, main:1200, far:2250, signs:['ALL SAINTS HOSPITAL','MEMORIAL ARCADE'], neon:'#9aa0a8', roof:'#272522' },
+  { id:'refinery', x:2850, y:9200, w:2000, main:3850, far:4600, signs:['ASHCROFT OIL','RIVER GAS WORKS'], neon:'#d4523a', roof:'#2a241d' },
+  { id:'campus', x:5200, y:9200, w:1800, main:6200, far:6750, signs:['NORTHSTAR COLLEGE','LOWTOWN LIBRARY'], neon:'#e09a3e', roof:'#22272a' },
+  { id:'marina', x:7350, y:9200, w:2200, main:8500, far:9300, signs:['KINGSPORT MARINA','CASINO MIRAGE'], neon:'#e8b84a', roof:'#24242a' }
 ];
 
 const bridges = [
-  { id: 'b1', x: 2500, y: 1135, w: 350, h: ROAD_W, name: 'Мост Железного Порта' },
-  { id: 'b2', x: 4850, y: 1135, w: 350, h: ROAD_W, name: 'Мост Фонарного Залива' }
+  { id: 'b1', x: 2500, y: 1135, w: 350, h: ROAD_W, dir: 'h', name: 'Мост Железного Порта' },
+  { id: 'b2', x: 4850, y: 1135, w: 350, h: ROAD_W, dir: 'h', name: 'Мост Фонарного Залива' },
+  { id: 'b3', x: 2500, y: 4135, w: 350, h: ROAD_W, dir: 'h', name: 'Мост Красного Крюка' },
+  { id: 'b4', x: 4850, y: 4135, w: 350, h: ROAD_W, dir: 'h', name: 'Мост Чёрного Леса' },
+  { id: 'b5', x: 1200, y: 2500, w: ROAD_W, h: 700, dir: 'v', name: 'Дамба Старой Мельницы' },
+  { id: 'b6', x: 3850, y: 2500, w: ROAD_W, h: 700, dir: 'v', name: 'Портовый Виадук' },
+  { id: 'b7', x: 6200, y: 2500, w: ROAD_W, h: 700, dir: 'v', name: 'Высотная Эстакада' },
+  { id: 'b8', x: 1200, y: 5400, w: ROAD_W, h: 800, dir: 'v', name: 'Дамба Марроу' },
+  { id: 'b9', x: 3850, y: 5400, w: ROAD_W, h: 800, dir: 'v', name: 'Южный Грузовой Мост' },
+  { id: 'b10', x: 6200, y: 5400, w: ROAD_W, h: 800, dir: 'v', name: 'Вельветская Эстакада' }
+  ,{ id: 'b11', x: 7000, y: 1135, w: 350, h: ROAD_W, dir: 'h', name: 'Восточный Мост' }
+  ,{ id: 'b12', x: 7000, y: 4135, w: 350, h: ROAD_W, dir: 'h', name: 'Мост Синдер-Парк' }
+  ,{ id: 'b13', x: 7000, y: 7135, w: 350, h: ROAD_W, dir: 'h', name: 'Аэродромный Мост' }
+  ,{ id: 'b14', x: 1200, y: 8400, w: ROAD_W, h: 800, dir: 'v', name: 'Мемориальная Дамба' }
+  ,{ id: 'b15', x: 3850, y: 8400, w: ROAD_W, h: 800, dir: 'v', name: 'Мост Эшкрофт' }
+  ,{ id: 'b16', x: 6200, y: 8400, w: ROAD_W, h: 800, dir: 'v', name: 'Университетский Мост' }
+  ,{ id: 'b17', x: 8500, y: 8400, w: ROAD_W, h: 800, dir: 'v', name: 'Марина Скайвей' }
+  ,{ id: 'b18', x: 2500, y: 10135, w: 350, h: ROAD_W, dir: 'h', name: 'Мост Всех Святых' }
+  ,{ id: 'b19', x: 4850, y: 10135, w: 350, h: ROAD_W, dir: 'h', name: 'Речной Мост' }
+  ,{ id: 'b20', x: 7000, y: 10135, w: 350, h: ROAD_W, dir: 'h', name: 'Кингспортский Мост' }
 ];
 
 const roads = [];
@@ -210,6 +259,12 @@ const policeCars = [];
 const pedestrians = [];
 const skidmarks = [];
 const waterSplashes = [];
+const streetLights = [];
+const trees = [];
+const parkedCars = [];
+const cranes = [];
+const billboards = [];
+let roam;
 
 const safeSpawnPoints = [
   { x: 1200, y: 1200 },
@@ -217,7 +272,22 @@ const safeSpawnPoints = [
   { x: 2950, y: 1200 },
   { x: 3850, y: 1200 },
   { x: 4800, y: 1200 },
-  { x: 5300, y: 1200 }
+  { x: 5300, y: 1200 },
+  { x: 1200, y: 4200 },
+  { x: 2950, y: 4200 },
+  { x: 3850, y: 4200 },
+  { x: 5300, y: 4200 },
+  { x: 6200, y: 4200 }
+  ,{ x: 1200, y: 7200 }
+  ,{ x: 3850, y: 7200 }
+  ,{ x: 6200, y: 7200 }
+  ,{ x: 8500, y: 1200 }
+  ,{ x: 8500, y: 4200 }
+  ,{ x: 8500, y: 7200 }
+  ,{ x: 1200, y: 10200 }
+  ,{ x: 3850, y: 10200 }
+  ,{ x: 6200, y: 10200 }
+  ,{ x: 8500, y: 10200 }
 ];
 
 function initTopology() {
@@ -228,12 +298,20 @@ function initTopology() {
   trafficCars.length = 0;
   policeCars.length = 0;
   pedestrians.length = 0;
+  streetLights.length = 0;
+  trees.length = 0;
+  parkedCars.length = 0;
+  cranes.length = 0;
+  billboards.length = 0;
 
   // Expressway
   roads.push(
     { x: 450, y: 1135, w: 2050, h: ROAD_W, dir: 'h', name: 'Центральный Проспект' },
     { x: 2850, y: 1135, w: 2000, h: ROAD_W, dir: 'h', name: 'Портовая Магистраль' },
-    { x: 5200, y: 1135, w: 1650, h: ROAD_W, dir: 'h', name: 'Фонарный Бульвар' }
+    { x: 5200, y: 1135, w: 1650, h: ROAD_W, dir: 'h', name: 'Фонарный Бульвар' },
+    { x: 450, y: 4135, w: 2050, h: ROAD_W, dir: 'h', name: 'Южное Кольцо' },
+    { x: 2850, y: 4135, w: 2000, h: ROAD_W, dir: 'h', name: 'Рыночная Магистраль' },
+    { x: 5200, y: 4135, w: 1650, h: ROAD_W, dir: 'h', name: 'Блэквуд Драйв' }
   );
 
   // Downtown
@@ -241,7 +319,7 @@ function initTopology() {
     { x: 450, y: 450, w: 1900, h: ROAD_W, dir: 'h' },
     { x: 450, y: 1850, w: 1900, h: ROAD_W, dir: 'h' },
     { x: 450, y: 450, w: ROAD_W, h: 1530, dir: 'v' },
-    { x: 1200, y: 450, w: ROAD_W, h: 1530, dir: 'v' },
+    { x: 1200, y: 450, w: ROAD_W, h: 2050, dir: 'v' },
     { x: 2000, y: 450, w: ROAD_W, h: 1530, dir: 'v' }
   );
 
@@ -250,7 +328,7 @@ function initTopology() {
     { x: 2950, y: 450, w: 1750, h: ROAD_W, dir: 'h' },
     { x: 2950, y: 1850, w: 1750, h: ROAD_W, dir: 'h' },
     { x: 2950, y: 450, w: ROAD_W, h: 1530, dir: 'v' },
-    { x: 3850, y: 450, w: ROAD_W, h: 1530, dir: 'v' },
+    { x: 3850, y: 450, w: ROAD_W, h: 2050, dir: 'v' },
     { x: 4600, y: 450, w: ROAD_W, h: 1530, dir: 'v' }
   );
 
@@ -259,13 +337,80 @@ function initTopology() {
     { x: 5300, y: 450, w: 1550, h: ROAD_W, dir: 'h' },
     { x: 5300, y: 1850, w: 1550, h: ROAD_W, dir: 'h' },
     { x: 5300, y: 450, w: ROAD_W, h: 1530, dir: 'v' },
-    { x: 6200, y: 450, w: ROAD_W, h: 1530, dir: 'v' }
+    { x: 6200, y: 450, w: ROAD_W, h: 2050, dir: 'v' }
   );
+
+  // Southern city belt
+  roads.push(
+    { x: 450, y: 3350, w: 1900, h: ROAD_W, dir: 'h' },
+    { x: 450, y: 4950, w: 1900, h: ROAD_W, dir: 'h' },
+    { x: 450, y: 3350, w: ROAD_W, h: 1730, dir: 'v' },
+    { x: 1200, y: 3200, w: ROAD_W, h: 2200, dir: 'v' },
+    { x: 2000, y: 3350, w: ROAD_W, h: 1730, dir: 'v' },
+    { x: 2950, y: 3350, w: 1750, h: ROAD_W, dir: 'h' },
+    { x: 2950, y: 4950, w: 1750, h: ROAD_W, dir: 'h' },
+    { x: 2950, y: 3350, w: ROAD_W, h: 1730, dir: 'v' },
+    { x: 3850, y: 3200, w: ROAD_W, h: 2200, dir: 'v' },
+    { x: 4600, y: 3350, w: ROAD_W, h: 1730, dir: 'v' },
+    { x: 5300, y: 3350, w: 1550, h: ROAD_W, dir: 'h' },
+    { x: 5300, y: 4950, w: 1550, h: ROAD_W, dir: 'h' },
+    { x: 5300, y: 3350, w: ROAD_W, h: 1730, dir: 'v' },
+    { x: 6200, y: 3200, w: ROAD_W, h: 2200, dir: 'v' }
+  );
+
+  // Far south expansion: residential peninsula, freight works and coast road.
+  roads.push(
+    { x: 450, y: 6350, w: 1900, h: ROAD_W, dir: 'h' },
+    { x: 450, y: 7135, w: 2050, h: ROAD_W, dir: 'h', name: 'Марроу Авеню' },
+    { x: 450, y: 7950, w: 1900, h: ROAD_W, dir: 'h' },
+    { x: 450, y: 6350, w: ROAD_W, h: 1730, dir: 'v' },
+    { x: 1200, y: 6200, w: ROAD_W, h: 2200, dir: 'v' },
+    { x: 2000, y: 6350, w: ROAD_W, h: 1730, dir: 'v' },
+    { x: 2850, y: 6350, w: 2000, h: ROAD_W, dir: 'h' },
+    { x: 2850, y: 7135, w: 2000, h: ROAD_W, dir: 'h', name: 'Фаундри Роу' },
+    { x: 2850, y: 7950, w: 2000, h: ROAD_W, dir: 'h' },
+    { x: 2950, y: 6350, w: ROAD_W, h: 1730, dir: 'v' },
+    { x: 3850, y: 6200, w: ROAD_W, h: 2200, dir: 'v' },
+    { x: 4600, y: 6350, w: ROAD_W, h: 1730, dir: 'v' },
+    { x: 5200, y: 6350, w: 1650, h: ROAD_W, dir: 'h' },
+    { x: 5200, y: 7135, w: 1650, h: ROAD_W, dir: 'h', name: 'Вельвет Кост Драйв' },
+    { x: 5200, y: 7950, w: 1650, h: ROAD_W, dir: 'h' },
+    { x: 5300, y: 6350, w: ROAD_W, h: 1730, dir: 'v' },
+    { x: 6200, y: 6200, w: ROAD_W, h: 2200, dir: 'v' }
+  );
+
+  // Eastern shore and deep-south metropolitan expansion. The repeated local
+  // grids keep navigation readable while the bridges preserve island identity.
+  for (const baseY of [300, 3200, 6200]) {
+    roads.push(
+      { x: 7450, y: baseY + 150, w: 1900, h: ROAD_W, dir: 'h' },
+      { x: 7450, y: baseY + 835, w: 1900, h: ROAD_W, dir: 'h', name: baseY === 300 ? 'Истгейт Авеню' : baseY === 3200 ? 'Синдер-Парквей' : 'Кингсвей' },
+      { x: 7450, y: baseY + 1550, w: 1900, h: ROAD_W, dir: 'h' },
+      { x: 7450, y: baseY + 150, w: ROAD_W, h: 1530, dir: 'v' },
+      { x: 8500, y: baseY, w: ROAD_W, h: 2200, dir: 'v' },
+      { x: 9220, y: baseY + 150, w: ROAD_W, h: 1530, dir: 'v' }
+    );
+  }
+  for (const column of [{x:300,w:2200,main:1200},{x:2850,w:2000,main:3850},{x:5200,w:1800,main:6200},{x:7350,w:2200,main:8500}]) {
+    roads.push(
+      { x: column.x + 150, y: 9350, w: column.w - 300, h: ROAD_W, dir: 'h' },
+      { x: column.x + 150, y: 10135, w: column.w - 300, h: ROAD_W, dir: 'h', name: 'Саут-Кросс Роуд' },
+      { x: column.x + 150, y: 10950, w: column.w - 300, h: ROAD_W, dir: 'h' },
+      { x: column.x + 150, y: 9350, w: ROAD_W, h: 1730, dir: 'v' },
+      { x: column.main, y: 9200, w: ROAD_W, h: 2200, dir: 'v' },
+      { x: column.x + column.w - 250, y: 9350, w: ROAD_W, h: 1730, dir: 'v' }
+    );
+  }
 
   // Bridges
   bridges.forEach(br => {
-    bridgeRails.push({ x: br.x, y: br.y - 12, w: br.w, h: 14 });
-    bridgeRails.push({ x: br.x, y: br.y + br.h - 2, w: br.w, h: 14 });
+    if (br.dir === 'v') {
+      bridgeRails.push({ x: br.x - 12, y: br.y, w: 14, h: br.h, axis: 'x' });
+      bridgeRails.push({ x: br.x + br.w - 2, y: br.y, w: 14, h: br.h, axis: 'x' });
+    } else {
+      bridgeRails.push({ x: br.x, y: br.y - 12, w: br.w, h: 14, axis: 'y' });
+      bridgeRails.push({ x: br.x, y: br.y + br.h - 2, w: br.w, h: 14, axis: 'y' });
+    }
   });
 
   // Buildings with neon & AC units
@@ -279,15 +424,105 @@ function initTopology() {
     { x: 3130, y: 1320, w: 670, h: 480, sign: '❄️ COLD STORAGE CORP', neon: '#38bdf8', roof: '#1e293c' },
     { x: 4030, y: 1320, w: 520, h: 480, sign: '🚢 PORT AUTHORITY', neon: '#f97316', roof: '#1a2332' },
     { x: 5480, y: 630, w: 670, h: 450, sign: '🏮 LANTERN BAY TAVERN', neon: '#ef4444', roof: '#221f1a' },
-    { x: 5480, y: 1320, w: 670, h: 480, sign: '🌴 OVERLOOK MOTEL', neon: '#a855f7', roof: '#201d18' }
+    { x: 5480, y: 1320, w: 670, h: 480, sign: '🌴 OVERLOOK MOTEL', neon: '#a855f7', roof: '#201d18' },
+    { x: 630, y: 3530, w: 520, h: 520, sign: '🏭 OLD MILL FOUNDRY', neon: '#f97316', roof: '#211b19' },
+    { x: 1380, y: 3530, w: 570, h: 520, sign: '🎱 BLACK DOG BILLIARDS', neon: '#22c55e', roof: '#171f1c' },
+    { x: 630, y: 4310, w: 520, h: 590, sign: '🔧 SOUTH SIDE GARAGE', neon: '#eab308', roof: '#202027' },
+    { x: 1380, y: 4310, w: 570, h: 590, sign: '📻 RADIO LOWTOWN 96.6', neon: '#ec4899', roof: '#211b2b' },
+    { x: 3130, y: 3530, w: 670, h: 520, sign: '🥩 RED HOOK MARKET', neon: '#ef4444', roof: '#231b1c' },
+    { x: 4030, y: 3530, w: 520, h: 520, sign: '🚇 SOUTH TERMINAL', neon: '#38bdf8', roof: '#182333' },
+    { x: 3130, y: 4310, w: 670, h: 590, sign: '📼 VIDEO PALACE', neon: '#a855f7', roof: '#201a2b' },
+    { x: 4030, y: 4310, w: 520, h: 590, sign: '🍜 NIGHT MARKET', neon: '#f59e0b', roof: '#231f19' },
+    { x: 5480, y: 3530, w: 670, h: 520, sign: '🌲 BLACKWOOD LODGE', neon: '#10b981', roof: '#17221d' },
+    { x: 5480, y: 4310, w: 670, h: 590, sign: '📡 CHANNEL 8 TOWER', neon: '#60a5fa', roof: '#1a2130' },
+    { x: 630, y: 6530, w: 520, h: 520, sign: '⚓ MARROW FISH MARKET', neon: '#e8b84a', roof: '#20251f' },
+    { x: 1380, y: 6530, w: 570, h: 520, sign: '🎺 BLUE NOTE SOCIAL', neon: '#d4523a', roof: '#211d20' },
+    { x: 630, y: 7310, w: 520, h: 590, sign: '🏘 SOUTH TENEMENTS', neon: '#9aa0a8', roof: '#24221f' },
+    { x: 1380, y: 7310, w: 570, h: 590, sign: '🥊 MARROW GYM', neon: '#e09a3e', roof: '#211d1a' },
+    { x: 3130, y: 6530, w: 670, h: 520, sign: '🏭 SOUTHPORT STEEL', neon: '#d4523a', roof: '#25221e' },
+    { x: 4030, y: 6530, w: 520, h: 520, sign: '🚂 FREIGHT DEPOT 12', neon: '#e8b84a', roof: '#1e2425' },
+    { x: 3130, y: 7310, w: 670, h: 590, sign: '🛢 MARITIME FUEL', neon: '#e09a3e', roof: '#24201b' },
+    { x: 4030, y: 7310, w: 520, h: 590, sign: '🔩 UNION MACHINE', neon: '#9aa0a8', roof: '#1f2324' },
+    { x: 5480, y: 6530, w: 670, h: 520, sign: '🎭 VELVET THEATRE', neon: '#d4523a', roof: '#241d22' },
+    { x: 5480, y: 7310, w: 670, h: 590, sign: '🌊 COASTLINE HOTEL', neon: '#e8b84a', roof: '#202429' }
   );
 
+  for (const district of expansionDistricts) {
+    const upper = district.y + 330;
+    const lower = district.y === 9200 ? district.y + 1110 : district.y + 1010;
+    const lowerH = district.y === 9200 ? 560 : 480;
+    const left = district.x + 330, right = district.main + 180;
+    const leftW = Math.min(620, district.main - left - 60), rightW = Math.min(620, district.far - right - 60);
+    buildings.push(
+      { x:left, y:upper, w:leftW, h:500, sign:district.signs[0], neon:district.neon, roof:district.roof },
+      { x:right, y:upper, w:rightW, h:500, sign:district.signs[1], neon:district.neon, roof:district.roof },
+      { x:left, y:lower, w:leftW, h:lowerH, sign:'APARTMENTS', neon:'#9aa0a8', roof:district.roof },
+      { x:right, y:lower, w:rightW, h:lowerH, sign:'NIGHT SERVICES', neon:'#bba77c', roof:district.roof }
+    );
+  }
+
+  // Separate street-front properties with driveable service alleys.
+  const blocks = buildings.splice(0);
+  blocks.forEach((block, blockIndex) => {
+    const gap = 76;
+    const bw = (block.w - gap) / 2, bh = (block.h - gap) / 2;
+    for (let row = 0; row < 2; row++) for (let col = 0; col < 2; col++) {
+      buildings.push({ ...block, x: block.x + col * (bw + gap), y: block.y + row * (bh + gap), w: bw, h: bh,
+        sign: row === 0 && col === 0 ? block.sign.replace(/[^\x20-\x7E]/g, '').trim() : ['APARTMENTS', 'REPAIR SHOP', 'GROCERY', 'WAREHOUSE'][(blockIndex + row + col) % 4],
+        neon: ['#e09a3e', '#bba77c', '#9aa0a8', '#d4523a'][blockIndex % 4] });
+    }
+    trees.push({ x: block.x + bw + gap / 2, y: block.y - 28, size: 23 });
+  });
+
   // Props
-  const hydrants = [{ x: 430, y: 1115 }, { x: 1180, y: 1115 }, { x: 1980, y: 1115 }, { x: 2930, y: 1115 }, { x: 3830, y: 1115 }, { x: 5280, y: 1115 }];
+  const hydrants = [{ x: 430, y: 1115 }, { x: 1180, y: 1115 }, { x: 1980, y: 1115 }, { x: 2930, y: 1115 }, { x: 3830, y: 1115 }, { x: 5280, y: 1115 }, { x: 430, y: 4115 }, { x: 1980, y: 4115 }, { x: 3830, y: 4115 }, { x: 5280, y: 4115 }];
   hydrants.forEach(h => breakableProps.push({ x: h.x, y: h.y, type: 'hydrant', intact: true, w: 14, h: 14 }));
 
-  const dumpsters = [{ x: 620, y: 1100 }, { x: 1370, y: 1100 }, { x: 3120, y: 1100 }, { x: 5470, y: 1100 }];
+  const dumpsters = [{ x: 620, y: 1100 }, { x: 1370, y: 1100 }, { x: 3120, y: 1100 }, { x: 5470, y: 1100 }, { x: 620, y: 4100 }, { x: 3120, y: 4100 }, { x: 5470, y: 4100 }];
   dumpsters.forEach(d => breakableProps.push({ x: d.x, y: d.y, type: 'dumpster', intact: true, w: 26, h: 18 }));
+
+  // District scenery: sodium lamps, parked cars, trees, cranes and billboards.
+  for (let x = 520; x <= WORLD_W - 520; x += 320) {
+    streetLights.push({ x, y: 1110, tone: '#e09a3e' }, { x, y: 4290, tone: '#e8b84a' }, { x, y: 7110, tone: '#e09a3e' }, { x, y: 10110, tone: '#e8b84a' });
+  }
+  for (const y of [700, 1000, 1500, 1760, 3600, 3920, 4520, 4820]) {
+    trees.push({ x: 5255, y, size: 18 + (y % 3) * 3 }, { x: 6765, y: y + 35, size: 20 + (y % 4) * 2 });
+  }
+  const parkedPalette = ['#7c2d12', '#1e3a5f', '#4b5563', '#7f1d1d', '#713f12', '#0f766e'];
+  for (let i = 0; i < 24; i++) {
+    const south = i >= 12;
+    const row = i % 12;
+    parkedCars.push({
+      x: [710, 880, 1450, 1660, 3190, 3410, 4100, 4320, 5540, 5750, 5910, 6050][row], y: south ? 4095 : 1095,
+      angle: 0, width: 40, height: 19, color: parkedPalette[i % parkedPalette.length]
+    });
+  }
+  cranes.push(
+    { x: 3260, y: 700, reach: 180 }, { x: 4320, y: 760, reach: -170 },
+    { x: 3300, y: 4450, reach: 190 }, { x: 4420, y: 4550, reach: -160 },
+    { x: 3000, y: 1720, reach: 150 }, { x: 4650, y: 1650, reach: -145 },
+    { x: 3260, y: 6660, reach: 205 }, { x: 4380, y: 7460, reach: -180 }
+  );
+  billboards.push(
+    { x: 980, y: 1050, text: 'LOWTOWN FM', color: '#ec4899' },
+    { x: 1720, y: 1050, text: 'MIDNIGHT OIL', color: '#f59e0b' },
+    { x: 3520, y: 1050, text: 'IRONWORKS', color: '#38bdf8' },
+    { x: 5860, y: 1050, text: 'LANTERN BAY', color: '#ef4444' },
+    { x: 970, y: 4050, text: 'OLD MILL', color: '#f97316' },
+    { x: 3520, y: 4050, text: 'RED HOOK', color: '#dc2626' },
+    { x: 5850, y: 4050, text: 'BLACKWOOD', color: '#22c55e' },
+    { x: 6400, y: 4850, text: 'CHANNEL 8', color: '#60a5fa' },
+    { x: 980, y: 7050, text: 'MARROW POINT', color: '#e8b84a' },
+    { x: 3520, y: 7050, text: 'SOUTHPORT', color: '#d4523a' },
+    { x: 5850, y: 7050, text: 'VELVET COAST', color: '#e09a3e' }
+    ,{ x: 8520, y: 1050, text: 'EASTGATE', color: '#e09a3e' }
+    ,{ x: 8520, y: 4050, text: 'CINDER PARK', color: '#d4523a' }
+    ,{ x: 8520, y: 7050, text: 'KINGSWAY', color: '#e8b84a' }
+    ,{ x: 980, y: 10050, text: 'ALL SAINTS', color: '#9aa0a8' }
+    ,{ x: 3520, y: 10050, text: 'ASHCROFT', color: '#d4523a' }
+    ,{ x: 5850, y: 10050, text: 'NORTHSTAR', color: '#e09a3e' }
+    ,{ x: 8520, y: 10050, text: 'KINGSPORT', color: '#e8b84a' }
+  );
 
   // Diverse Traffic Roster (Sedans, Taxis, Vans)
   const carTypes = [
@@ -313,6 +548,64 @@ function initTopology() {
       height: model.h,
       minX: 450,
       maxX: 6850
+    });
+  }
+  for (let i = 0; i < 14; i++) {
+    const isEast = i % 2 === 0;
+    const model = carTypes[(i + 2) % carTypes.length];
+    trafficCars.push({
+      x: 520 + i * 455,
+      y: isEast ? 4165 : 4205,
+      angle: isEast ? 0 : Math.PI,
+      speed: (isEast ? 1 : -1) * (1.9 + Math.random() * 0.6),
+      color: model.color, type: model.type, width: model.w, height: model.h,
+      axis: 'x', minX: 450, maxX: 6850
+    });
+  }
+  for (let i = 0; i < 16; i++) {
+    const isEast = i % 2 === 0;
+    const model = carTypes[(i + 4) % carTypes.length];
+    trafficCars.push({
+      x: 520 + i * 410, y: isEast ? 7165 : 7205,
+      angle: isEast ? 0 : Math.PI,
+      speed: (isEast ? 1 : -1) * (1.8 + Math.random() * 0.55),
+      color: model.color, type: model.type, width: model.w, height: model.h,
+      axis: 'x', minX: 450, maxX: 6850
+    });
+  }
+  [1200, 3850, 6200].forEach((x, lane) => {
+    for (let i = 0; i < 4; i++) {
+      const isSouth = i % 2 === 0;
+      const model = carTypes[(lane * 2 + i) % carTypes.length];
+      trafficCars.push({
+        x: x + (isSouth ? 32 : 88), y: 700 + i * 1050,
+        angle: isSouth ? Math.PI / 2 : -Math.PI / 2,
+        speed: (isSouth ? 1 : -1) * (1.6 + Math.random() * 0.5),
+        color: model.color, type: model.type, width: model.w, height: model.h,
+        axis: 'y', minY: 450, maxY: 5250
+      });
+    }
+  });
+  for (let i = 0; i < 18; i++) {
+    const isEast = i % 2 === 0;
+    const model = carTypes[(i + 1) % carTypes.length];
+    trafficCars.push({
+      x: 520 + i * 515, y: isEast ? 10165 : 10205,
+      angle: isEast ? 0 : Math.PI,
+      speed: (isEast ? 1 : -1) * (1.8 + Math.random() * 0.5),
+      color: model.color, type: model.type, width: model.w, height: model.h,
+      axis: 'x', minX: 450, maxX: 9350
+    });
+  }
+  for (let i = 0; i < 8; i++) {
+    const isSouth = i % 2 === 0;
+    const model = carTypes[(i + 3) % carTypes.length];
+    trafficCars.push({
+      x: 8500 + (isSouth ? 32 : 88), y: 650 + i * 1320,
+      angle: isSouth ? Math.PI / 2 : -Math.PI / 2,
+      speed: (isSouth ? 1 : -1) * (1.65 + Math.random() * 0.45),
+      color: model.color, type: model.type, width: model.w, height: model.h,
+      axis: 'y', minY: 450, maxY: 11100
     });
   }
 
@@ -341,11 +634,40 @@ function initTopology() {
       fleeTimer: 0
     });
   }
+  for (let i = 0; i < 24; i++) {
+    const style = pedStyles[(i + 3) % pedStyles.length];
+    pedestrians.push({
+      x: 500 + i * 265,
+      y: 4120 + (i % 2 === 0 ? -16 : ROAD_W + 16),
+      vx: (Math.random() - 0.5) * 0.9, vy: 0,
+      minX: 450, maxX: 6850,
+      shirt: style.shirt, pants: style.pants, hair: style.hair, skin: style.skin,
+      walkPhase: Math.random() * Math.PI * 2, fleeTimer: 0
+    });
+  }
+  for (let i = 0; i < 24; i++) {
+    const style = pedStyles[(i + 2) % pedStyles.length];
+    pedestrians.push({
+      x: 500 + i * 265, y: 7120 + (i % 2 === 0 ? -16 : ROAD_W + 16),
+      vx: (Math.random() - 0.5) * 0.85, vy: 0, minX: 450, maxX: 6850,
+      shirt: style.shirt, pants: style.pants, hair: style.hair, skin: style.skin,
+      walkPhase: Math.random() * Math.PI * 2, fleeTimer: 0
+    });
+  }
+  for (let i = 0; i < 32; i++) {
+    const style = pedStyles[(i + 1) % pedStyles.length];
+    pedestrians.push({
+      x: 520 + i * 285, y: 10120 + (i % 2 === 0 ? -16 : ROAD_W + 16),
+      vx: (Math.random() - 0.5) * 0.85, vy: 0, minX: 450, maxX: 9350,
+      shirt: style.shirt, pants: style.pants, hair: style.hair, skin: style.skin,
+      walkPhase: Math.random() * Math.PI * 2, fleeTimer: 0
+    });
+  }
 }
 
 function isPositionOnSolidGround(x, y) {
   for (let isl of islands) {
-    if (x >= isl.x && x <= isl.x + isl.w && y >= isl.y && y <= isl.y + isl.h) return true;
+    if (pointInCoast(x, y, isl)) return true;
   }
   for (let br of bridges) {
     if (x >= br.x - 10 && x <= br.x + br.w + 10 && y >= br.y - 12 && y <= br.y + br.h + 12) return true;
@@ -360,6 +682,9 @@ function updatePhysics(dt) {
   }
 
   if (state.invulnTimer > 0) state.invulnTimer--;
+
+  const specialMovement = roam?.step(state.keys, dt);
+  if (!specialMovement) {
 
   const onGround = isPositionOnSolidGround(player.x, player.y);
 
@@ -404,7 +729,7 @@ function updatePhysics(dt) {
     }
   }
 
-  let maxSpeed = 8.8;
+  let maxSpeed = roam?.profile?.max || 8.8;
   let accel = 0.17;
 
   if (CARPARTS.find(p => p.id === 'turbo')?.found) maxSpeed *= 1.2;
@@ -424,12 +749,16 @@ function updatePhysics(dt) {
   if (state.keys.up) {
     player.speed = Math.min(maxSpeed, player.speed + accel);
   } else if (state.keys.down) {
-    player.speed = Math.max(-maxSpeed * 0.45, player.speed - accel * 1.3);
+    // Brake to a clean stop before engaging reverse. This removes the
+    // sideways lurch caused by flipping direction with lateral inertia.
+    if (player.speed > 0.18) player.speed = Math.max(0, player.speed - accel * 2.55);
+    else player.speed = Math.max(-maxSpeed * 0.38, player.speed - accel * 0.82);
   } else {
-    player.speed *= 0.97;
+    player.speed *= 0.965;
+    if (Math.abs(player.speed) < 0.025) player.speed = 0;
   }
 
-  let lateralGrip = 0.92;
+  let lateralGrip = 0.18;
   if (state.keys.handbrake) {
     player.speed *= 0.96;
     lateralGrip = 0.76;
@@ -440,22 +769,27 @@ function updatePhysics(dt) {
     if (skidmarks.length > 200) skidmarks.shift();
   }
 
-  if (Math.abs(player.speed) > 0.2) {
+  if (Math.abs(player.speed) > 0.12) {
     const dir = player.speed >= 0 ? 1 : -1;
-    const turnSpeed = state.keys.handbrake ? 0.065 : 0.046;
+    const steeringAuthority = Math.min(1, 0.28 + Math.abs(player.speed) / 3.2);
+    const turnSpeed = (state.keys.handbrake ? 0.063 : 0.044) * steeringAuthority;
     if (state.keys.left) player.angle -= turnSpeed * dir;
     if (state.keys.right) player.angle += turnSpeed * dir;
   }
 
-  const forwardX = Math.cos(player.angle) * player.speed;
-  const forwardY = Math.sin(player.angle) * player.speed;
-  player.vx = player.vx * lateralGrip + forwardX * (1 - lateralGrip);
-  player.vy = player.vy * lateralGrip + forwardY * (1 - lateralGrip);
+  Object.assign(player, velocityForHeading(player, lateralGrip));
 
   player.x += player.vx;
   player.y += player.vy;
 
-  // Collision: Buildings
+  // Full oriented body, not just the vehicle centre, meets solid geometry.
+  const impactSpeed = Math.abs(player.speed);
+  if (resolveScenery(player, buildings, trees) && impactSpeed > 3 && state.invulnTimer === 0) {
+    player.hp = Math.max(0, player.hp - 5);
+    state.invulnTimer = 24;
+    sound.playImpact();
+  }
+  /* Legacy point contacts superseded by chassis contacts.
   buildings.forEach(b => {
     const pad = 16;
     if (player.x > b.x - pad && player.x < b.x + b.w + pad &&
@@ -479,14 +813,21 @@ function updatePhysics(dt) {
     }
   });
 
+  */
   // Collision: Bridge rails
   bridgeRails.forEach(br => {
     const pad = 12;
     if (player.x > br.x - pad && player.x < br.x + br.w + pad &&
         player.y > br.y - pad && player.y < br.y + br.h + pad) {
-      const cy = br.y + br.h / 2;
-      player.y = player.y > cy ? br.y + br.h + pad : br.y - pad;
-      player.vy = 0;
+      if (br.axis === 'x') {
+        const cx = br.x + br.w / 2;
+        player.x = player.x > cx ? br.x + br.w + pad : br.x - pad;
+        player.vx = 0;
+      } else {
+        const cy = br.y + br.h / 2;
+        player.y = player.y > cy ? br.y + br.h + pad : br.y - pad;
+        player.vy = 0;
+      }
       player.speed *= 0.9;
     }
   });
@@ -522,15 +863,29 @@ function updatePhysics(dt) {
     }
   });
 
+  }
   // Traffic update
   trafficCars.forEach(c => {
-    c.x += c.speed;
-    if (c.speed > 0 && c.x > c.maxX) c.x = c.minX;
-    if (c.speed < 0 && c.x < c.minX) c.x = c.maxX;
-    if (Math.hypot(c.x - player.x, c.y - player.y) < 34) {
-      player.speed *= 0.5;
+    if (c.cruiseSpeed === undefined) c.cruiseSpeed = c.speed;
+    const axis = c.axis === 'y' ? 'y' : 'x';
+    const cross = axis === 'x' ? 'y' : 'x';
+    const direction = Math.sign(c.cruiseSpeed);
+    const obstacle = [player, ...trafficCars, ...parkedCars].some(other => other !== c &&
+      Math.abs(other[cross] - c[cross]) < 27 && (other[axis] - c[axis]) * direction > 0 && (other[axis] - c[axis]) * direction < 90);
+    c.speed += ((obstacle ? 0 : c.cruiseSpeed) - c.speed) * 0.08;
+    if (c.axis === 'y') {
+      c.y += c.speed;
+      if (c.speed > 0 && c.y > c.maxY) c.y = c.minY;
+      if (c.speed < 0 && c.y < c.minY) c.y = c.maxY;
+    } else {
+      c.x += c.speed;
+      if (c.speed > 0 && c.x > c.maxX) c.x = c.minX;
+      if (c.speed < 0 && c.x < c.minX) c.x = c.maxX;
+    }
+    if (!roam?.special && resolveContact(player, c)) {
       if (state.invulnTimer === 0) {
         player.hp = Math.max(0, player.hp - 8);
+        state.invulnTimer = 24;
         sound.playImpact();
         if (state.wanted === 0) setWanted(1);
       }
@@ -541,7 +896,7 @@ function updatePhysics(dt) {
   pedestrians.forEach(p => {
     p.x += p.vx;
     p.walkPhase += 0.08;
-    if (p.x < 450 || p.x > 6850) p.vx *= -1;
+    if (p.x < (p.minX ?? 450) || p.x > (p.maxX ?? 6850)) p.vx *= -1;
 
     const d = Math.hypot(p.x - player.x, p.y - player.y);
     if (d < 120 && Math.abs(player.speed) > 3) {
@@ -558,16 +913,35 @@ function updatePhysics(dt) {
     }
   });
 
-  updatePoliceAI(dt);
+  if (!roam?.special) updatePoliceAI(dt);
+  const vehicles = [...(!roam?.special ? [player] : []), ...trafficCars, ...policeCars];
+  // Repeated projection handles simultaneous wall/car contacts at intersections.
+  for (let pass = 0; pass < 3; pass++) {
+    for (let i = 0; i < vehicles.length; i++) {
+      for (let j = i + 1; j < vehicles.length; j++) resolveContact(vehicles[i], vehicles[j]);
+      for (const parked of parkedCars) resolveContact(vehicles[i], parked, true);
+      for (const vehicle of roam?.fleet || []) if (vehicle.kind !== 'water') resolveContact(vehicles[i],vehicle,true);
+      resolveScenery(vehicles[i], buildings, trees);
+    }
+  }
+  roam?.contacts();
 
   const speedKmh = Math.abs(player.speed) * 12;
-  player.gear = player.speed < -0.1 ? 'R' : speedKmh < 30 ? 'D1' : speedKmh < 60 ? 'D2' : speedKmh < 95 ? 'D3' : speedKmh < 130 ? 'D4' : 'D5';
+  if (!roam?.special) player.gear = player.speed < -0.1 ? 'R' : speedKmh < 30 ? 'D1' : speedKmh < 60 ? 'D2' : speedKmh < 95 ? 'D3' : speedKmh < 130 ? 'D4' : 'D5';
   player.rpm = Math.min(1.0, (speedKmh % 35) / 35 + 0.2);
   sound.update(player.rpm, player.speed);
 
   const distEl = document.getElementById('hudDistrict');
   if (distEl) {
-    if (player.x > 5000) distEl.innerText = 'LANTERN BAY HEIGHTS';
+    const farSouth = player.y > 5950;
+    const south = player.y > 2850;
+    if (farSouth && player.x > 5000) distEl.innerText = 'VELVET COAST';
+    else if (farSouth && player.x > 2700) distEl.innerText = 'SOUTHPORT WORKS';
+    else if (farSouth) distEl.innerText = 'MARROW POINT';
+    else if (south && player.x > 5000) distEl.innerText = 'BLACKWOOD HILLS';
+    else if (south && player.x > 2700) distEl.innerText = 'RED HOOK MARKET';
+    else if (south) distEl.innerText = 'OLD MILL WARD';
+    else if (player.x > 5000) distEl.innerText = 'LANTERN BAY HEIGHTS';
     else if (player.x > 2700) distEl.innerText = 'IRONWORKS DOCKS';
     else distEl.innerText = 'LOWTOWN DOWNTOWN';
   }
@@ -578,6 +952,131 @@ function setWanted(lvl) {
   state.evading = false;
   state.evadeTimer = 5.0;
   if (state.wanted > 0) showToast(`🚨 УРОВЕНЬ РОЗЫСКА: ★ x ${state.wanted}!`);
+}
+
+function stableVisualHash(a, b, c = 0) {
+  const value = Math.sin(a * 12.9898 + b * 78.233 + c * 37.719) * 43758.5453;
+  return value - Math.floor(value);
+}
+
+function drawBuilding(b,index) { drawArchitecture(ctx,b,index); }
+function drawCityScenery() {
+  // Parking bays and stationary cars make blocks feel inhabited.
+  parkedCars.forEach((car, index) => {
+    ctx.save(); ctx.translate(car.x, car.y); ctx.rotate(car.angle);
+    ctx.strokeStyle = 'rgba(210, 215, 220, 0.22)'; ctx.lineWidth = 2;
+    ctx.strokeRect(-34, -18, 68, 36);
+    drawDetailedCar(ctx, 0, 0, 0, car.color, 40, 19, false);
+    if (index % 4 === 0) { ctx.fillStyle = 'rgba(0,0,0,.38)'; ctx.fillRect(-46, 23, 92, 7); }
+    ctx.restore();
+  });
+
+  trees.forEach((tree, index) => {
+    ctx.fillStyle = 'rgba(0,0,0,.45)';
+    ctx.beginPath(); ctx.ellipse(tree.x + 8, tree.y + 8, tree.size, tree.size * .65, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#412d20'; ctx.fillRect(tree.x - 3, tree.y - 2, 6, 18);
+    ctx.fillStyle = index % 3 === 0 ? '#183f30' : '#1d4b36';
+    ctx.beginPath(); ctx.arc(tree.x, tree.y - 8, tree.size, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2f6a46';
+    ctx.beginPath(); ctx.arc(tree.x - tree.size * .3, tree.y - tree.size * .45, tree.size * .55, 0, Math.PI * 2); ctx.fill();
+    for (let leaf = 0; leaf < 9; leaf++) {
+      const angle = leaf * 2.4, radius = tree.size * .58;
+      ctx.fillStyle = ['#31553b', '#426548', '#274833'][leaf % 3];
+      ctx.beginPath(); ctx.arc(tree.x + Math.cos(angle) * radius, tree.y - 8 + Math.sin(angle) * radius, tree.size * .32, 0, Math.PI * 2); ctx.fill();
+    }
+  });
+
+  cranes.forEach((crane, index) => {
+    const boomY = crane.y - 150;
+    ctx.strokeStyle = index % 2 ? '#a86528' : '#c48632'; ctx.lineWidth = 11;
+    ctx.beginPath(); ctx.moveTo(crane.x, crane.y); ctx.lineTo(crane.x, boomY); ctx.lineTo(crane.x + crane.reach, boomY); ctx.stroke();
+    ctx.strokeStyle = '#6c401f'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(crane.x, boomY); ctx.lineTo(crane.x + crane.reach * .75, crane.y - 35); ctx.stroke();
+    const hookX = crane.x + crane.reach * .82;
+    ctx.beginPath(); ctx.moveTo(hookX, boomY); ctx.lineTo(hookX, boomY + 95); ctx.stroke();
+    ctx.fillStyle = '#111820'; ctx.fillRect(hookX - 9, boomY + 92, 18, 12);
+  });
+
+  billboards.forEach(board => {
+    ctx.fillStyle = '#070a0f'; ctx.fillRect(board.x - 72, board.y - 30, 144, 52);
+    ctx.strokeStyle = board.color; ctx.lineWidth = 3; ctx.shadowColor = board.color; ctx.shadowBlur = 14;
+    ctx.strokeRect(board.x - 72, board.y - 30, 144, 52);
+    ctx.fillStyle = board.color; ctx.font = '900 13px Inter, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(board.text, board.x, board.y + 2); ctx.shadowBlur = 0;
+    ctx.fillStyle = '#303846'; ctx.fillRect(board.x - 4, board.y + 22, 8, 38);
+  });
+
+  streetLights.forEach((lamp, index) => {
+    const glow = ctx.createRadialGradient(lamp.x, lamp.y, 2, lamp.x, lamp.y, 62);
+    glow.addColorStop(0, 'rgba(232,184,74,.28)'); glow.addColorStop(1, 'rgba(232,184,74,0)');
+    ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(lamp.x, lamp.y, 62, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#4b5563'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(lamp.x, lamp.y + 8); ctx.lineTo(lamp.x, lamp.y - 34); ctx.lineTo(lamp.x + (index % 2 ? -11 : 11), lamp.y - 34); ctx.stroke();
+    ctx.fillStyle = lamp.tone; ctx.shadowColor = lamp.tone; ctx.shadowBlur = 13;
+    ctx.beginPath(); ctx.arc(lamp.x + (index % 2 ? -11 : 11), lamp.y - 32, 5, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+  });
+}
+
+function drawDistrictGroundDetails() {
+  // Parks, plazas, service yards and wet reflections break up the block grid
+  // without changing the city's collision geometry.
+  const parks = [
+    { x: 640, y: 650, w: 475, h: 405, tone: '#243229' },
+    { x: 5510, y: 655, w: 600, h: 390, tone: '#27362c' },
+    { x: 5500, y: 3555, w: 610, h: 455, tone: '#213127' },
+    { x: 650, y: 6550, w: 465, h: 455, tone: '#27312a' },
+    { x: 5500, y: 7350, w: 610, h: 500, tone: '#243029' }
+  ];
+  for (const [i, park] of parks.entries()) {
+    ctx.fillStyle = park.tone; ctx.fillRect(park.x, park.y, park.w, park.h);
+    ctx.strokeStyle = 'rgba(154,160,168,.22)'; ctx.lineWidth = 5; ctx.strokeRect(park.x, park.y, park.w, park.h);
+    ctx.strokeStyle = 'rgba(216,201,161,.15)'; ctx.lineWidth = 16;
+    ctx.beginPath(); ctx.moveTo(park.x + 24, park.y + park.h * .5); ctx.lineTo(park.x + park.w - 24, park.y + park.h * .5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(park.x + park.w * .5, park.y + 24); ctx.lineTo(park.x + park.w * .5, park.y + park.h - 24); ctx.stroke();
+    ctx.fillStyle = i === 1 ? '#343b3c' : '#303637';
+    ctx.beginPath(); ctx.arc(park.x + park.w / 2, park.y + park.h / 2, 34, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(224,154,62,.28)'; ctx.lineWidth = 3; ctx.stroke();
+  }
+
+  const yards = [
+    { x: 3150, y: 650, w: 620, h: 395 }, { x: 4050, y: 650, w: 470, h: 395 },
+    { x: 3150, y: 3550, w: 620, h: 460 }, { x: 4050, y: 3550, w: 470, h: 460 },
+    { x: 3150, y: 6550, w: 620, h: 455 }, { x: 4050, y: 6550, w: 470, h: 455 },
+    { x: 3150, y: 7350, w: 620, h: 500 }, { x: 4050, y: 7350, w: 470, h: 500 }
+  ];
+  for (const [n, yard] of yards.entries()) {
+    ctx.fillStyle = n % 2 ? '#292b2a' : '#2d2d29'; ctx.fillRect(yard.x, yard.y, yard.w, yard.h);
+    ctx.strokeStyle = 'rgba(188,154,91,.25)'; ctx.lineWidth = 3; ctx.setLineDash([18, 13]); ctx.strokeRect(yard.x + 14, yard.y + 14, yard.w - 28, yard.h - 28); ctx.setLineDash([]);
+    for (let c = 0; c < 4; c++) {
+      const cx = yard.x + 55 + c * Math.min(125, (yard.w - 110) / 3), cy = yard.y + 55 + ((c + n) % 2) * 72;
+      ctx.fillStyle = ['#70442d','#355261','#6b6d62','#7a542c'][(c+n)%4]; ctx.fillRect(cx, cy, 62, 30);
+      ctx.strokeStyle = '#171a1b'; ctx.lineWidth = 2; ctx.strokeRect(cx, cy, 62, 30);
+    }
+  }
+
+  ctx.save(); ctx.globalCompositeOperation = 'screen';
+  for (let i = 0; i < 34; i++) {
+    const x = 520 + ((i * 733) % 6250), y = [1170,4170,7170][i % 3];
+    const g = ctx.createLinearGradient(x - 45, y, x + 45, y);
+    g.addColorStop(0, 'rgba(224,154,62,0)'); g.addColorStop(.5, 'rgba(224,154,62,.10)'); g.addColorStop(1, 'rgba(224,154,62,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x, y, 58, 9 + (i % 3) * 3, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawShoreLife() {
+  // Beaches, rocks and mooring posts broaden the world outside the street grid.
+  for(const island of islands){
+    const samples=[[.14,.04],[.38,.01],[.72,.03],[.96,.27],[.98,.7],[.74,.97],[.34,.99],[.04,.72],[.02,.32]];
+    samples.forEach(([u,v],i)=>{
+      const x=island.x+island.w*u,y=island.y+island.h*v;
+      ctx.fillStyle=i%3===0?'#77705c':'#3b4240';ctx.beginPath();ctx.ellipse(x,y,13+i%4*3,8+i%3*2,i*.7,0,Math.PI*2);ctx.fill();
+      if(i%3===1){ctx.fillStyle='#202522';ctx.beginPath();ctx.arc(x+8,y-9,10,0,Math.PI*2);ctx.fill();}
+    });
+  }
+  for(const [x,y] of [[2500,1770],[2500,2100],[4850,1770],[4850,2100]]){
+    ctx.fillStyle='#5f4730';ctx.fillRect(x-5,y-5,10,22);ctx.fillStyle='#d7b56d';ctx.beginPath();ctx.arc(x,y-6,6,0,Math.PI*2);ctx.fill();
+  }
 }
 
 function updatePoliceAI(dt) {
@@ -676,32 +1175,64 @@ function renderWorld() {
   ctx.save();
   const leadX = Math.cos(player.angle) * player.speed * 6;
   const leadY = Math.sin(player.angle) * player.speed * 6;
-  ctx.translate(w / 2 - player.x - leadX, h / 2 - player.y - leadY);
+  const center = projectIso(player.x + leadX, player.y + leadY);
+  ctx.translate(w / 2 - center.x, h / 2 - center.y);
+  ctx.transform(Math.sqrt(3) / 2, 0.5, -Math.sqrt(3) / 2, 0.5, 0, 0);
 
+  // Animated tidal ripples and shallow water around the shared coast polygon.
+  ctx.strokeStyle = 'rgba(104,156,166,.13)'; ctx.lineWidth = 2;
+  for (let x = 150; x < WORLD_W; x += 180) for (let y = 120; y < WORLD_H; y += 170) {
+    if (isPositionOnSolidGround(x,y)) continue;
+    const drift = Math.sin(performance.now()*.0007+x)*12;
+    ctx.beginPath();ctx.moveTo(x+drift,y);ctx.lineTo(x+50+drift,y+7);ctx.stroke();
+  }
   // 1. Island Bases with Dark Shoreline
   islands.forEach(isl => {
-    ctx.fillStyle = '#0c1017';
-    ctx.fillRect(isl.x - 8, isl.y - 8, isl.w + 16, isl.h + 16);
-    ctx.fillStyle = '#141822';
-    ctx.fillRect(isl.x, isl.y, isl.w, isl.h);
-    ctx.strokeStyle = '#252c3b';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(isl.x, isl.y, isl.w, isl.h);
+    coastPath(ctx, isl);ctx.strokeStyle='#183d48';ctx.lineWidth=55;ctx.stroke();
+    ctx.strokeStyle='#45605c';ctx.lineWidth=20;ctx.stroke();
+    ctx.fillStyle = '#202721';ctx.fill();
+    ctx.strokeStyle = '#686556';ctx.lineWidth = 7;ctx.stroke();
   });
+  // Harbour piers, landing pads and a small airstrip occupy open waterfront land.
+  for (const x of [2470,4820]) {
+    ctx.fillStyle='#686357';ctx.fillRect(x,1760,45,400);
+    ctx.strokeStyle='#b8a77e';ctx.lineWidth=2;
+    for(let y=1760;y<2160;y+=20){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+45,y);ctx.stroke();}
+  }
+  for (const x of [2470,4820]) {
+    ctx.fillStyle='#686357';ctx.fillRect(x,7480,45,430);
+    ctx.strokeStyle='#b8a77e';ctx.lineWidth=2;
+    for(let y=7480;y<7910;y+=20){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+45,y);ctx.stroke();}
+  }
+  ctx.fillStyle='#373b3b';ctx.fillRect(1400,2140,650,100);
+  ctx.strokeStyle='#c8c5ae';ctx.lineWidth=3;ctx.setLineDash([30,25]);ctx.beginPath();ctx.moveTo(1420,2190);ctx.lineTo(2030,2190);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#373b3b';ctx.fillRect(1400,8040,650,100);
+  ctx.strokeStyle='#c8c5ae';ctx.lineWidth=3;ctx.setLineDash([30,25]);ctx.beginPath();ctx.moveTo(1420,8090);ctx.lineTo(2030,8090);ctx.stroke();ctx.setLineDash([]);
+  for(const [x,y] of [[1040,2070],[6550,2070],[6550,8070]]){ctx.strokeStyle='#d3c58e';ctx.lineWidth=4;ctx.beginPath();ctx.arc(x,y,55,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#d3c58e';ctx.font='bold 42px sans-serif';ctx.textAlign='center';ctx.fillText('H',x,y+15);}
 
   // 2. Bridges with Steel Rails
   bridges.forEach(br => {
     ctx.fillStyle = PALETTE.bridgeAsphalt;
     ctx.fillRect(br.x, br.y, br.w, br.h);
     ctx.fillStyle = '#334155';
-    ctx.fillRect(br.x, br.y - 8, br.w, 8);
-    ctx.fillRect(br.x, br.y + br.h, br.w, 8);
+    if (br.dir === 'v') {
+      ctx.fillRect(br.x - 8, br.y, 8, br.h);
+      ctx.fillRect(br.x + br.w, br.y, 8, br.h);
+    } else {
+      ctx.fillRect(br.x, br.y - 8, br.w, 8);
+      ctx.fillRect(br.x, br.y + br.h, br.w, 8);
+    }
     ctx.strokeStyle = PALETTE.roadMarkingYellow;
     ctx.lineWidth = 2.5;
     ctx.setLineDash([16, 20]);
     ctx.beginPath();
-    ctx.moveTo(br.x, br.y + br.h / 2);
-    ctx.lineTo(br.x + br.w, br.y + br.h / 2);
+    if (br.dir === 'v') {
+      ctx.moveTo(br.x + br.w / 2, br.y);
+      ctx.lineTo(br.x + br.w / 2, br.y + br.h);
+    } else {
+      ctx.moveTo(br.x, br.y + br.h / 2);
+      ctx.lineTo(br.x + br.w, br.y + br.h / 2);
+    }
     ctx.stroke();
     ctx.setLineDash([]);
   });
@@ -739,7 +1270,25 @@ function renderWorld() {
     ctx.setLineDash([]);
   });
 
-  // 4. Tire Skidmarks
+  // Continuous intersections: no kerbs or lane stripes across crossing roads.
+  for (const horizontal of roads.filter(r => r.dir === 'h')) {
+    for (const vertical of roads.filter(r => r.dir === 'v')) {
+      if (vertical.x < horizontal.x || vertical.x + vertical.w > horizontal.x + horizontal.w || horizontal.y < vertical.y || horizontal.y + horizontal.h > vertical.y + vertical.h) continue;
+      ctx.fillStyle = PALETTE.asphalt;
+      ctx.fillRect(vertical.x - 2, horizontal.y - 2, vertical.w + 4, horizontal.h + 4);
+      drawRoundedJunction(ctx,horizontal,vertical,PALETTE.asphalt);
+      ctx.fillStyle = 'rgba(220,216,197,.48)';
+      for (let stripe = 8; stripe < vertical.w - 8; stripe += 15) {
+        ctx.fillRect(vertical.x + stripe, horizontal.y + 8, 7, 20);
+        ctx.fillRect(vertical.x + stripe, horizontal.y + horizontal.h - 28, 7, 20);
+      }
+    }
+  }
+
+  // 4. District texture and lived-in ground detail.
+  drawDistrictGroundDetails();
+
+  // 5. Tire Skidmarks
   skidmarks.forEach(sm => {
     ctx.save();
     ctx.translate(sm.x, sm.y);
@@ -791,40 +1340,14 @@ function renderWorld() {
     }
   });
 
-  // 7. Detailed Buildings & Rooftops
-  buildings.forEach(b => {
-    // Drop shadow
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
-    ctx.fillRect(b.x + 12, b.y + 12, b.w, b.h);
-
-    // Roof
-    ctx.fillStyle = b.roof;
-    ctx.fillRect(b.x, b.y, b.w, b.h);
-    ctx.strokeStyle = '#2b3648';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(b.x, b.y, b.w, b.h);
-
-    // AC units & Roof vents
-    ctx.fillStyle = '#0f172a';
-    ctx.fillRect(b.x + 30, b.y + 30, 45, 25);
-    ctx.fillRect(b.x + b.w - 80, b.y + 40, 50, 30);
-
-    // Neon Billboard with Glow
-    ctx.save();
-    ctx.fillStyle = 'rgba(10, 14, 22, 0.95)';
-    ctx.fillRect(b.x + 20, b.y + 15, b.w - 40, 28);
-    ctx.strokeStyle = b.neon || '#f59e0b';
-    ctx.lineWidth = 1.5;
-    ctx.shadowColor = b.neon || '#f59e0b';
-    ctx.shadowBlur = 12;
-    ctx.strokeRect(b.x + 20, b.y + 15, b.w - 40, 28);
-
-    ctx.fillStyle = b.neon || '#f59e0b';
-    ctx.font = '800 11px Inter, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(b.sign, b.x + b.w / 2, b.y + 33);
-    ctx.restore();
-  });
+  // 7. Volumetric district scenery and detailed buildings.
+  drawShoreLife();
+  drawCityScenery();
+  buildings
+    .map((building,index)=>({building,index}))
+    .filter(({building:b})=>Math.abs((b.x+b.w*.5)-player.x)<2300&&Math.abs((b.y+b.h*.5)-player.y)<2300)
+    .sort((a,b)=>(a.building.x+a.building.y+a.building.w+a.building.h)-(b.building.x+b.building.y+b.building.w+b.building.h))
+    .forEach(({building,index})=>drawBuilding(building,index));
 
   // 8. Detailed Pedestrians
   pedestrians.forEach(ped => {
@@ -896,6 +1419,15 @@ function renderWorld() {
     if (sp.alpha <= 0) waterSplashes.splice(idx, 1);
   });
 
+  for (const vehicle of roam?.fleet || []) drawTransport(ctx,vehicle,performance.now()/1000);
+  if (roam?.special) {
+    if (roam.mode === 'foot') {
+      const stride=Math.sin(performance.now()*.012)*3;
+      ctx.save();ctx.translate(player.x,player.y);ctx.rotate(player.angle);ctx.fillStyle='rgba(0,0,0,.5)';ctx.beginPath();ctx.ellipse(3,5,8,4,0,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='#24282b';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-2,2);ctx.lineTo(-5,9+stride);ctx.moveTo(2,2);ctx.lineTo(5,9-stride);ctx.stroke();
+      ctx.fillStyle='#5f482f';ctx.fillRect(-5,-7,10,11);ctx.fillStyle='#d5b594';ctx.beginPath();ctx.arc(0,-11,4.5,0,Math.PI*2);ctx.fill();ctx.fillStyle='#1a1512';ctx.beginPath();ctx.arc(-1,-13,4,Math.PI,Math.PI*2);ctx.fill();ctx.restore();
+    } else drawTransport(ctx,{...roam.profile,type:roam.mode,x:player.x,y:player.y,angle:player.angle},performance.now()/1000,roam.altitude);
+  } else {
   // 12. Player Vehicle with Volumetric Headlights
   ctx.save();
   ctx.translate(player.x, player.y);
@@ -959,13 +1491,14 @@ function renderWorld() {
   ctx.fillRect(-player.width / 2, player.height / 2 - 7, 3, 5);
 
   ctx.restore();
+  }
 
   ctx.restore();
 
   // Radar & HUD
   renderRadar();
   const speedEl = document.getElementById('hudSpeed');
-  if (speedEl) speedEl.innerText = Math.round(Math.abs(player.speed) * 12);
+  if (speedEl) speedEl.innerText = roam?.mode === 'foot' ? 'ПЕШКОМ' : Math.round(Math.abs(player.speed) * 12);
   const gearEl = document.getElementById('hudGear');
   if (gearEl) gearEl.innerText = player.gear;
   const rpmEl = document.getElementById('hudRpm');
@@ -1051,7 +1584,7 @@ function renderRadar() {
 
   islands.forEach(isl => {
     radarCtx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-    radarCtx.fillRect((isl.x - player.x) * scale, (isl.y - player.y) * scale, isl.w * scale, isl.h * scale);
+    coastPath(radarCtx,isl,scale,-player.x*scale,-player.y*scale);radarCtx.fill();
   });
 
   bridges.forEach(br => {
@@ -1074,6 +1607,10 @@ function renderRadar() {
     }
   });
 
+  for (const vehicle of roam?.fleet || []) {
+    radarCtx.fillStyle=vehicle.kind==='water'?'#61b9ce':vehicle.kind==='air'?'#ddd7be':'#bd9954';
+    radarCtx.fillRect((vehicle.x-player.x)*scale-2,(vehicle.y-player.y)*scale-2,4,4);
+  }
   radarCtx.rotate(player.angle + Math.PI / 2);
   radarCtx.fillStyle = '#e59d35';
   radarCtx.beginPath();
@@ -1091,51 +1628,59 @@ function renderFullMap() {
   const mw = fullMapCanvas.width;
   const mh = fullMapCanvas.height;
   fullMapCtx.clearRect(0, 0, mw, mh);
-  const scale = mw / WORLD_W;
+  const scale = Math.min(mw / WORLD_W, mh / WORLD_H);
+  const mapX = (mw - WORLD_W * scale) / 2;
+  const mapY = (mh - WORLD_H * scale) / 2;
 
   fullMapCtx.fillStyle = '#06090e';
   fullMapCtx.fillRect(0, 0, mw, mh);
 
   islands.forEach(isl => {
     fullMapCtx.fillStyle = '#1e2430';
-    fullMapCtx.fillRect(isl.x * scale, isl.y * scale, isl.w * scale, isl.h * scale);
+    coastPath(fullMapCtx,isl,scale,mapX,mapY);fullMapCtx.fill();
     fullMapCtx.strokeStyle = '#334155';
-    fullMapCtx.strokeRect(isl.x * scale, isl.y * scale, isl.w * scale, isl.h * scale);
+    fullMapCtx.stroke();
   });
 
   bridges.forEach(br => {
     fullMapCtx.fillStyle = '#38bdf8';
-    fullMapCtx.fillRect(br.x * scale, br.y * scale, br.w * scale, br.h * scale);
+    fullMapCtx.fillRect(mapX + br.x * scale, mapY + br.y * scale, br.w * scale, br.h * scale);
   });
 
   fullMapCtx.fillStyle = 'rgba(235, 240, 250, 0.5)';
   roads.forEach(r => {
-    fullMapCtx.fillRect(r.x * scale, r.y * scale, r.w * scale, r.h * scale);
+    fullMapCtx.fillRect(mapX + r.x * scale, mapY + r.y * scale, r.w * scale, r.h * scale);
   });
 
   CARPARTS.forEach(p => {
     if (!p.found) {
       fullMapCtx.fillStyle = '#e59d35';
       fullMapCtx.beginPath();
-      fullMapCtx.arc(p.x * scale, p.y * scale, 4, 0, Math.PI * 2);
+      fullMapCtx.arc(mapX + p.x * scale, mapY + p.y * scale, 4, 0, Math.PI * 2);
       fullMapCtx.fill();
     }
   });
 
+  for (const vehicle of roam?.fleet || []) {
+    fullMapCtx.fillStyle=vehicle.kind==='water'?'#61b9ce':vehicle.kind==='air'?'#ddd7be':'#bd9954';
+    const x=mapX+vehicle.x*scale,y=mapY+vehicle.y*scale;
+    fullMapCtx.fillRect(x-3,y-3,6,6);fullMapCtx.font='12px sans-serif';fullMapCtx.fillText(vehicle.name,x+6,y-6);
+  }
   fullMapCtx.fillStyle = '#fff';
   fullMapCtx.beginPath();
-  fullMapCtx.arc(player.x * scale, player.y * scale, 5, 0, Math.PI * 2);
+  fullMapCtx.arc(mapX + player.x * scale, mapY + player.y * scale, 5, 0, Math.PI * 2);
   fullMapCtx.fill();
 }
 
 function autoSaveProgress() {
+  if (driveLab?.running) return;
   const saveData = {
     cash: state.cash,
     x: player.x,
     y: player.y,
     parts: CARPARTS.map(p => ({ id: p.id, found: p.found }))
   };
-  localStorage.setItem('lowtown_integrity_save', JSON.stringify(saveData));
+  try { localStorage.setItem('lowtown_integrity_save', JSON.stringify(saveData)); } catch { /* Storage may be disabled. */ }
 }
 
 function loadProgress() {
@@ -1144,8 +1689,8 @@ function loadProgress() {
     if (saved) {
       const data = JSON.parse(saved);
       state.cash = data.cash || 750;
-      player.x = data.x || 1200;
-      player.y = data.y || 1200;
+      player.x = Number.isFinite(data.x) && data.x > 0 && data.x < WORLD_W ? data.x : 1200;
+      player.y = Number.isFinite(data.y) && data.y > 0 && data.y < WORLD_H ? data.y : 1200;
       if (data.parts) {
         data.parts.forEach(sp => {
           const p = CARPARTS.find(item => item.id === sp.id);
@@ -1190,17 +1735,37 @@ function showToast(msg) {
   }
 }
 
+let accumulator = 0;
+let driveLab;
 function gameLoop(now) {
-  const dt = Math.min(0.05, (now - state.lastFrameTime) / 1000);
+  const dt = Math.max(0, Math.min(0.1, (now - state.lastFrameTime) / 1000));
   state.lastFrameTime = now;
-  updatePhysics(dt);
-  renderWorld();
+  accumulator += dt;
+  try {
+    while (accumulator >= 1 / 60) {
+      driveLab?.beforeStep();
+      updatePhysics(1 / 60);
+      driveLab?.afterStep();
+      accumulator -= 1 / 60;
+    }
+    renderWorld();
+    driveLab?.afterFrame();
+    window.__lowtownLastFrame = performance.now();
+  } catch (error) {
+    window.__lowtownFail?.(error.message);
+    driveLab?.fail(error.message);
+    return;
+  }
   requestAnimationFrame(gameLoop);
 }
 
 function setupInputListeners() {
   window.addEventListener('keydown', e => {
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+    if (driveLab?.running) return;
     sound.init();
+    if (e.code === 'KeyE' && !e.repeat) roam?.interact();
+    if (e.code === 'KeyQ' && !e.repeat) roam?.toggleFlight();
     if (e.code === 'KeyW' || e.code === 'ArrowUp') state.keys.up = true;
     if (e.code === 'KeyS' || e.code === 'ArrowDown') state.keys.down = true;
     if (e.code === 'KeyA' || e.code === 'ArrowLeft') state.keys.left = true;
@@ -1253,6 +1818,14 @@ function setupInputListeners() {
   bindDriveButton('btnRight', 'right');
   bindDriveButton('btnHandbrake', 'handbrake');
   bindDriveButton('btnNitro', 'nitro');
+  const clearInput = () => {
+    Object.keys(state.keys).forEach(k => state.keys[k] = false);
+    document.querySelectorAll('.btn-drive').forEach(b => b.classList.remove('active'));
+    accumulator = 0;
+    state.lastFrameTime = performance.now();
+  };
+  window.addEventListener('blur', clearInput);
+  document.addEventListener('visibilitychange', clearInput);
 
   window.addEventListener('mouseup', () => {
     state.keys.up = false;
@@ -1305,9 +1878,19 @@ function toggleGarage() {
   modal.style.display = state.isGarageOpen ? 'flex' : 'none';
 }
 
-window.addEventListener('DOMContentLoaded', () => {
+function boot() {
   initTopology();
+  roam = createFreeRoam(player, parkedCars, buildings, trees, isPositionOnSolidGround, showToast);
+  const roamControls = document.createElement('div');
+  roamControls.className = 'roam-controls';
+  const enterButton = document.createElement('button');enterButton.textContent = 'Выйти / сесть · E';enterButton.addEventListener('click',()=>roam.interact());
+  const flyButton = document.createElement('button');flyButton.textContent = 'Высота · Q';flyButton.addEventListener('click',()=>roam.toggleFlight());
+  roamControls.append(enterButton,flyButton);document.body.appendChild(roamControls);
   loadProgress();
   setupInputListeners();
+  driveLab = createDriveLab({ player, state, canvas, roads, buildings, trafficCars, policeCars, routeInput });
+  state.lastFrameTime = performance.now();
   requestAnimationFrame(gameLoop);
-});
+}
+if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', boot, { once: true });
+else boot();

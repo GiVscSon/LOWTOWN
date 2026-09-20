@@ -1,0 +1,18 @@
+#driveLab { position:fixed; z-index:30; top:128px; left:14px; width:280px; max-width:calc(100vw - 28px); background:#101319ef; border:1px solid #45403a; padding:16px; border-radius:8px; color:#dce0e5; font:14px/1.45 system-ui,sans-serif; box-shadow:0 12px 40px #0006; }
+#driveLab h1 { font-size:23px; letter-spacing:3px; margin:0 0 3px; color:#e8b84a; }
+#driveLab small { color:#a0a5ae; font-size:12px; }
+#driveLab button { border:1px solid #756145; border-radius:5px; padding:10px 12px; background:#e09a3e; color:#14161a; font:700 14px system-ui; cursor:pointer; min-height:42px; }
+#driveLab .lab-actions { display:flex; gap:6px; margin:12px 0; }
+#driveLab button.secondary { background:#222730; color:#dce0e5; border-color:#48505a; }
+#labStatus { margin:8px 0; color:#e8b84a; }
+#labMetrics { white-space:pre-line; font:13px/1.6 ui-monospace,monospace; }
+#driveLab details { margin-top:10px; }
+#driveLab summary { cursor:pointer; }
+#driveLab p { margin:8px 0; }
+#labError { position:fixed; z-index:200; inset:30% 8% auto; padding:24px; background:#201719; color:#ffd7d1; border:1px solid #d4523a; font:16px/1.5 system-ui; }
+.btn-top { min-width:36px; min-height:36px; font-size:14px; }
+@media(max-width:600px) { #driveLab { top:112px; padding:10px; width:230px; } #driveLab h1 {font-size:18px;} #driveLab details:not([open]) {margin-top:4px;} #driveLab .lab-actions {margin:8px 0;} }
+@media(max-height:520px) { #driveLab {top:12px;left:120px;width:260px;} #driveLab details {display:none;} #labMetrics {font-size:12px;} }
+.roam-controls { position:fixed; left:50%; top:76px; transform:translateX(-50%); display:flex; gap:8px; z-index:60; }
+.roam-controls button { background:#151a1eef; color:#ebd6a5; border:1px solid #76613d; border-radius:8px; padding:12px; font:600 14px sans-serif; touch-action:manipulation; min-height:44px; }
+@media(max-width:600px) { .roam-controls { top:110px; width:max-content; } .roam-controls button { padding:10px; } }

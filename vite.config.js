@@ -8,7 +8,7 @@ const hasSentryUploadConfig = Boolean(
 );
 
 export default defineConfig({
-  base: '/LOWTOWN/',
+  base: './',
   plugins: hasSentryUploadConfig
     ? [
         sentryVitePlugin({

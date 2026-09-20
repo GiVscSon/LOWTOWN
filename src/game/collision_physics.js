@@ -1,7 +1,7 @@
 const finite=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-export function circleContact(a,b,{restitution=.12,friction=.45,damageScale=.002,maxImpulse=90,separation=.95}={}){
+export function circleContact(a,b,{restitution=.12,friction=.45,damageScale=.002,maxImpulse=90000,separation=.95}={}){
   const ax=finite(a.x),ay=finite(a.y),bx=finite(b.x),by=finite(b.y);
   const dx=bx-ax,dy=by-ay,distance=Math.hypot(dx,dy);
   const radius=Math.max(0,finite(a.radius,10))+Math.max(0,finite(b.radius,10));
@@ -20,7 +20,7 @@ export function circleContact(a,b,{restitution=.12,friction=.45,damageScale=.002
   return {hit:true,penetration,normalX:nx,normalY:ny,impulse,frictionImpulse,damage,separating:false};
 }
 
-export function resolveWallContact(state,normalX,normalY,{restitution=.08,friction=.35,damageScale=.0015,maxImpulse=120}={}){
+export function resolveWallContact(state,normalX,normalY,{restitution=.08,friction=.35,damageScale=.0015,maxImpulse=120000}={}){
   const nx=finite(normalX),ny=finite(normalY);const nLen=Math.hypot(nx,ny)||1;const nxx=nx/nLen,nyy=ny/nLen;
   const vn=finite(state.vx)*nxx+finite(state.vy)*nyy;
   if(vn>=0)return {hit:false,impulse:0,damage:0};

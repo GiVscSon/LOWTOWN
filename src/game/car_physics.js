@@ -93,6 +93,19 @@ export function stepCarPhysics(state,dt,input,physics){
     stepKinematicGrip(state,safeDt,c,p);
   }
 
+  // A service brake must remove the car's total kinetic energy, including
+  // lateral velocity left by the bicycle model.
+  if(c.brake){
+    const brakingSpeed=Math.hypot(state.vx,state.vy);
+    const brakeDeceleration=finite(p.arcadeBrake,Math.abs(p.brakeForce||0)/mass);
+    const remaining=Math.max(0,brakingSpeed-brakeDeceleration*c.brake*safeDt);
+    const scale=brakingSpeed>.0001?remaining/brakingSpeed:0;
+    state.vx*=scale;
+    state.vy*=scale;
+    state.yawRate*=Math.max(0,1-c.brake*safeDt*8);
+    if(remaining<.35){state.vx=0;state.vy=0;state.yawRate=0;}
+  }
+
   state.dynamicHandlingActive=autoDynamic||explicitDynamic;
   const resistance=(p.rollingResistance||0)*speed*safeDt;
   if(speed>1){state.vx-=state.vx/speed*resistance;state.vy-=state.vy/speed*resistance;}

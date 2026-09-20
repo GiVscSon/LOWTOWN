@@ -4,7 +4,21 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#06090e" />
-  <title>LOWTOWN // THREE ISLANDS // GTA 2 ARCADE</title>
+  <title>LOWTOWN — приватный тест-драйв</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='5' fill='%2314161a'/%3E%3Cpath d='M9 7v18h15v-5H14V7z' fill='%23e8b84a'/%3E%3C/svg%3E">
+  <script>
+    window.__lowtownLastFrame = 0;
+    window.__lowtownFail = function(message) {
+      let box = document.getElementById('labError');
+      if (!box) { box = document.createElement('div'); box.id = 'labError'; box.setAttribute('role','alert'); document.body.appendChild(box); }
+      box.textContent = 'Не удалось запустить игру: ' + message + '. Обновите страницу.';
+    };
+    window.addEventListener('error', function(e) { window.__lowtownFail(e.message || 'ошибка загрузки'); });
+    window.addEventListener('unhandledrejection', function(e) { window.__lowtownFail(String(e.reason)); });
+    window.addEventListener('load', function() { setInterval(function() {
+      if (!document.hidden && (!window.__lowtownLastFrame || performance.now()-window.__lowtownLastFrame>5000)) window.__lowtownFail('нет новых кадров');
+    },6000); });
+  </script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@700;800&display=swap');
     :root {

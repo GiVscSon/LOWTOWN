@@ -15,7 +15,7 @@ export function createDriverExitDiagnostic(options={}){
     const demanding=Math.abs(state.commandThrottle)>=minThrottle&&Math.abs(state.appliedThrottle)>=minThrottle;
     const moving=state.vehicleSpeed>minSpeed||state.frameDistance>minSpeed*h;
     if(state.phase===DRIVER_EXIT_STATES.DRIVING){if(demanding&&!moving){state.stallTime+=h;}else if(moving){state.stallTime=0;}
-      if(state.stallTime>=stallSeconds){state.phase=DRIVER_EXIT_STATES.EXITING;state.exitReason=state.engineAcceleration<1e-3?'NO_ENGINE_RESPONSE':'NO_VEHICLE_MOTION';state.physicsHealthy=false;}
+      if(state.stallTime+1e-9>=stallSeconds){state.phase=DRIVER_EXIT_STATES.EXITING;state.exitReason=state.engineAcceleration<1e-3?'NO_ENGINE_RESPONSE':'NO_VEHICLE_MOTION';state.physicsHealthy=false;}
       else if(moving)state.physicsHealthy=true;
     }
     return snapshot();
