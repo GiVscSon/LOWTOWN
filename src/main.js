@@ -472,7 +472,7 @@ function updatePhysics(dt) {
         player.y = player.y > cy ? b.y + b.h + pad : b.y - pad;
         player.vy = 0;
       }
-      if (state.invulnTimer === 0 && Math.abs(player.speed) > 3) {
+      if (state.invulnTimer === 0 && Math.abs(player.speed) > 150) {
         player.hp = Math.max(0, player.hp - 5);
         sound.playImpact();
         player.speed *= -0.85;
@@ -545,14 +545,14 @@ function updatePhysics(dt) {
     if (p.x < 450 || p.x > 6850) p.vx *= -1;
 
     const d = Math.hypot(p.x - player.x, p.y - player.y);
-    if (d < 120 && Math.abs(player.speed) > 3) {
+    if (d < 120 && Math.abs(player.speed) > 150) {
       p.fleeTimer = 30;
       p.y += (p.y > player.y ? 2.5 : -2.5); // Flee away from road
     }
 
     if (d < 22) {
       p.y += (p.y > player.y ? 20 : -20);
-      if (state.invulnTimer === 0 && Math.abs(player.speed) > 2) {
+      if (state.invulnTimer === 0 && Math.abs(player.speed) > 100) {
         if (state.wanted < 3) setWanted(state.wanted + 1);
         showToast('🚨 НАЕЗД НА ПЕШЕХОДА!');
       }
@@ -561,7 +561,7 @@ function updatePhysics(dt) {
 
   updatePoliceAI(dt);
 
-  const speedKmh = Math.abs(player.speed) * 12;
+  const speedKmh = Math.abs(player.speed) * 0.24;
   player.gear = player.speed < -0.1 ? 'R' : speedKmh < 30 ? 'D1' : speedKmh < 60 ? 'D2' : speedKmh < 95 ? 'D3' : speedKmh < 130 ? 'D4' : 'D5';
   player.rpm = Math.min(1.0, (speedKmh % 35) / 35 + 0.2);
   sound.update(player.rpm, player.speed);
@@ -966,7 +966,7 @@ function renderWorld() {
   // Radar & HUD
   renderRadar();
   const speedEl = document.getElementById('hudSpeed');
-  if (speedEl) speedEl.innerText = Math.round(Math.abs(player.speed) * 12);
+  if (speedEl) speedEl.innerText = Math.round(Math.abs(player.speed) * 0.24);
   const gearEl = document.getElementById('hudGear');
   if (gearEl) gearEl.innerText = player.gear;
   const rpmEl = document.getElementById('hudRpm');
