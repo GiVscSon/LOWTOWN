@@ -145,14 +145,14 @@ const WORLD_H = 11700;
 const ROAD_W = 130;
 
 const PALETTE = {
-  waterDark: '#060a12',
-  waterShore: '#0c121e',
-  asphalt: '#171b22',
-  asphaltWet: '#1c212a',
+  waterDark: '#05080b',
+  waterShore: '#0a1115',
+  asphalt: '#111417',
+  asphaltWet: '#1a1d1e',
   roadMarkingYellow: '#d4a34b',
-  roadMarkingWhite: 'rgba(240, 244, 255, 0.75)',
-  sidewalk: '#151922',
-  curb: '#252b38',
+  roadMarkingWhite: 'rgba(218, 216, 205, 0.56)',
+  sidewalk: '#262422',
+  curb: '#5b5750',
   buildingWall: '#11151e',
   buildingRoof: '#181e2b',
   bridgeAsphalt: '#1e2533',
@@ -933,17 +933,8 @@ function updatePhysics(dt) {
 
   const distEl = document.getElementById('hudDistrict');
   if (distEl) {
-    const farSouth = player.y > 5950;
-    const south = player.y > 2850;
-    if (farSouth && player.x > 5000) distEl.innerText = 'VELVET COAST';
-    else if (farSouth && player.x > 2700) distEl.innerText = 'SOUTHPORT WORKS';
-    else if (farSouth) distEl.innerText = 'MARROW POINT';
-    else if (south && player.x > 5000) distEl.innerText = 'BLACKWOOD HILLS';
-    else if (south && player.x > 2700) distEl.innerText = 'RED HOOK MARKET';
-    else if (south) distEl.innerText = 'OLD MILL WARD';
-    else if (player.x > 5000) distEl.innerText = 'LANTERN BAY HEIGHTS';
-    else if (player.x > 2700) distEl.innerText = 'IRONWORKS DOCKS';
-    else distEl.innerText = 'LOWTOWN DOWNTOWN';
+    const district = islands.find(isl => player.x >= isl.x && player.x <= isl.x + isl.w && player.y >= isl.y && player.y <= isl.y + isl.h);
+    distEl.innerText = (district?.name || 'LOWTOWN CAUSEWAY').toUpperCase();
   }
 }
 
@@ -957,6 +948,52 @@ function setWanted(lvl) {
 function stableVisualHash(a, b, c = 0) {
   const value = Math.sin(a * 12.9898 + b * 78.233 + c * 37.719) * 43758.5453;
   return value - Math.floor(value);
+}
+
+function drawWetRoadSurface(r, index) {
+  ctx.save();
+  ctx.beginPath(); ctx.rect(r.x, r.y, r.w, r.h); ctx.clip();
+  const across = r.dir === 'h' ? r.h : r.w;
+  const length = r.dir === 'h' ? r.w : r.h;
+  const x2 = r.dir === 'h' ? r.x : r.x + r.w;
+  const y2 = r.dir === 'h' ? r.y + r.h : r.y;
+  const wet = ctx.createLinearGradient(r.x, r.y, x2, y2);
+  wet.addColorStop(0, 'rgba(255,255,255,.015)'); wet.addColorStop(.48, 'rgba(117,126,128,.13)'); wet.addColorStop(.54, 'rgba(0,0,0,.12)'); wet.addColorStop(1, 'rgba(255,255,255,.025)');
+  ctx.fillStyle = wet; ctx.fillRect(r.x, r.y, r.w, r.h);
+
+  ctx.globalCompositeOperation = 'screen';
+  for (let i = 0; i < Math.min(9, Math.floor(length / 180) + 2); i++) {
+    const along = (stableVisualHash(index, i, 2) * .86 + .07) * length;
+    const lane = (stableVisualHash(index, i, 5) * .72 + .14) * across;
+    const warm = i % 4 === 3;
+    const color = warm ? '211,55,25' : '231,161,58';
+    const px = r.dir === 'h' ? r.x + along : r.x + lane;
+    const py = r.dir === 'h' ? r.y + lane : r.y + along;
+    const g = ctx.createRadialGradient(px, py, 1, px, py, 25 + i % 3 * 8);
+    g.addColorStop(0, `rgba(${color},.18)`); g.addColorStop(1, `rgba(${color},0)`);
+    ctx.fillStyle = g; ctx.beginPath();
+    ctx.ellipse(px, py, r.dir === 'h' ? 55 : 10, r.dir === 'h' ? 10 : 55, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.strokeStyle = 'rgba(198,205,201,.08)'; ctx.lineWidth = 1;
+  for (let i = 0; i < 5; i++) {
+    const along = stableVisualHash(index, i, 9) * length;
+    ctx.beginPath();
+    if (r.dir === 'h') { ctx.moveTo(r.x + along, r.y + across * .2); ctx.lineTo(r.x + along + 34, r.y + across * .42); ctx.lineTo(r.x + along + 12, r.y + across * .72); }
+    else { ctx.moveTo(r.x + across * .2, r.y + along); ctx.lineTo(r.x + across * .42, r.y + along + 34); ctx.lineTo(r.x + across * .72, r.y + along + 12); }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawNoirPostFx(w, h) {
+  ctx.save();
+  const vignette = ctx.createRadialGradient(w*.5,h*.48,Math.min(w,h)*.18,w*.5,h*.48,Math.max(w,h)*.72);
+  vignette.addColorStop(0,'rgba(0,0,0,0)'); vignette.addColorStop(.72,'rgba(0,0,0,.08)'); vignette.addColorStop(1,'rgba(0,0,0,.55)');
+  ctx.fillStyle=vignette;ctx.fillRect(0,0,w,h);
+  ctx.fillStyle='rgba(255,218,150,.018)';
+  for(let y=0;y<h;y+=4)ctx.fillRect(0,y,w,1);
+  ctx.restore();
 }
 
 function drawBuilding(b,index) { drawArchitecture(ctx,b,index); }
@@ -1176,7 +1213,10 @@ function renderWorld() {
   const leadX = Math.cos(player.angle) * player.speed * 6;
   const leadY = Math.sin(player.angle) * player.speed * 6;
   const center = projectIso(player.x + leadX, player.y + leadY);
-  ctx.translate(w / 2 - center.x, h / 2 - center.y);
+  ctx.translate(w / 2, h / 2);
+  const cameraZoom = w > 900 ? 1.12 : .96;
+  ctx.scale(cameraZoom, cameraZoom);
+  ctx.translate(-center.x, -center.y);
   ctx.transform(Math.sqrt(3) / 2, 0.5, -Math.sqrt(3) / 2, 0.5, 0, 0);
 
   // Animated tidal ripples and shallow water around the shared coast polygon.
@@ -1238,7 +1278,7 @@ function renderWorld() {
   });
 
   // 3. Wet Asphalt Roads with Sidewalks & Crosswalks
-  roads.forEach(r => {
+  roads.forEach((r, roadIndex) => {
     // Sidewalk border
     ctx.fillStyle = PALETTE.sidewalk;
     ctx.fillRect(r.x - 12, r.y - 12, r.w + 24, r.h + 24);
@@ -1249,10 +1289,11 @@ function renderWorld() {
     // Asphalt
     ctx.fillStyle = PALETTE.asphalt;
     ctx.fillRect(r.x, r.y, r.w, r.h);
+    drawWetRoadSurface(r, roadIndex);
 
     // Markings
     ctx.strokeStyle = PALETTE.roadMarkingWhite;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1;
     ctx.strokeRect(r.x, r.y, r.w, r.h);
 
     ctx.strokeStyle = PALETTE.roadMarkingYellow;
@@ -1438,6 +1479,13 @@ function renderWorld() {
   }
   ctx.rotate(player.angle);
 
+  if (!state.isDrowning) {
+    ctx.save(); ctx.globalCompositeOperation='screen';
+    const tailGlow=ctx.createLinearGradient(-96,0,-18,0);
+    tailGlow.addColorStop(0,'rgba(210,28,18,0)');tailGlow.addColorStop(.72,'rgba(235,38,20,.13)');tailGlow.addColorStop(1,'rgba(255,48,22,.34)');
+    ctx.fillStyle=tailGlow;ctx.beginPath();ctx.ellipse(-56,0,48,10,0,0,Math.PI*2);ctx.fill();ctx.restore();
+  }
+
   // Dynamic Headlights Cone
   if (!state.isDrowning) {
     const headGrad = ctx.createRadialGradient(24, 0, 10, 120, 0, 140);
@@ -1495,6 +1543,8 @@ function renderWorld() {
 
   ctx.restore();
 
+  drawNoirPostFx(w,h);
+
   // Radar & HUD
   renderRadar();
   const speedEl = document.getElementById('hudSpeed');
@@ -1532,6 +1582,11 @@ function drawDetailedCar(ctx, x, y, ang, color, w, h, isPolice = false) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(ang);
+
+  ctx.save();ctx.globalCompositeOperation='screen';
+  const tailGlow=ctx.createLinearGradient(-82,0,-w*.35,0);
+  tailGlow.addColorStop(0,'rgba(204,24,16,0)');tailGlow.addColorStop(.72,'rgba(232,33,18,.1)');tailGlow.addColorStop(1,'rgba(255,47,22,.27)');
+  ctx.fillStyle=tailGlow;ctx.beginPath();ctx.ellipse(-45,0,38,7,0,0,Math.PI*2);ctx.fill();ctx.restore();
 
   // Shadow
   ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
