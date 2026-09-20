@@ -1,5 +1,6 @@
 import { createTransportController } from './game/transport_controller.js';
 import { createTransportSystem } from './game/transport.js';
+import { createAIDriver } from './game/ai_driver.js';
 
 // LOWTOWN // THREE ISLANDS VISUAL OVERHAUL // GTA 2 RETRO-NOIR ENGINE
 // High-detail procedural pedestrian sprites, isometric vehicle chassis, wet road reflections, neon glow & audio
@@ -220,6 +221,8 @@ const policeCars = [];
 const pedestrians = [];
 const skidmarks = [];
 const waterSplashes = [];
+const modularTraffic = [];
+let unifiedTrafficNodes = [];
 
 const safeSpawnPoints = [
   { x: 1200, y: 1200 },
@@ -350,6 +353,108 @@ function initTopology() {
       walkPhase: Math.random() * Math.PI * 2,
       fleeTimer: 0
     });
+  }
+}
+
+
+function isRoadSurface(x, y, margin = 8) {
+  for (const r of roads) {
+    if (x >= r.x - margin && x <= r.x + r.w + margin &&
+        y >= r.y - margin && y <= r.y + r.h + margin) return true;
+  }
+  for (const br of bridges) {
+    if (x >= br.x - margin && x <= br.x + br.w + margin &&
+        y >= br.y - margin && y <= br.y + br.h + margin) return true;
+  }
+  return false;
+}
+
+function buildUnifiedTrafficGraph() {
+  const specs = [
+    // Downtown
+    [515,515],[1265,515],[2065,515],
+    [515,1200],[1265,1200],[2065,1200],
+    [515,1915],[1265,1915],[2065,1915],
+    // Docks
+    [3015,515],[3915,515],[4665,515],
+    [3015,1200],[3915,1200],[4665,1200],
+    [3015,1915],[3915,1915],[4665,1915],
+    // Lantern Bay
+    [5365,515],[6265,515],
+    [5365,1200],[6265,1200],
+    [5365,1915],[6265,1915],
+    // Bridge guide nodes
+    [2510,1200],[2840,1200],[4860,1200],[5190,1200]
+  ];
+  const nodes = specs.map(([x,y],i)=>({id:`u_${i}`,x,y,links:[]}));
+  const onSameRoad = (a,b) => {
+    if (Math.abs(a.y-b.y) < 1) {
+      const lo=Math.min(a.x,b.x), hi=Math.max(a.x,b.x), y=a.y;
+      return roads.some(r=>r.dir==='h' && y>=r.y && y<=r.y+r.h && lo>=r.x-20 && hi<=r.x+r.w+20) ||
+             bridges.some(br=>y>=br.y && y<=br.y+br.h && lo>=br.x-20 && hi<=br.x+br.w+20);
+    }
+    if (Math.abs(a.x-b.x) < 1) {
+      const lo=Math.min(a.y,b.y), hi=Math.max(a.y,b.y), x=a.x;
+      return roads.some(r=>r.dir==='v' && x>=r.x && x<=r.x+r.w && lo>=r.y-20 && hi<=r.y+r.h+20);
+    }
+    return false;
+  };
+  for (const n of nodes) {
+    const candidates = nodes
+      .filter(m=>m!==n && onSameRoad(n,m))
+      .sort((a,b)=>Math.hypot(a.x-n.x,a.y-n.y)-Math.hypot(b.x-n.x,b.y-n.y));
+    const byAxis = new Map();
+    for (const m of candidates) {
+      const axis = Math.abs(m.x-n.x) > Math.abs(m.y-n.y) ? (m.x>n.x?'E':'W') : (m.y>n.y?'S':'N');
+      if (!byAxis.has(axis)) byAxis.set(axis,m);
+    }
+    n.links=[...byAxis.values()];
+  }
+  return nodes;
+}
+
+function initUnifiedTraffic() {
+  modularTraffic.length = 0;
+  unifiedTrafficNodes = buildUnifiedTrafficGraph();
+  trafficCars.length = 0;
+  const roster = [
+    ['sedan','#334155'],['taxi','#eab308'],['coupe','#2563eb'],
+    ['sedan','#475569'],['van','#64748b'],['sedan','#7c2d12'],
+    ['taxi','#eab308'],['coupe','#991b1b'],['sedan','#1f2937'],['van','#4b5563']
+  ];
+  const getTraffic = () => modularTraffic.map(m => {
+    const s=m.controller.state;
+    return {x:s.x,y:s.y,a:s.a,v:Math.hypot(s.vx||0,s.vy||0)};
+  });
+  roster.forEach(([vehicleId,color],i) => {
+    const start = unifiedTrafficNodes[(i*3)%Math.max(1,unifiedTrafficNodes.length)] || {x:500,y:1200};
+    const controller = createTransportController(vehicleId,{x:start.x,y:start.y,a:0,vx:0,vy:0});
+    const ai = createAIDriver({
+      nodes: unifiedTrafficNodes,
+      blocked: (x,y)=>!isRoadSurface(x,y,14),
+      getTraffic
+    });
+    ai.start(controller.state);
+    const visual = {
+      x:controller.state.x,y:controller.state.y,angle:controller.state.a,
+      speed:0,color,type:vehicleId,width:vehicleId==='van'?54:46,height:vehicleId==='van'?24:22,
+      controller,ai
+    };
+    modularTraffic.push(visual);
+    trafficCars.push(visual);
+  });
+}
+
+function updateUnifiedTraffic(dt) {
+  for (const car of modularTraffic) {
+    const control = car.ai.update(car.controller.state,dt) || {throttle:.4,brake:0,steer:0};
+    car.controller.step(dt,control);
+    const s=car.controller.state;
+    car.x=s.x; car.y=s.y; car.angle=s.a; car.speed=Math.hypot(s.vx||0,s.vy||0);
+    if (!isRoadSurface(car.x,car.y,36)) {
+      car.ai.reset();
+      car.ai.start(s);
+    }
   }
 }
 
@@ -525,13 +630,13 @@ function updatePhysics(dt) {
     }
   });
 
-  // Traffic update
+  // Unified modular AI traffic
+  updateUnifiedTraffic(dt);
   trafficCars.forEach(c => {
-    c.x += c.speed;
-    if (c.speed > 0 && c.x > c.maxX) c.x = c.minX;
-    if (c.speed < 0 && c.x < c.minX) c.x = c.maxX;
     if (Math.hypot(c.x - player.x, c.y - player.y) < 34) {
       player.speed *= 0.5;
+      const ps = playerTransport.state;
+      ps.vx *= 0.55; ps.vy *= 0.55; ps.v *= 0.55;
       if (state.invulnTimer === 0) {
         player.hp = Math.max(0, player.hp - 8);
         sound.playImpact();
@@ -1315,6 +1420,7 @@ function toggleGarage() {
 
 window.addEventListener('DOMContentLoaded', () => {
   initTopology();
+  initUnifiedTraffic();
   loadProgress();
   setupInputListeners();
   requestAnimationFrame(gameLoop);
