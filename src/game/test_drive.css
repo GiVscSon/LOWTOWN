@@ -1,5 +1,7 @@
 #driveLab { position:fixed; z-index:30; top:128px; left:14px; width:280px; max-width:calc(100vw - 28px); background:#101319ef; border:1px solid #45403a; padding:16px; border-radius:8px; color:#dce0e5; font:14px/1.45 system-ui,sans-serif; box-shadow:0 12px 40px #0006; }
 #driveLab h1 { font-size:23px; letter-spacing:3px; margin:0 0 3px; color:#e8b84a; }
+#driveLab .lab-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+#driveLab #labToggle { min-width:34px; min-height:32px; padding:2px 9px; }
 #driveLab small { color:#a0a5ae; font-size:12px; }
 #driveLab button { border:1px solid #756145; border-radius:5px; padding:10px 12px; background:#e09a3e; color:#14161a; font:700 14px system-ui; cursor:pointer; min-height:42px; }
 #driveLab .lab-actions { display:flex; gap:6px; margin:12px 0; }
@@ -11,7 +13,16 @@
 #driveLab p { margin:8px 0; }
 #labError { position:fixed; z-index:200; inset:30% 8% auto; padding:24px; background:#201719; color:#ffd7d1; border:1px solid #d4523a; font:16px/1.5 system-ui; }
 .btn-top { min-width:36px; min-height:36px; font-size:14px; }
-@media(max-width:600px) { #driveLab { top:112px; padding:10px; width:230px; } #driveLab h1 {font-size:18px;} #driveLab details:not([open]) {margin-top:4px;} #driveLab .lab-actions {margin:8px 0;} }
+@media(max-width:700px),(pointer:coarse) {
+  #driveLab { top:112px; padding:9px; width:210px; background:rgba(10,12,15,.9); }
+  #driveLab h1 {font-size:17px;}
+  #driveLab details:not([open]) {margin-top:4px;}
+  #driveLab .lab-actions {margin:7px 0;}
+  #driveLab[data-collapsed="true"] {width:164px;padding:7px 8px;}
+  #driveLab[data-collapsed="true"] small,#driveLab[data-collapsed="true"] #labStatus,#driveLab[data-collapsed="true"] #labMetrics,#driveLab[data-collapsed="true"] details,#driveLab[data-collapsed="true"] #labReset {display:none;}
+  #driveLab[data-collapsed="true"] .lab-actions {margin:5px 0 0;}
+  #driveLab[data-collapsed="true"] #labRun {padding:6px 9px;min-height:34px;font-size:12px;}
+}
 @media(max-height:520px) { #driveLab {top:12px;left:120px;width:260px;} #driveLab details {display:none;} #labMetrics {font-size:12px;} }
 .roam-controls { position:fixed; left:50%; top:76px; transform:translateX(-50%); display:flex; gap:8px; z-index:60; }
 .roam-controls button { background:#151a1eef; color:#ebd6a5; border:1px solid #76613d; border-radius:8px; padding:12px; font:600 14px sans-serif; touch-action:manipulation; min-height:44px; }
