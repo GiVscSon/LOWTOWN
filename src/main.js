@@ -1,3 +1,7 @@
+import { createTransportController } from './game/transport_controller.js';
+import { createTransportSystem } from './game/transport.js';
+import { createAIDriver } from './game/ai_driver.js';
+
 // LOWTOWN // THREE ISLANDS VISUAL OVERHAUL // GTA 2 RETRO-NOIR ENGINE
 // High-detail procedural pedestrian sprites, isometric vehicle chassis, wet road reflections, neon glow & audio
 
@@ -190,6 +194,13 @@ const player = {
   bodyColor: '#e59d35'
 };
 
+// Unified runtime: keep the richer Three Islands world, but drive the player
+// through the tested modular transport physics used by LOWTOWN's AI/tests.
+const playerTransport = createTransportController('sedan', {
+  x: player.x, y: player.y, a: player.angle, vx: 0, vy: 0
+});
+const worldTransport = createTransportSystem();
+
 const islands = [
   { id: 'core', name: 'Lowtown Downtown', x: 300, y: 300, w: 2200, h: 2200 },
   { id: 'docks', name: 'Ironworks Docks', x: 2850, y: 300, w: 2000, h: 2200 },
@@ -210,6 +221,8 @@ const policeCars = [];
 const pedestrians = [];
 const skidmarks = [];
 const waterSplashes = [];
+const modularTraffic = [];
+let unifiedTrafficNodes = [];
 
 const safeSpawnPoints = [
   { x: 1200, y: 1200 },
@@ -343,6 +356,136 @@ function initTopology() {
   }
 }
 
+
+function isRoadSurface(x, y, margin = 8) {
+  for (const r of roads) {
+    if (x >= r.x - margin && x <= r.x + r.w + margin &&
+        y >= r.y - margin && y <= r.y + r.h + margin) return true;
+  }
+  for (const br of bridges) {
+    if (x >= br.x - margin && x <= br.x + br.w + margin &&
+        y >= br.y - margin && y <= br.y + br.h + margin) return true;
+  }
+  return false;
+}
+
+function buildUnifiedTrafficGraph() {
+  const specs = [
+    // Downtown
+    [515,515],[1265,515],[2065,515],
+    [515,1200],[1265,1200],[2065,1200],
+    [515,1915],[1265,1915],[2065,1915],
+    // Docks
+    [3015,515],[3915,515],[4665,515],
+    [3015,1200],[3915,1200],[4665,1200],
+    [3015,1915],[3915,1915],[4665,1915],
+    // Lantern Bay
+    [5365,515],[6265,515],
+    [5365,1200],[6265,1200],
+    [5365,1915],[6265,1915],
+    // Bridge guide nodes
+    [2510,1200],[2840,1200],[4860,1200],[5190,1200]
+  ];
+  const nodes = specs.map(([x,y],i)=>({id:`u_${i}`,x,y,links:[]}));
+  const onSameRoad = (a,b) => {
+    if (Math.abs(a.y-b.y) < 1) {
+      const lo=Math.min(a.x,b.x), hi=Math.max(a.x,b.x), y=a.y;
+      return roads.some(r=>r.dir==='h' && y>=r.y && y<=r.y+r.h && lo>=r.x-20 && hi<=r.x+r.w+20) ||
+             bridges.some(br=>y>=br.y && y<=br.y+br.h && lo>=br.x-20 && hi<=br.x+br.w+20);
+    }
+    if (Math.abs(a.x-b.x) < 1) {
+      const lo=Math.min(a.y,b.y), hi=Math.max(a.y,b.y), x=a.x;
+      return roads.some(r=>r.dir==='v' && x>=r.x && x<=r.x+r.w && lo>=r.y-20 && hi<=r.y+r.h+20);
+    }
+    return false;
+  };
+  for (const n of nodes) {
+    const candidates = nodes
+      .filter(m=>m!==n && onSameRoad(n,m))
+      .sort((a,b)=>Math.hypot(a.x-n.x,a.y-n.y)-Math.hypot(b.x-n.x,b.y-n.y));
+    const byAxis = new Map();
+    for (const m of candidates) {
+      const axis = Math.abs(m.x-n.x) > Math.abs(m.y-n.y) ? (m.x>n.x?'E':'W') : (m.y>n.y?'S':'N');
+      if (!byAxis.has(axis)) byAxis.set(axis,m);
+    }
+    n.links=[...byAxis.values()];
+  }
+  return nodes;
+}
+
+function initUnifiedTraffic() {
+  modularTraffic.length = 0;
+  unifiedTrafficNodes = buildUnifiedTrafficGraph();
+  trafficCars.length = 0;
+  const roster = [
+    ['sedan','#334155'],['taxi','#eab308'],['coupe','#2563eb'],
+    ['sedan','#475569'],['van','#64748b'],['sedan','#7c2d12'],
+    ['taxi','#eab308'],['coupe','#991b1b'],['sedan','#1f2937'],['van','#4b5563']
+  ];
+  const getTraffic = () => modularTraffic.map(m => {
+    const s=m.controller.state;
+    return {x:s.x,y:s.y,a:s.a,v:Math.hypot(s.vx||0,s.vy||0)};
+  });
+  roster.forEach(([vehicleId,color],i) => {
+    const start = unifiedTrafficNodes[(i*3)%Math.max(1,unifiedTrafficNodes.length)] || {x:500,y:1200};
+    const controller = createTransportController(vehicleId,{x:start.x,y:start.y,a:0,vx:0,vy:0});
+    const ai = createAIDriver({
+      nodes: unifiedTrafficNodes,
+      blocked: (x,y)=>!isRoadSurface(x,y,14),
+      getTraffic
+    });
+    ai.start(controller.state);
+    const visual = {
+      x:controller.state.x,y:controller.state.y,angle:controller.state.a,
+      speed:0,color,type:vehicleId,width:vehicleId==='van'?54:46,height:vehicleId==='van'?24:22,
+      controller,ai
+    };
+    modularTraffic.push(visual);
+    trafficCars.push(visual);
+  });
+}
+
+
+function installUnifiedTestHooks() {
+  const lead = modularTraffic[0];
+  if (!lead) return;
+  const controller = lead.controller;
+  const ai = lead.ai;
+  window.__LOWTOWN_TRANSPORT = controller;
+  window.__LOWTOWN_AI = ai;
+  window.__LOWTOWN_TEST = {
+    state() {
+      const s = controller.state;
+      const speed = Math.hypot(s.vx || 0, s.vy || 0);
+      return {
+        x: s.x,
+        y: s.y,
+        speed,
+        maxSpeed: controller.physics?.maxForwardSpeed || 0,
+        distance: s.distance || 0,
+        objectiveDistance: Infinity,
+        money: state.cash,
+        missionReward: 0,
+        missionComplete: false,
+        objectiveTrace: []
+      };
+    }
+  };
+}
+
+function updateUnifiedTraffic(dt) {
+  for (const car of modularTraffic) {
+    const control = car.ai.update(car.controller.state,dt) || {throttle:.4,brake:0,steer:0};
+    car.controller.step(dt,control);
+    const s=car.controller.state;
+    car.x=s.x; car.y=s.y; car.angle=s.a; car.speed=Math.hypot(s.vx||0,s.vy||0);
+    if (!isRoadSurface(car.x,car.y,36)) {
+      car.ai.reset();
+      car.ai.start(s);
+    }
+  }
+}
+
 function isPositionOnSolidGround(x, y) {
   for (let isl of islands) {
     if (x >= isl.x && x <= isl.x + isl.w && y >= isl.y && y <= isl.y + isl.h) return true;
@@ -404,56 +547,49 @@ function updatePhysics(dt) {
     }
   }
 
-  let maxSpeed = 8.8;
-  let accel = 0.17;
-
-  if (CARPARTS.find(p => p.id === 'turbo')?.found) maxSpeed *= 1.2;
-  if (CARPARTS.find(p => p.id === 'cams')?.found) accel += 0.04;
+  // Modular player physics. The world/collisions below remain authoritative,
+  // while acceleration, steering, grip and handbrake come from transport_controller.
+  const transportState = playerTransport.state;
+  transportState.x = player.x;
+  transportState.y = player.y;
+  transportState.a = player.angle;
+  transportState.vx = player.vx;
+  transportState.vy = player.vy;
+  transportState.v = player.speed;
 
   const isBoosting = state.keys.nitro && state.nitroAmount > 5;
-  if (isBoosting) {
-    maxSpeed *= 1.35;
-    accel *= 1.8;
-    state.nitroAmount = Math.max(0, state.nitroAmount - 0.7);
-  } else if (state.nitroAmount < 100) {
-    state.nitroAmount = Math.min(100, state.nitroAmount + 0.2);
-  }
+  if (isBoosting) state.nitroAmount = Math.max(0, state.nitroAmount - 28 * dt);
+  else if (state.nitroAmount < 100) state.nitroAmount = Math.min(100, state.nitroAmount + 8 * dt);
   const nitroBarEl = document.getElementById('nitroBar');
   if (nitroBarEl) nitroBarEl.style.width = Math.round(state.nitroAmount) + '%';
 
-  if (state.keys.up) {
-    player.speed = Math.min(maxSpeed, player.speed + accel);
-  } else if (state.keys.down) {
-    player.speed = Math.max(-maxSpeed * 0.45, player.speed - accel * 1.3);
-  } else {
-    player.speed *= 0.97;
+  const steer = (state.keys.right ? 1 : 0) - (state.keys.left ? 1 : 0);
+  const throttle = state.keys.up ? 1 : (state.keys.down ? -0.65 : 0);
+  const telemetry = playerTransport.step(dt, {
+    throttle,
+    brake: 0,
+    steer,
+    handbrake: state.keys.handbrake
+  });
+
+  // N2O stays an arcade layer on top of the shared physical kernel.
+  if (isBoosting) {
+    const boost = Math.min(1.22, 1 + 1.6 * dt);
+    transportState.vx *= boost;
+    transportState.vy *= boost;
   }
 
-  let lateralGrip = 0.92;
-  if (state.keys.handbrake) {
-    player.speed *= 0.96;
-    lateralGrip = 0.76;
-  }
+  player.x = transportState.x;
+  player.y = transportState.y;
+  player.angle = transportState.a;
+  player.vx = transportState.vx;
+  player.vy = transportState.vy;
+  player.speed = Number.isFinite(transportState.v) ? transportState.v : telemetry.forwardSpeed;
 
-  if (Math.abs(player.speed) > 2) {
+  if (Math.abs(player.speed) > 70 && state.keys.handbrake) {
     skidmarks.push({ x: player.x, y: player.y, angle: player.angle, alpha: 0.5 });
     if (skidmarks.length > 200) skidmarks.shift();
   }
-
-  if (Math.abs(player.speed) > 0.2) {
-    const dir = player.speed >= 0 ? 1 : -1;
-    const turnSpeed = state.keys.handbrake ? 0.065 : 0.046;
-    if (state.keys.left) player.angle -= turnSpeed * dir;
-    if (state.keys.right) player.angle += turnSpeed * dir;
-  }
-
-  const forwardX = Math.cos(player.angle) * player.speed;
-  const forwardY = Math.sin(player.angle) * player.speed;
-  player.vx = player.vx * lateralGrip + forwardX * (1 - lateralGrip);
-  player.vy = player.vy * lateralGrip + forwardY * (1 - lateralGrip);
-
-  player.x += player.vx;
-  player.y += player.vy;
 
   // Collision: Buildings
   buildings.forEach(b => {
@@ -471,7 +607,7 @@ function updatePhysics(dt) {
         player.y = player.y > cy ? b.y + b.h + pad : b.y - pad;
         player.vy = 0;
       }
-      if (state.invulnTimer === 0 && Math.abs(player.speed) > 3) {
+      if (state.invulnTimer === 0 && Math.abs(player.speed) > 150) {
         player.hp = Math.max(0, player.hp - 5);
         sound.playImpact();
         player.speed *= -0.85;
@@ -522,13 +658,13 @@ function updatePhysics(dt) {
     }
   });
 
-  // Traffic update
+  // Unified modular AI traffic
+  updateUnifiedTraffic(dt);
   trafficCars.forEach(c => {
-    c.x += c.speed;
-    if (c.speed > 0 && c.x > c.maxX) c.x = c.minX;
-    if (c.speed < 0 && c.x < c.minX) c.x = c.maxX;
     if (Math.hypot(c.x - player.x, c.y - player.y) < 34) {
       player.speed *= 0.5;
+      const ps = playerTransport.state;
+      ps.vx *= 0.55; ps.vy *= 0.55; ps.v *= 0.55;
       if (state.invulnTimer === 0) {
         player.hp = Math.max(0, player.hp - 8);
         sound.playImpact();
@@ -544,14 +680,14 @@ function updatePhysics(dt) {
     if (p.x < 450 || p.x > 6850) p.vx *= -1;
 
     const d = Math.hypot(p.x - player.x, p.y - player.y);
-    if (d < 120 && Math.abs(player.speed) > 3) {
+    if (d < 120 && Math.abs(player.speed) > 150) {
       p.fleeTimer = 30;
       p.y += (p.y > player.y ? 2.5 : -2.5); // Flee away from road
     }
 
     if (d < 22) {
       p.y += (p.y > player.y ? 20 : -20);
-      if (state.invulnTimer === 0 && Math.abs(player.speed) > 2) {
+      if (state.invulnTimer === 0 && Math.abs(player.speed) > 100) {
         if (state.wanted < 3) setWanted(state.wanted + 1);
         showToast('🚨 НАЕЗД НА ПЕШЕХОДА!');
       }
@@ -559,8 +695,9 @@ function updatePhysics(dt) {
   });
 
   updatePoliceAI(dt);
+  worldTransport.update(dt);
 
-  const speedKmh = Math.abs(player.speed) * 12;
+  const speedKmh = Math.abs(player.speed) * 0.24;
   player.gear = player.speed < -0.1 ? 'R' : speedKmh < 30 ? 'D1' : speedKmh < 60 ? 'D2' : speedKmh < 95 ? 'D3' : speedKmh < 130 ? 'D4' : 'D5';
   player.rpm = Math.min(1.0, (speedKmh % 35) / 35 + 0.2);
   sound.update(player.rpm, player.speed);
@@ -738,6 +875,10 @@ function renderWorld() {
     ctx.stroke();
     ctx.setLineDash([]);
   });
+
+  // 3b. Shared world transport layer: ferries are now simulated by the modular system.
+  // The current Three Islands renderer uses world-space coordinates, so the projection is identity.
+  worldTransport.draw(ctx, p => p, performance.now());
 
   // 4. Tire Skidmarks
   skidmarks.forEach(sm => {
@@ -965,7 +1106,7 @@ function renderWorld() {
   // Radar & HUD
   renderRadar();
   const speedEl = document.getElementById('hudSpeed');
-  if (speedEl) speedEl.innerText = Math.round(Math.abs(player.speed) * 12);
+  if (speedEl) speedEl.innerText = Math.round(Math.abs(player.speed) * 0.24);
   const gearEl = document.getElementById('hudGear');
   if (gearEl) gearEl.innerText = player.gear;
   const rpmEl = document.getElementById('hudRpm');
@@ -1307,6 +1448,8 @@ function toggleGarage() {
 
 window.addEventListener('DOMContentLoaded', () => {
   initTopology();
+  initUnifiedTraffic();
+  installUnifiedTestHooks();
   loadProgress();
   setupInputListeners();
   requestAnimationFrame(gameLoop);
