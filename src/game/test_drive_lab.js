@@ -4,10 +4,10 @@ const route = [
 ];
 const routeLegs = route.length - 1;
 
-export function createDriveLab({player,state,canvas,buildings,trafficCars,policeCars,routeInput}) {
+export function createDriveLab({player,state,canvas,buildings,trafficCars,policeCars,routeInput,roam}) {
   const panel = document.createElement('section');
   panel.id = 'driveLab';
-  panel.innerHTML = `<h1>LOWTOWN</h1><small>PRIVATE TEST DRIVE · 1994</small>
+  panel.innerHTML = `<div class="lab-heading"><h1>LOWTOWN</h1><button id="labToggle" class="secondary" aria-label="Свернуть панель">−</button></div><small>PRIVATE TEST DRIVE · 1994</small>
     <div class="lab-actions"><button id="labRun">Автотест</button><button class="secondary" id="labReset">На старт</button></div>
     <div id="labStatus" role="status">Свободная поездка</div><div id="labMetrics"></div>
     <details><summary>Управление и проверки</summary><p>WASD / стрелки — газ, задний ход и руль. Пробел — ручник. На телефоне — кнопки внизу. M — карта.</p><p>Автотест ведёт машину по восьми участкам через северный и южный городские пояса. Трафик на время отключён. Проверяются кадры, направление, скольжение, мосты, повороты и столкновения.</p><p>Проверка изображения эвристическая: она не заменяет визуальный просмотр всех артефактов.</p></details>`;
@@ -24,9 +24,14 @@ export function createDriveLab({player,state,canvas,buildings,trafficCars,police
     for(const id of ['mapModal','garageModal']) document.getElementById(id).style.display='none';
     clear();
   }
+  if (window.matchMedia?.('(max-width: 700px), (pointer: coarse)').matches) panel.dataset.collapsed='true';
+  panel.querySelector('#labToggle').addEventListener('click',()=>{
+    panel.dataset.collapsed=panel.dataset.collapsed==='true'?'false':'true';
+    panel.querySelector('#labToggle').textContent=panel.dataset.collapsed==='true'?'+':'−';
+  });
   function stop(label) {
     running=false; clear(); player.speed=player.vx=player.vy=0;
-    if(saved) {trafficCars.push(...saved.traffic); policeCars.push(...saved.police); saved=null;}
+    if(saved) {trafficCars.push(...saved.traffic); policeCars.push(...saved.police); if(roam?.fleet)roam.fleet.push(...saved.fleet); saved=null;}
     panel.querySelector('#labRun').textContent='Автотест';
     status.textContent=label;
     panel.dataset.result=issues.size ? 'fail' : (label.startsWith('Пройден') ? 'pass' : 'stopped');
@@ -38,8 +43,8 @@ export function createDriveLab({player,state,canvas,buildings,trafficCars,police
   function start() {
     if(running) {stop('Остановлен');return;}
     reset(); steps=frames=0;waypoint=1;maxSlip=distance=turns=0;issues=new Set();lastAngle=0;
-    saved={traffic:trafficCars.splice(0),police:policeCars.splice(0)};
-    running=true;panel.dataset.result='running';status.textContent='Автотест: едем по маршруту';
+    saved={traffic:trafficCars.splice(0),police:policeCars.splice(0),fleet:roam?.fleet?.splice(0)||[]};
+    running=true;panel.dataset.result='running';panel.dataset.collapsed='false';status.textContent='Автотест: едем по маршруту';
     panel.querySelector('#labRun').textContent='Стоп';updateUi();
   }
   panel.querySelector('#labRun').addEventListener('click',start);

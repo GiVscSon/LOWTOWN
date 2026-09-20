@@ -609,6 +609,15 @@ function initTopology() {
     });
   }
 
+  // Traffic actors carry an explicit identity so lane followers are not
+  // repeatedly pushed sideways by the generic collision solver. Keep the
+  // opening junction clear for a fair first frame and deterministic autotest.
+  for (let i = trafficCars.length - 1; i >= 0; i--) {
+    const car = trafficCars[i];
+    car.isTraffic = true; car.trafficId = `traffic-${i}`; car.waitingAtEdge = false;
+    if (Math.hypot(car.x - player.x, car.y - player.y) < 230) trafficCars.splice(i, 1);
+  }
+
   // Stylish Pedestrians
   const pedStyles = [
     { shirt: '#ef4444', pants: '#1e293b', hair: '#78350f', skin: '#fcd34d' },
@@ -870,17 +879,26 @@ function updatePhysics(dt) {
     const axis = c.axis === 'y' ? 'y' : 'x';
     const cross = axis === 'x' ? 'y' : 'x';
     const direction = Math.sign(c.cruiseSpeed);
-    const obstacle = [player, ...trafficCars, ...parkedCars].some(other => other !== c &&
-      Math.abs(other[cross] - c[cross]) < 27 && (other[axis] - c[axis]) * direction > 0 && (other[axis] - c[axis]) * direction < 90);
-    c.speed += ((obstacle ? 0 : c.cruiseSpeed) - c.speed) * 0.08;
+    const forwardGap = Math.max(72, (c.width || 46) + 34);
+    const occupied = [player, ...trafficCars, ...parkedCars].some(other => other !== c &&
+      Math.abs(other[cross] - c[cross]) < 22 && (other[axis] - c[axis]) * direction > 0 && (other[axis] - c[axis]) * direction < forwardGap);
+    // Alternating six-second phases give the visible junctions coherent flow.
+    const phase = Math.floor(performance.now() / 6000) % 2;
+    const redForAxis = (axis === 'x' ? 0 : 1) !== phase;
+    const nearJunction = roads.some(r => r.dir !== (axis === 'x' ? 'h' : 'v') &&
+      Math.abs((axis === 'x' ? r.x + r.w / 2 : r.y + r.h / 2) - c[axis]) < 52 &&
+      c[cross] >= (axis === 'x' ? r.y : r.x) - 15 && c[cross] <= (axis === 'x' ? r.y + r.h : r.x + r.w) + 15);
+    const obstacle = occupied || (redForAxis && nearJunction);
+    c.speed += ((obstacle ? 0 : c.cruiseSpeed) - c.speed) * Math.min(1, dt * (obstacle ? 9 : 3.5));
+    const frame = Math.min(dt, .05) * 60;
     if (c.axis === 'y') {
-      c.y += c.speed;
-      if (c.speed > 0 && c.y > c.maxY) c.y = c.minY;
-      if (c.speed < 0 && c.y < c.minY) c.y = c.maxY;
+      c.y += c.speed * frame;
+      const wrapped = c.speed > 0 && c.y > c.maxY ? c.minY : c.speed < 0 && c.y < c.minY ? c.maxY : null;
+      if (wrapped !== null && !trafficCars.some(o=>o!==c&&Math.abs(o.x-c.x)<24&&Math.abs(o.y-wrapped)<110)) c.y=wrapped;
     } else {
-      c.x += c.speed;
-      if (c.speed > 0 && c.x > c.maxX) c.x = c.minX;
-      if (c.speed < 0 && c.x < c.minX) c.x = c.maxX;
+      c.x += c.speed * frame;
+      const wrapped = c.speed > 0 && c.x > c.maxX ? c.minX : c.speed < 0 && c.x < c.minX ? c.maxX : null;
+      if (wrapped !== null && !trafficCars.some(o=>o!==c&&Math.abs(o.y-c.y)<24&&Math.abs(o.x-wrapped)<110)) c.x=wrapped;
     }
     if (!roam?.special && resolveContact(player, c)) {
       if (state.invulnTimer === 0) {
@@ -893,16 +911,30 @@ function updatePhysics(dt) {
   });
 
   // Pedestrians AI & Flee
-  pedestrians.forEach(p => {
-    p.x += p.vx;
-    p.walkPhase += 0.08;
-    if (p.x < (p.minX ?? 450) || p.x > (p.maxX ?? 6850)) p.vx *= -1;
-
+  pedestrians.forEach((p, pedIndex) => {
+    if (p.homeY === undefined) { p.homeY=p.y; p.pause=stableVisualHash(p.x,p.y,3)*1.5; }
+    const frame=Math.min(dt,.05)*60;
     const d = Math.hypot(p.x - player.x, p.y - player.y);
-    if (d < 120 && Math.abs(player.speed) > 3) {
-      p.fleeTimer = 30;
-      p.y += (p.y > player.y ? 2.5 : -2.5); // Flee away from road
+    p.fleeTimer=Math.max(0,p.fleeTimer-dt);
+    if (d < 135 && Math.abs(player.speed) > 2.5) p.fleeTimer=1.3;
+
+    if (p.fleeTimer>0) {
+      const len=d||1;
+      p.x+=(p.x-player.x)/len*1.35*frame;
+      p.y+=(p.y-player.y)/len*1.35*frame;
+      p.walkPhase+=.18*frame;
+    } else {
+      p.pause-=dt;
+      if(p.pause<=-2.2){p.pause=1.1+stableVisualHash(pedIndex,Math.floor(performance.now()/1000),4)*1.8;p.vx*=-1;}
+      const moving=p.pause<=0;
+      p.x+=(moving?p.vx:0)*frame;
+      p.y+=(p.homeY-p.y)*Math.min(.12,dt*3);
+      if(moving)p.walkPhase+=.09*frame;
     }
+    if (p.x < (p.minX ?? 450) || p.x > (p.maxX ?? 6850)) {p.vx*=-1;p.x=Math.max(p.minX??450,Math.min(p.maxX??6850,p.x));}
+    // Small personal-space steering prevents pedestrians from forming one dot.
+    const neighbor=pedestrians.find((o,j)=>j!==pedIndex&&Math.abs(o.x-p.x)<12&&Math.abs(o.y-p.y)<10);
+    if(neighbor)p.y+=(pedIndex%2?1:-1)*.18*frame;
 
     if (d < 22) {
       p.y += (p.y > player.y ? 20 : -20);
@@ -918,7 +950,10 @@ function updatePhysics(dt) {
   // Repeated projection handles simultaneous wall/car contacts at intersections.
   for (let pass = 0; pass < 3; pass++) {
     for (let i = 0; i < vehicles.length; i++) {
-      for (let j = i + 1; j < vehicles.length; j++) resolveContact(vehicles[i], vehicles[j]);
+      for (let j = i + 1; j < vehicles.length; j++) {
+        if (vehicles[i].isTraffic && vehicles[j].isTraffic) continue;
+        resolveContact(vehicles[i], vehicles[j]);
+      }
       for (const parked of parkedCars) resolveContact(vehicles[i], parked, true);
       for (const vehicle of roam?.fleet || []) if (vehicle.kind !== 'water') resolveContact(vehicles[i],vehicle,true);
       resolveScenery(vehicles[i], buildings, trees);
@@ -1214,14 +1249,15 @@ function renderWorld() {
   const leadY = Math.sin(player.angle) * player.speed * 6;
   const center = projectIso(player.x + leadX, player.y + leadY);
   ctx.translate(w / 2, h / 2);
-  const cameraZoom = w > 900 ? 1.12 : .96;
+  const cameraZoom = w > 900 ? 1.04 : .82;
   ctx.scale(cameraZoom, cameraZoom);
   ctx.translate(-center.x, -center.y);
   ctx.transform(Math.sqrt(3) / 2, 0.5, -Math.sqrt(3) / 2, 0.5, 0, 0);
 
   // Animated tidal ripples and shallow water around the shared coast polygon.
   ctx.strokeStyle = 'rgba(104,156,166,.13)'; ctx.lineWidth = 2;
-  for (let x = 150; x < WORLD_W; x += 180) for (let y = 120; y < WORLD_H; y += 170) {
+  const waterStartX=Math.floor((player.x-2500)/180)*180, waterStartY=Math.floor((player.y-2500)/170)*170;
+  for (let x = waterStartX; x < player.x+2500; x += 180) for (let y = waterStartY; y < player.y+2500; y += 170) {
     if (isPositionOnSolidGround(x,y)) continue;
     const drift = Math.sin(performance.now()*.0007+x)*12;
     ctx.beginPath();ctx.moveTo(x+drift,y);ctx.lineTo(x+50+drift,y+7);ctx.stroke();
@@ -1391,45 +1427,7 @@ function renderWorld() {
     .forEach(({building,index})=>drawBuilding(building,index));
 
   // 8. Detailed Pedestrians
-  pedestrians.forEach(ped => {
-    ctx.save();
-    ctx.translate(ped.x, ped.y);
-
-    // Shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    ctx.beginPath();
-    ctx.ellipse(0, 4, 6, 3, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    const leg = Math.sin(ped.walkPhase) * 3;
-
-    // Legs
-    ctx.fillStyle = ped.pants;
-    ctx.fillRect(-3 + leg, 0, 2.5, 6);
-    ctx.fillRect(1 - leg, 0, 2.5, 6);
-
-    // Torso / Jacket
-    ctx.fillStyle = ped.shirt;
-    ctx.fillRect(-4, -7, 8, 7);
-
-    // Arms with swing
-    ctx.fillStyle = ped.skin;
-    ctx.fillRect(-6 - leg * 0.5, -6, 2, 5);
-    ctx.fillRect(4 + leg * 0.5, -6, 2, 5);
-
-    // Head & Hair
-    ctx.fillStyle = ped.hair;
-    ctx.beginPath();
-    ctx.arc(0, -11, 4, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = ped.skin;
-    ctx.beginPath();
-    ctx.arc(0, -9.5, 2.8, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.restore();
-  });
+  pedestrians.forEach(ped => drawPedestrian(ctx,ped));
 
   // 9. Traffic Vehicles (Chassis, Cabin, Glass & Lights)
   trafficCars.forEach(c => drawDetailedCar(ctx, c.x, c.y, c.angle, c.color, c.width || 46, c.height || 22, false));
@@ -1463,82 +1461,17 @@ function renderWorld() {
   for (const vehicle of roam?.fleet || []) drawTransport(ctx,vehicle,performance.now()/1000);
   if (roam?.special) {
     if (roam.mode === 'foot') {
-      const stride=Math.sin(performance.now()*.012)*3;
-      ctx.save();ctx.translate(player.x,player.y);ctx.rotate(player.angle);ctx.fillStyle='rgba(0,0,0,.5)';ctx.beginPath();ctx.ellipse(3,5,8,4,0,0,Math.PI*2);ctx.fill();
-      ctx.strokeStyle='#24282b';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-2,2);ctx.lineTo(-5,9+stride);ctx.moveTo(2,2);ctx.lineTo(5,9-stride);ctx.stroke();
-      ctx.fillStyle='#5f482f';ctx.fillRect(-5,-7,10,11);ctx.fillStyle='#d5b594';ctx.beginPath();ctx.arc(0,-11,4.5,0,Math.PI*2);ctx.fill();ctx.fillStyle='#1a1512';ctx.beginPath();ctx.arc(-1,-13,4,Math.PI,Math.PI*2);ctx.fill();ctx.restore();
+      drawPedestrian(ctx,{x:player.x,y:player.y,walkPhase:performance.now()*.012,shirt:'#735235',pants:'#22272b',skin:'#d5b594',hair:'#1a1512',player:true});
     } else drawTransport(ctx,{...roam.profile,type:roam.mode,x:player.x,y:player.y,angle:player.angle},performance.now()/1000,roam.altitude);
   } else {
-  // 12. Player Vehicle with Volumetric Headlights
-  ctx.save();
-  ctx.translate(player.x, player.y);
-  if (state.isDrowning) {
-    const scale = Math.max(0.2, 1 - state.drownProgress * 0.7);
-    ctx.scale(scale, scale);
-    ctx.globalAlpha = Math.max(0.2, 1 - state.drownProgress);
-  }
-  ctx.rotate(player.angle);
-
-  if (!state.isDrowning) {
-    ctx.save(); ctx.globalCompositeOperation='screen';
-    const tailGlow=ctx.createLinearGradient(-96,0,-18,0);
-    tailGlow.addColorStop(0,'rgba(210,28,18,0)');tailGlow.addColorStop(.72,'rgba(235,38,20,.13)');tailGlow.addColorStop(1,'rgba(255,48,22,.34)');
-    ctx.fillStyle=tailGlow;ctx.beginPath();ctx.ellipse(-56,0,48,10,0,0,Math.PI*2);ctx.fill();ctx.restore();
-  }
-
-  // Dynamic Headlights Cone
-  if (!state.isDrowning) {
-    const headGrad = ctx.createRadialGradient(24, 0, 10, 120, 0, 140);
-    headGrad.addColorStop(0, 'rgba(255, 245, 210, 0.45)');
-    headGrad.addColorStop(0.5, 'rgba(255, 230, 160, 0.18)');
-    headGrad.addColorStop(1, 'rgba(255, 230, 160, 0)');
-    ctx.fillStyle = headGrad;
-    ctx.beginPath();
-    ctx.moveTo(24, -9);
-    ctx.lineTo(140, -48);
-    ctx.lineTo(140, 48);
-    ctx.lineTo(24, 9);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  // Shadow
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-  ctx.beginPath();
-  ctx.ellipse(0, 6, player.width * 0.55, player.height * 0.48, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Wheels
-  ctx.fillStyle = '#0a0d14';
-  ctx.fillRect(-18, -player.height / 2 - 2, 10, 4);
-  ctx.fillRect(10, -player.height / 2 - 2, 10, 4);
-  ctx.fillRect(-18, player.height / 2 - 2, 10, 4);
-  ctx.fillRect(10, player.height / 2 - 2, 10, 4);
-
-  // Main Body
-  ctx.fillStyle = player.bodyColor;
-  ctx.fillRect(-player.width / 2, -player.height / 2, player.width, player.height);
-  ctx.strokeStyle = '#111827';
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(-player.width / 2, -player.height / 2, player.width, player.height);
-
-  // Roof & Glass Cabin
-  ctx.fillStyle = '#0f172a';
-  ctx.fillRect(-8, -player.height / 2 + 3, 20, player.height - 6);
-  ctx.fillStyle = '#1e293b';
-  ctx.fillRect(-4, -player.height / 2 + 5, 14, player.height - 10);
-
-  // Headlights
-  ctx.fillStyle = '#fffbeb';
-  ctx.fillRect(player.width / 2 - 3, -player.height / 2 + 2, 3, 5);
-  ctx.fillRect(player.width / 2 - 3, player.height / 2 - 7, 3, 5);
-
-  // Taillights
-  ctx.fillStyle = state.keys.down ? '#ff2222' : '#dc2626';
-  ctx.fillRect(-player.width / 2, -player.height / 2 + 2, 3, 5);
-  ctx.fillRect(-player.width / 2, player.height / 2 - 7, 3, 5);
-
-  ctx.restore();
+    // 12. Player vehicle uses the same volumetric model as traffic.
+    if(!state.isDrowning){
+      ctx.save();ctx.translate(player.x,player.y);ctx.rotate(player.angle);
+      const headGrad=ctx.createRadialGradient(24,0,10,120,0,140);headGrad.addColorStop(0,'rgba(255,245,210,.4)');headGrad.addColorStop(.5,'rgba(255,230,160,.16)');headGrad.addColorStop(1,'rgba(255,230,160,0)');
+      ctx.fillStyle=headGrad;ctx.beginPath();ctx.moveTo(24,-9);ctx.lineTo(140,-48);ctx.lineTo(140,48);ctx.lineTo(24,9);ctx.closePath();ctx.fill();ctx.restore();
+    }
+    ctx.save();ctx.globalAlpha=state.isDrowning?Math.max(.2,1-state.drownProgress):1;
+    drawDetailedCar(ctx,player.x,player.y,player.angle,player.bodyColor,player.width,player.height,false);ctx.restore();
   }
 
   ctx.restore();
@@ -1578,52 +1511,68 @@ function renderWorld() {
   }
 }
 
+function drawPedestrian(ctx,ped){
+  const step=Math.sin(ped.walkPhase||0)*2.8;
+  const height=ped.player?27:24;
+  ctx.save();ctx.translate(ped.x,ped.y);
+  ctx.fillStyle='rgba(0,0,0,.52)';ctx.beginPath();ctx.ellipse(5,6,9,5,0,0,Math.PI*2);ctx.fill();
+  // Legs are separate dark prisms, giving a readable walking gait.
+  ctx.strokeStyle=ped.pants||'#23272a';ctx.lineWidth=4;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(-2,-7);ctx.lineTo(-5+step,4);ctx.moveTo(2,-7);ctx.lineTo(5-step,4);ctx.stroke();
+  const top=[-height,-height], shoulder=7;
+  ctx.fillStyle='rgba(20,15,12,.55)';ctx.beginPath();ctx.moveTo(-shoulder,-5);ctx.lineTo(shoulder,-5);ctx.lineTo(shoulder+top[0],-5+top[1]);ctx.lineTo(-shoulder+top[0],-5+top[1]);ctx.closePath();ctx.fill();
+  ctx.fillStyle=ped.shirt||'#62503f';ctx.beginPath();ctx.moveTo(-shoulder+top[0],-5+top[1]);ctx.lineTo(shoulder+top[0],-5+top[1]);ctx.lineTo(5+top[0],8+top[1]);ctx.lineTo(-5+top[0],8+top[1]);ctx.closePath();ctx.fill();
+  ctx.strokeStyle='rgba(255,225,177,.22)';ctx.lineWidth=1.4;ctx.stroke();
+  ctx.strokeStyle=ped.shirt||'#62503f';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-6+top[0],-2+top[1]);ctx.lineTo(-10+top[0],7+top[1]+step);ctx.moveTo(6+top[0],-2+top[1]);ctx.lineTo(10+top[0],7+top[1]-step);ctx.stroke();
+  ctx.fillStyle=ped.skin||'#d7b08a';ctx.beginPath();ctx.arc(top[0],top[1]-7,6,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=ped.hair||'#211915';ctx.beginPath();ctx.arc(top[0]-1,top[1]-9,5.6,Math.PI,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(255,231,191,.5)';ctx.beginPath();ctx.arc(top[0]-2,top[1]-8,1.5,0,Math.PI*2);ctx.fill();
+  if(ped.player){ctx.strokeStyle='#e8b84a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(top[0],top[1]-7,10,0,Math.PI*2);ctx.stroke();}
+  ctx.restore();
+}
+
 function drawDetailedCar(ctx, x, y, ang, color, w, h, isPolice = false) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(ang);
+  const elevation=5.5, cs=Math.cos(ang), sn=Math.sin(ang);
+  // Inverse-rotated world vertical; after the camera transform this stays an
+  // upright screen-space extrusion at every vehicle heading.
+  const zx=-elevation*(cs+sn), zy=elevation*(sn-cs);
+  const body=[[-w*.5+h*.12,-h*.5], [w*.38,-h*.5], [w*.5,-h*.28], [w*.5,h*.28], [w*.38,h*.5], [-w*.5+h*.12,h*.5], [-w*.5,h*.25], [-w*.5,-h*.25]];
+  const poly=(points,fill,stroke)=>{ctx.beginPath();points.forEach(([px,py],i)=>i?ctx.lineTo(px,py):ctx.moveTo(px,py));ctx.closePath();ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.stroke();}};
 
   ctx.save();ctx.globalCompositeOperation='screen';
-  const tailGlow=ctx.createLinearGradient(-82,0,-w*.35,0);
-  tailGlow.addColorStop(0,'rgba(204,24,16,0)');tailGlow.addColorStop(.72,'rgba(232,33,18,.1)');tailGlow.addColorStop(1,'rgba(255,47,22,.27)');
+  const tailGlow=ctx.createLinearGradient(-82,0,-w*.35,0);tailGlow.addColorStop(0,'rgba(204,24,16,0)');tailGlow.addColorStop(.72,'rgba(232,33,18,.1)');tailGlow.addColorStop(1,'rgba(255,47,22,.27)');
   ctx.fillStyle=tailGlow;ctx.beginPath();ctx.ellipse(-45,0,38,7,0,0,Math.PI*2);ctx.fill();ctx.restore();
+  ctx.fillStyle='rgba(0,0,0,.58)';ctx.beginPath();ctx.ellipse(4,5,w*.58,h*.58,0,0,Math.PI*2);ctx.fill();
 
-  // Shadow
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-  ctx.beginPath();
-  ctx.ellipse(0, 4, w * 0.55, h * 0.45, 0, 0, Math.PI * 2);
-  ctx.fill();
+  // Tyres remain on the road while the body is raised above them.
+  ctx.fillStyle='#050607';
+  for(const wx of [-w*.3,w*.23])for(const wy of [-h*.54,h*.44])ctx.fillRect(wx-5,wy,11,4.5);
+  // Dark vertical side faces.
+  for(let i=0;i<body.length;i++){
+    const a=body[i],b=body[(i+1)%body.length];
+    if(i===0||i===1||i===2||i===6)poly([a,b,[b[0]+zx,b[1]+zy],[a[0]+zx,a[1]+zy]],i<2?'rgba(23,25,27,.92)':'rgba(8,10,12,.82)');
+  }
+  const top=body.map(([px,py])=>[px+zx,py+zy]);
+  ctx.lineWidth=1.35;poly(top,color,'#090b0d');
+  // Bonnet/trunk highlights make the heading unambiguous.
+  ctx.strokeStyle='rgba(255,238,202,.28)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(w*.22+zx,-h*.42+zy);ctx.lineTo(w*.42+zx,-h*.22+zy);ctx.lineTo(w*.42+zx,h*.22+zy);ctx.lineTo(w*.22+zx,h*.42+zy);ctx.stroke();
+  ctx.strokeStyle='rgba(0,0,0,.42)';ctx.beginPath();ctx.moveTo(-w*.32+zx,-h*.4+zy);ctx.lineTo(-w*.32+zx,h*.4+zy);ctx.stroke();
 
-  // Wheels
-  ctx.fillStyle = '#090d16';
-  ctx.fillRect(-w * 0.38, -h * 0.5 - 2, 8, 3.5);
-  ctx.fillRect(w * 0.22, -h * 0.5 - 2, 8, 3.5);
-  ctx.fillRect(-w * 0.38, h * 0.5 - 1.5, 8, 3.5);
-  ctx.fillRect(w * 0.22, h * 0.5 - 1.5, 8, 3.5);
+  // Raised glass cabin with distinct front and rear windscreens.
+  const rzX=zx*1.72,rzY=zy*1.72;
+  const cabin=[[-w*.18,-h*.36],[w*.18,-h*.34],[w*.27,-h*.2],[w*.27,h*.2],[w*.18,h*.34],[-w*.18,h*.36],[-w*.27,h*.2],[-w*.27,-h*.2]].map(([px,py])=>[px+rzX,py+rzY]);
+  poly(cabin,'#17262e','#080d10');
+  ctx.fillStyle='rgba(100,139,151,.38)';poly([[w*.04+rzX,-h*.27+rzY],[w*.18+rzX,-h*.2+rzY],[w*.18+rzX,h*.2+rzY],[w*.04+rzX,h*.27+rzY]],'rgba(99,137,149,.45)');
+  ctx.strokeStyle='rgba(220,232,226,.2)';ctx.beginPath();ctx.moveTo(-w*.08+rzX,-h*.31+rzY);ctx.lineTo(-w*.08+rzX,h*.31+rzY);ctx.stroke();
 
-  // Body
-  ctx.fillStyle = color;
-  ctx.fillRect(-w / 2, -h / 2, w, h);
-  ctx.strokeStyle = '#0f172a';
-  ctx.lineWidth = 1.2;
-  ctx.strokeRect(-w / 2, -h / 2, w, h);
-
-  // Cabin
-  ctx.fillStyle = '#0f172a';
-  ctx.fillRect(-w * 0.18, -h * 0.38, w * 0.42, h * 0.76);
-  ctx.fillStyle = '#1e293b';
-  ctx.fillRect(-w * 0.08, -h * 0.28, w * 0.26, h * 0.56);
-
-  // Headlights
-  ctx.fillStyle = '#fef08a';
-  ctx.fillRect(w / 2 - 2.5, -h / 2 + 2, 2.5, 4);
-  ctx.fillRect(w / 2 - 2.5, h / 2 - 6, 2.5, 4);
-
-  // Taillights
-  ctx.fillStyle = '#dc2626';
-  ctx.fillRect(-w / 2, -h / 2 + 2, 2.5, 4);
-  ctx.fillRect(-w / 2, h / 2 - 6, 2.5, 4);
-
+  ctx.fillStyle='#fff2b0';ctx.shadowColor='#ffe18a';ctx.shadowBlur=5;
+  ctx.fillRect(w*.46+zx,-h*.34+zy,3.5,5);ctx.fillRect(w*.46+zx,h*.22+zy,3.5,5);ctx.shadowBlur=0;
+  ctx.fillStyle='#ef3629';ctx.fillRect(-w*.5+zx,-h*.31+zy,3.5,5);ctx.fillRect(-w*.5+zx,h*.2+zy,3.5,5);
+  if(isPolice){ctx.fillStyle='#e43b35';ctx.fillRect(-2+rzX,-5+rzY,5,5);ctx.fillStyle='#3d7ee8';ctx.fillRect(3+rzX,-5+rzY,5,5);}
   ctx.restore();
 }
 
@@ -1943,7 +1892,7 @@ function boot() {
   roamControls.append(enterButton,flyButton);document.body.appendChild(roamControls);
   loadProgress();
   setupInputListeners();
-  driveLab = createDriveLab({ player, state, canvas, roads, buildings, trafficCars, policeCars, routeInput });
+  driveLab = createDriveLab({ player, state, canvas, roads, buildings, trafficCars, policeCars, routeInput, roam });
   state.lastFrameTime = performance.now();
   requestAnimationFrame(gameLoop);
 }
