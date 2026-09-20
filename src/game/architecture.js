@@ -1,6 +1,6 @@
 // Equal negative X/Y offsets become height after the isometric camera transform.
 export function drawArchitecture(ctx, b, index) {
-  const floors = 2 + index % 5, z = floors * 24, r = 16 + index % 3 * 3;
+  const floors = b.floors ?? (2 + index % 5), z = floors * 24, r = b.cornerRadius ?? (16 + index % 3 * 3);
   const base = [[b.x+r,b.y],[b.x+b.w-r,b.y],[b.x+b.w,b.y+r],[b.x+b.w,b.y+b.h-r],[b.x+b.w-r,b.y+b.h],[b.x+r,b.y+b.h],[b.x,b.y+b.h-r],[b.x,b.y+r]];
   const polygon = (points, color) => { ctx.beginPath(); points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y)); ctx.closePath(); ctx.fillStyle=color; ctx.fill(); };
   const palettes = [
