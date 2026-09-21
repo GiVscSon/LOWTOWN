@@ -30,7 +30,7 @@ export function resolveContact(a, b, fixed = false) {
   }
   return true;
 }
-export function resolveScenery(car, buildings, trees = []) {
+export function resolveScenery(car, buildings, trees = [], props = []) {
   let hit = false;
   for (const b of buildings) {
     if (Math.abs(car.x - b.x - b.w / 2) > b.w / 2 + 40 || Math.abs(car.y - b.y - b.h / 2) > b.h / 2 + 40) continue;
@@ -38,5 +38,10 @@ export function resolveScenery(car, buildings, trees = []) {
   }
   for (const tree of trees) if (Math.hypot(car.x - tree.x, car.y - tree.y) < 45)
     hit = resolveContact(car, { x: tree.x, y: tree.y, width: 12, height: 12 }, true) || hit;
+  for (const prop of props) {
+    const width=prop.width||12,height=prop.height||12;
+    if(Math.abs(car.x-prop.x)>width*.5+45||Math.abs(car.y-prop.y)>height*.5+45)continue;
+    hit=resolveContact(car,{x:prop.x,y:prop.y,width,height,angle:prop.angle||0},true)||hit;
+  }
   return hit;
 }
