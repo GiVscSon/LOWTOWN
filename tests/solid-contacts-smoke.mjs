@@ -13,4 +13,7 @@ resolveContact({ x: 10, y: 0, speed: 6 }, parked, true);
 assert.equal(parked.x, 0);
 const treeCar = { x: 0, y: 0, speed: 4 };
 assert(resolveScenery(treeCar, [], [{ x: 0, y: 0 }]));
+const parkCar={x:0,y:0,angle:0,width:18,height:10,speed:2,vx:1,vy:0};
+assert(resolveScenery(parkCar,[],[],[{x:0,y:0,width:42,height:18,type:'bench'}]));
+assert.ok(Math.hypot(parkCar.x,parkCar.y)>0,'park furniture must push vehicles out');
 console.log('PASS: rotated and coincident cars, wall footprint, fixed parking, tree trunks');
