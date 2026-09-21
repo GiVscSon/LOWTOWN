@@ -43,5 +43,5 @@ assert.equal(sandbox.result.segments,8,'Expanded route must complete');
 assert.ok(sandbox.result.maxSlip<18,'No excessive lateral slide');
 assert.equal(sandbox.result.hits,0);
 assert.equal(sandbox.result.drowned,false);
-assert.equal(JSON.stringify(sandbox.result.world),JSON.stringify({islands:16,bridges:20,roads:93,buildings:232,traffic:0,pedestrians:0,verticalRails:20,streetLights:116,trees:74,parkedCars:24,cranes:8,billboards:18}));
+assert.equal(JSON.stringify(sandbox.result.world),JSON.stringify({islands:16,bridges:20,roads:93,buildings:232,traffic:0,pedestrians:0,verticalRails:20,streetLights:116,trees:278,parkedCars:24,cranes:8,billboards:18}));
 console.log('PASS: heading, projection, steering and sixteen-district world route through actual game physics');
