@@ -468,24 +468,31 @@ function initTopology() {
   blocks.forEach((block, blockIndex) => {
     const gap = 76;
     const bw = (block.w - gap) / 2, bh = (block.h - gap) / 2;
-    if (blockIndex % 7 === 0 || blockIndex % 11 === 5) {
+    if (blockIndex % 5 === 0 || blockIndex % 9 === 4) {
       // Give every few districts breathing room: four low perimeter buildings
       // frame a real civic park instead of another full roof-to-roof block.
       const edgeH=Math.max(82,block.h*.22), edgeW=Math.max(92,block.w*.25);
       buildings.push(
-        {...block,x:block.x,y:block.y,w:block.w*.42,h:edgeH,floors:2,sign:block.sign},
-        {...block,x:block.x+block.w*.58,y:block.y,w:block.w*.42,h:edgeH,floors:2,sign:'CAFE'},
-        {...block,x:block.x,y:block.y+block.h-edgeH,w:block.w*.34,h:edgeH,floors:1,sign:'PARK HOUSE'},
-        {...block,x:block.x+block.w-edgeW,y:block.y+block.h-edgeH,w:edgeW,h:edgeH,floors:1,sign:'NEWS & FLOWERS'}
+        {...block,x:block.x,y:block.y,w:block.w*.42,h:edgeH,floors:2,archetype:'pavilion',sign:block.sign},
+        {...block,x:block.x+block.w*.58,y:block.y,w:block.w*.42,h:edgeH,floors:2,archetype:'shop',sign:'CAFE'},
+        {...block,x:block.x,y:block.y+block.h-edgeH,w:block.w*.34,h:edgeH,floors:1,archetype:'pavilion',sign:'PARK HOUSE'},
+        {...block,x:block.x+block.w-edgeW,y:block.y+block.h-edgeH,w:edgeW,h:edgeH,floors:1,archetype:'shop',sign:'NEWS & FLOWERS'}
       );
       parkZones.push({x:block.x+28,y:block.y+edgeH+24,w:block.w-56,h:block.h-edgeH*2-48,type:blockIndex%4});
       trees.push({x:block.x+block.w*.5,y:block.y-28,size:23});
       return;
     }
+    const districtTypes=['tenement','shop','warehouse','deco','townhouse','office'];
+    const secondarySigns=['APARTMENTS','REPAIR SHOP','GROCERY','WAREHOUSE','LAUNDROMAT','DINER','PAWN & LOAN','OLD BOOKS'];
+    const floorRanges={tenement:[4,6],shop:[2,3],warehouse:[1,2],deco:[3,5],townhouse:[2,4],office:[5,7]};
     for (let row = 0; row < 2; row++) for (let col = 0; col < 2; col++) {
-      buildings.push({ ...block, x: block.x + col * (bw + gap), y: block.y + row * (bh + gap), w: bw, h: bh,
-        sign: row === 0 && col === 0 ? block.sign.replace(/[^\x20-\x7E]/g, '').trim() : ['APARTMENTS', 'REPAIR SHOP', 'GROCERY', 'WAREHOUSE'][(blockIndex + row + col) % 4],
-        neon: ['#e09a3e', '#bba77c', '#9aa0a8', '#d4523a'][blockIndex % 4] });
+      const archetype=districtTypes[(blockIndex+row*2+col)%districtTypes.length];
+      const range=floorRanges[archetype], floors=range[0]+((blockIndex+row+col)%(range[1]-range[0]+1));
+      const inset=archetype==='townhouse'?14:archetype==='warehouse'?5:archetype==='office'?9:0;
+      buildings.push({ ...block, x: block.x + col * (bw + gap)+inset, y: block.y + row * (bh + gap)+(archetype==='shop'?12:0), w: bw-inset*1.35, h: bh-(archetype==='warehouse'?8:archetype==='shop'?18:0),
+        floors,archetype,cornerRadius:archetype==='warehouse'?5:archetype==='deco'?11:archetype==='townhouse'?7:18,
+        sign: row === 0 && col === 0 ? block.sign.replace(/[^\x20-\x7E]/g, '').trim() : secondarySigns[(blockIndex*3 + row*2 + col) % secondarySigns.length],
+        neon: ['#e09a3e', '#bba77c', '#9aa0a8', '#d4523a','#5f9ea0','#c06b47'][(blockIndex+row+col) % 6] });
     }
     trees.push({ x: block.x + bw + gap / 2, y: block.y - 28, size: 23 });
   });
@@ -656,6 +663,7 @@ function initTopology() {
       hair: style.hair,
       skin: style.skin,
       walkPhase: Math.random() * Math.PI * 2,
+      visualScale: .82 + (i % 5) * .035,
       fleeTimer: 0
     });
   }
@@ -667,7 +675,7 @@ function initTopology() {
       vx: (Math.random() - 0.5) * 0.9, vy: 0,
       minX: 450, maxX: 6850,
       shirt: style.shirt, pants: style.pants, hair: style.hair, skin: style.skin,
-      walkPhase: Math.random() * Math.PI * 2, fleeTimer: 0
+      walkPhase: Math.random() * Math.PI * 2, visualScale: .82 + (i % 4) * .04, fleeTimer: 0
     });
   }
   for (let i = 0; i < 24; i++) {
@@ -676,7 +684,7 @@ function initTopology() {
       x: 500 + i * 265, y: 7120 + (i % 2 === 0 ? -16 : ROAD_W + 16),
       vx: (Math.random() - 0.5) * 0.85, vy: 0, minX: 450, maxX: 6850,
       shirt: style.shirt, pants: style.pants, hair: style.hair, skin: style.skin,
-      walkPhase: Math.random() * Math.PI * 2, fleeTimer: 0
+      walkPhase: Math.random() * Math.PI * 2, visualScale: .82 + (i % 6) * .03, fleeTimer: 0
     });
   }
   for (let i = 0; i < 32; i++) {
@@ -685,7 +693,7 @@ function initTopology() {
       x: 520 + i * 285, y: 10120 + (i % 2 === 0 ? -16 : ROAD_W + 16),
       vx: (Math.random() - 0.5) * 0.85, vy: 0, minX: 450, maxX: 9350,
       shirt: style.shirt, pants: style.pants, hair: style.hair, skin: style.skin,
-      walkPhase: Math.random() * Math.PI * 2, fleeTimer: 0
+      walkPhase: Math.random() * Math.PI * 2, visualScale: .82 + (i % 5) * .035, fleeTimer: 0
     });
   }
 }
@@ -698,6 +706,21 @@ function isPositionOnSolidGround(x, y) {
     if (x >= br.x - 10 && x <= br.x + br.w + 10 && y >= br.y - 12 && y <= br.y + br.h + 12) return true;
   }
   return false;
+}
+
+function isPedestrianBlocked(x,y){
+  if(!isPositionOnSolidGround(x,y))return true;
+  if(buildings.some(b=>x>b.x-7&&x<b.x+b.w+7&&y>b.y-7&&y<b.y+b.h+7))return true;
+  return trees.some(t=>Math.hypot(x-t.x,y-t.y)<t.size+6);
+}
+
+function movePedestrian(p,dx,dy){
+  const attempts=[[dx,dy],[dx,0],[0,dy],[-dy*.75,dx*.75],[dy*.75,-dx*.75]];
+  for(const [mx,my] of attempts){
+    if(Math.abs(mx)+Math.abs(my)<.001||isPedestrianBlocked(p.x+mx,p.y+my))continue;
+    p.x+=mx;p.y+=my;return true;
+  }
+  p.vx*=-1;p.fleeTimer=0;p.pause=.45;return false;
 }
 
 function updatePhysics(dt) {
@@ -939,24 +962,22 @@ function updatePhysics(dt) {
 
     if (p.fleeTimer>0) {
       const len=d||1;
-      p.x+=(p.x-player.x)/len*1.35*frame;
-      p.y+=(p.y-player.y)/len*1.35*frame;
-      p.walkPhase+=.18*frame;
+      const moved=movePedestrian(p,(p.x-player.x)/len*1.35*frame,(p.y-player.y)/len*1.35*frame);
+      if(moved)p.walkPhase+=.18*frame;
     } else {
       p.pause-=dt;
       if(p.pause<=-2.2){p.pause=1.1+stableVisualHash(pedIndex,Math.floor(performance.now()/1000),4)*1.8;p.vx*=-1;}
       const moving=p.pause<=0;
-      p.x+=(moving?p.vx:0)*frame;
-      p.y+=(p.homeY-p.y)*Math.min(.12,dt*3);
-      if(moving)p.walkPhase+=.09*frame;
+      const dx=(moving?p.vx:0)*frame,dy=(p.homeY-p.y)*Math.min(.12,dt*3);
+      if(movePedestrian(p,dx,dy)&&moving)p.walkPhase+=.09*frame;
     }
     if (p.x < (p.minX ?? 450) || p.x > (p.maxX ?? 6850)) {p.vx*=-1;p.x=Math.max(p.minX??450,Math.min(p.maxX??6850,p.x));}
     // Small personal-space steering prevents pedestrians from forming one dot.
     const neighbor=pedestrians.find((o,j)=>j!==pedIndex&&Math.abs(o.x-p.x)<12&&Math.abs(o.y-p.y)<10);
-    if(neighbor)p.y+=(pedIndex%2?1:-1)*.18*frame;
+    if(neighbor)movePedestrian(p,0,(pedIndex%2?1:-1)*.18*frame);
 
     if (d < 22) {
-      p.y += (p.y > player.y ? 20 : -20);
+      movePedestrian(p,0,p.y > player.y ? 20 : -20);
       if (state.invulnTimer === 0 && Math.abs(player.speed) > 2) {
         if (state.wanted < 3) setWanted(state.wanted + 1);
         showToast('🚨 НАЕЗД НА ПЕШЕХОДА!');
@@ -1576,7 +1597,9 @@ function renderWorld() {
 }
 
 function drawScreenPedestrian(ped,sx,sy,index){
-  const scale=ped.player?1.2:.86+stableVisualHash(ped.x,ped.y,index)*.17;
+  // Scale is an identity trait, never a position hash: walking must not make
+  // a person breathe in and out as their world coordinates change.
+  const scale=ped.player?1.2:(ped.visualScale??(.84+(index%5)*.035));
   const step=Math.sin(ped.walkPhase||0)*2.3*scale, bodyH=15*scale, shoulder=4.4*scale;
   ctx.save();ctx.translate(Math.round(sx),Math.round(sy));
   ctx.fillStyle='rgba(0,0,0,.5)';ctx.beginPath();ctx.ellipse(3*scale,2,7*scale,3.2*scale,-.08,0,Math.PI*2);ctx.fill();
@@ -1594,11 +1617,37 @@ function drawScreenPedestrian(ped,sx,sy,index){
   ctx.restore();
 }
 
+function convexHull(points){
+  const sorted=points.slice().sort((a,b)=>a.x-b.x||a.y-b.y);
+  const cross=(o,a,b)=>(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x);
+  const half=[];for(const p of sorted){while(half.length>1&&cross(half[half.length-2],half[half.length-1],p)<=0)half.pop();half.push(p);}
+  const lower=half.slice();half.length=0;for(const p of sorted.reverse()){while(half.length>1&&cross(half[half.length-2],half[half.length-1],p)<=0)half.pop();half.push(p);}
+  lower.pop();half.pop();return lower.concat(half);
+}
+
+function pointInPolygon2d(x,y,poly){
+  let inside=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+    const a=poly[i],b=poly[j];if(((a.y>y)!==(b.y>y))&&(x<(b.x-a.x)*(y-a.y)/(b.y-a.y)+a.x))inside=!inside;
+  }return inside;
+}
+
+function pedestrianOccluded(ped,sx,sy,w,h,center,zoom){
+  const depth=ped.x+ped.y;
+  return buildings.some((b,index)=>{
+    const frontDepth=b.x+b.y+b.w+b.h;if(depth>=frontDepth-8)return false;
+    if(Math.abs(ped.x-(b.x+b.w*.5))>b.w+420||Math.abs(ped.y-(b.y+b.h*.5))>b.h+420)return false;
+    const z=(b.floors??(2+index%5))*24;
+    const corners=[[b.x,b.y],[b.x+b.w,b.y],[b.x+b.w,b.y+b.h],[b.x,b.y+b.h],[b.x-z,b.y-z],[b.x+b.w-z,b.y-z],[b.x+b.w-z,b.y+b.h-z],[b.x-z,b.y+b.h-z]];
+    const hull=convexHull(corners.map(([x,y])=>{const q=projectIso(x,y);return{x:w/2+(q.x-center.x)*zoom,y:h/2+(q.y-center.y)*zoom};}));
+    return pointInPolygon2d(sx,sy-8,hull);
+  });
+}
+
 function drawScreenPedestrians(w,h,center,zoom){
   const actors=pedestrians.slice();
   if(roam?.mode==='foot')actors.push({x:player.x,y:player.y,walkPhase:performance.now()*.012,shirt:'#735235',pants:'#22272b',skin:'#d5b594',hair:'#1a1512',player:true});
   actors.map((ped,index)=>{const p=projectIso(ped.x,ped.y);return{ped,index,sx:w/2+(p.x-center.x)*zoom,sy:h/2+(p.y-center.y)*zoom};})
-    .filter(a=>a.sx>-40&&a.sx<w+40&&a.sy>-60&&a.sy<h+30).sort((a,b)=>a.sy-b.sy)
+    .filter(a=>a.sx>-40&&a.sx<w+40&&a.sy>-60&&a.sy<h+30&&!pedestrianOccluded(a.ped,a.sx,a.sy,w,h,center,zoom)).sort((a,b)=>a.sy-b.sy)
     .forEach(a=>drawScreenPedestrian(a.ped,a.sx,a.sy,a.index));
 }
 
