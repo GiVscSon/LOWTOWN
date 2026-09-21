@@ -265,6 +265,7 @@ const parkedCars = [];
 const cranes = [];
 const billboards = [];
 const parkZones = [];
+const parkObstacles = [];
 let roam;
 
 const safeSpawnPoints = [
@@ -305,6 +306,7 @@ function initTopology() {
   cranes.length = 0;
   billboards.length = 0;
   parkZones.length = 0;
+  parkObstacles.length = 0;
 
   // Expressway
   roads.push(
@@ -495,6 +497,27 @@ function initTopology() {
         neon: ['#e09a3e', '#bba77c', '#9aa0a8', '#d4523a','#5f9ea0','#c06b47'][(blockIndex+row+col) % 6] });
     }
     trees.push({ x: block.x + bw + gap / 2, y: block.y - 28, size: 23 });
+  });
+
+  // Park furniture is real world geometry, not paint on the ground. The same
+  // deterministic layouts drive rendering, pedestrian navigation and vehicle
+  // contacts so visible trunks, water and street furniture cannot be crossed.
+  parkZones.forEach((park,i)=>{
+    park.trees=[];park.benches=[];park.feature={x:park.x+park.w*.53,y:park.y+park.h*.51,type:park.type};
+    for(let t=0;t<12;t++){
+      const edge=t%4,ratio=(Math.floor(t/4)+1)/4;
+      const x=edge===0?park.x+park.w*ratio:edge===1?park.x+park.w-18:edge===2?park.x+park.w*(1-ratio):park.x+18;
+      const y=edge===0?park.y+18:edge===1?park.y+park.h*ratio:edge===2?park.y+park.h-18:park.y+park.h*(1-ratio);
+      const tree={x,y,size:15+(t+i)%5,park:true};park.trees.push(tree);trees.push(tree);
+    }
+    for(let n=0;n<3;n++){
+      const bench={x:park.x+park.w*(.25+n*.25),y:park.y+park.h*.78,width:42,height:10,type:'bench'};
+      park.benches.push(bench);parkObstacles.push(bench);
+    }
+    const f=park.feature;
+    if(park.type===0)parkObstacles.push({x:f.x,y:f.y,width:88,height:58,type:'fountain'});
+    if(park.type===1)parkObstacles.push({x:f.x,y:f.y,width:park.w*.42,height:park.h*.48,type:'pond'});
+    if(park.type===3)for(let s=0;s<4;s++)parkObstacles.push({x:f.x-48+s*40,y:f.y-6,width:31,height:28,type:'stall'});
   });
 
   // Props
@@ -711,6 +734,7 @@ function isPositionOnSolidGround(x, y) {
 function isPedestrianBlocked(x,y){
   if(!isPositionOnSolidGround(x,y))return true;
   if(buildings.some(b=>x>b.x-7&&x<b.x+b.w+7&&y>b.y-7&&y<b.y+b.h+7))return true;
+  if(parkObstacles.some(o=>Math.abs(x-o.x)<o.width*.5+5&&Math.abs(y-o.y)<o.height*.5+5))return true;
   return trees.some(t=>Math.hypot(x-t.x,y-t.y)<t.size+6);
 }
 
@@ -832,7 +856,7 @@ function updatePhysics(dt) {
 
   // Full oriented body, not just the vehicle centre, meets solid geometry.
   const impactSpeed = Math.abs(player.speed);
-  if (resolveScenery(player, buildings, trees) && impactSpeed > 3 && state.invulnTimer === 0) {
+  if (resolveScenery(player, buildings, trees, parkObstacles) && impactSpeed > 3 && state.invulnTimer === 0) {
     player.hp = Math.max(0, player.hp - 5);
     state.invulnTimer = 24;
     sound.playImpact();
@@ -996,7 +1020,7 @@ function updatePhysics(dt) {
       }
       for (const parked of parkedCars) resolveContact(vehicles[i], parked, true);
       for (const vehicle of roam?.fleet || []) if (vehicle.kind !== 'water') resolveContact(vehicles[i],vehicle,true);
-      resolveScenery(vehicles[i], buildings, trees);
+      resolveScenery(vehicles[i], buildings, trees, parkObstacles);
     }
   }
   roam?.contacts();
@@ -1084,6 +1108,7 @@ function drawCityScenery() {
   });
 
   trees.forEach((tree, index) => {
+    if(tree.park)return;
     ctx.fillStyle = 'rgba(0,0,0,.45)';
     ctx.beginPath(); ctx.ellipse(tree.x + 8, tree.y + 8, tree.size, tree.size * .65, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#412d20'; ctx.fillRect(tree.x - 3, tree.y - 2, 6, 18);
@@ -1159,20 +1184,24 @@ function drawDistrictGroundDetails() {
     ctx.beginPath();ctx.moveTo(park.x+park.w*.46,park.y+15);ctx.quadraticCurveTo(park.x+park.w*.64,park.y+park.h*.55,park.x+park.w*.54,park.y+park.h-15);ctx.stroke();
     const cx=park.x+park.w*.53,cy=park.y+park.h*.51;
     if(park.type===0){
-      ctx.fillStyle='#253b3c';ctx.beginPath();ctx.ellipse(cx,cy,43,28,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#879087';ctx.lineWidth=5;ctx.stroke();
+      ctx.fillStyle='rgba(0,0,0,.4)';ctx.beginPath();ctx.ellipse(cx+8,cy+10,49,29,0,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#4c5552';ctx.beginPath();ctx.ellipse(cx,cy+7,43,28,0,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#8c9188';ctx.beginPath();ctx.ellipse(cx,cy,43,28,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#a7a99f';ctx.lineWidth=5;ctx.stroke();
       const glow=ctx.createRadialGradient(cx,cy,2,cx,cy,38);glow.addColorStop(0,'rgba(134,197,204,.65)');glow.addColorStop(1,'rgba(55,116,125,.12)');ctx.fillStyle=glow;ctx.beginPath();ctx.ellipse(cx,cy,31,19,0,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#7c837c';ctx.fillRect(cx-6,cy-30,12,30);ctx.beginPath();ctx.ellipse(cx,cy-30,9,5,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle='rgba(173,224,228,.65)';ctx.lineWidth=2;for(let n=-1;n<=1;n++){ctx.beginPath();ctx.moveTo(cx+n*4,cy-29);ctx.quadraticCurveTo(cx+n*13,cy-42,cx+n*19,cy-4);ctx.stroke();}
     }else if(park.type===1){
-      ctx.fillStyle='#102d34';ctx.beginPath();ctx.ellipse(cx,cy,park.w*.2,park.h*.23,-.25,0,Math.PI*2);ctx.fill();ctx.strokeStyle='rgba(109,162,157,.55)';ctx.lineWidth=4;ctx.stroke();
+      ctx.fillStyle='#565b53';ctx.beginPath();ctx.ellipse(cx,cy+5,park.w*.22,park.h*.25,-.25,0,Math.PI*2);ctx.fill();ctx.fillStyle='#102d34';ctx.beginPath();ctx.ellipse(cx,cy,park.w*.2,park.h*.23,-.25,0,Math.PI*2);ctx.fill();ctx.strokeStyle='rgba(109,162,157,.55)';ctx.lineWidth=4;ctx.stroke();
       for(let l=0;l<5;l++){ctx.strokeStyle='rgba(151,196,187,.18)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx-18+l*9,cy,12,0,Math.PI);ctx.stroke();}
+      ctx.strokeStyle='#718052';ctx.lineWidth=3;for(let r=0;r<8;r++){const a=r*.78;ctx.beginPath();ctx.moveTo(cx+Math.cos(a)*park.w*.19,cy+Math.sin(a)*park.h*.21);ctx.lineTo(cx+Math.cos(a)*park.w*.21,cy-12+Math.sin(a)*park.h*.22);ctx.stroke();}
     }else if(park.type===2){
       ctx.fillStyle='#3b3a31';ctx.fillRect(cx-48,cy-29,96,58);ctx.strokeStyle='rgba(225,207,158,.48)';ctx.lineWidth=3;ctx.strokeRect(cx-48,cy-29,96,58);ctx.beginPath();ctx.moveTo(cx,cy-29);ctx.lineTo(cx,cy+29);ctx.stroke();
       ctx.beginPath();ctx.arc(cx-31,cy,10,0,Math.PI*2);ctx.arc(cx+31,cy,10,0,Math.PI*2);ctx.stroke();
     }else{
-      for(let s=0;s<4;s++){const sx=cx-62+s*40;ctx.fillStyle=['#9a5733','#365f69','#84642e','#6c3d34'][s];ctx.fillRect(sx,cy-18,28,23);ctx.fillStyle='#d3c29a';ctx.fillRect(sx-3,cy-22,34,5);}
+      for(let s=0;s<4;s++){const sx=cx-62+s*40;ctx.fillStyle='rgba(0,0,0,.35)';ctx.fillRect(sx+6,cy-10,31,25);ctx.fillStyle=['#9a5733','#365f69','#84642e','#6c3d34'][s];ctx.fillRect(sx,cy-18,28,23);ctx.fillStyle='#201d1a';ctx.fillRect(sx+5,cy-13,18,14);ctx.fillStyle='#d3c29a';ctx.beginPath();ctx.moveTo(sx-4,cy-22);ctx.lineTo(sx+32,cy-22);ctx.lineTo(sx+27,cy-31);ctx.lineTo(sx+1,cy-31);ctx.closePath();ctx.fill();ctx.strokeStyle='#5b4932';ctx.stroke();}
     }
     // Tree belts, benches, bins and warm footlights make the park inhabited.
-    for(let t=0;t<12;t++){const edge=t%4,ratio=(Math.floor(t/4)+1)/4;const tx=edge===0?park.x+park.w*ratio:edge===1?park.x+park.w-18:edge===2?park.x+park.w*(1-ratio):park.x+18;const ty=edge===0?park.y+18:edge===1?park.y+park.h*ratio:edge===2?park.y+park.h-18:park.y+park.h*(1-ratio);parkTree(tx,ty,15+(t+i)%5,t+i);}
-    for(let b=0;b<3;b++){const bx=park.x+park.w*(.25+b*.25),by=park.y+park.h*.78;ctx.fillStyle='#171a19';ctx.fillRect(bx-17,by+4,38,6);ctx.fillStyle='#76583a';ctx.fillRect(bx-19,by,38,5);}
+    park.trees.forEach((tree,t)=>parkTree(tree.x,tree.y,tree.size,t+i));
+    park.benches.forEach(bench=>{ctx.fillStyle='rgba(0,0,0,.4)';ctx.fillRect(bench.x-15,bench.y+8,42,7);ctx.fillStyle='#30251c';ctx.fillRect(bench.x-17,bench.y+4,38,7);ctx.fillStyle='#8b6842';ctx.fillRect(bench.x-19,bench.y,38,6);ctx.fillStyle='#54402b';ctx.fillRect(bench.x-17,bench.y-8,38,6);ctx.fillRect(bench.x-15,bench.y+6,4,9);ctx.fillRect(bench.x+15,bench.y+6,4,9);});
     for(let l=0;l<4;l++){const lx=park.x+park.w*(.18+l*.22),ly=park.y+park.h*.18;const g=ctx.createRadialGradient(lx,ly,1,lx,ly,24);g.addColorStop(0,'rgba(232,184,74,.35)');g.addColorStop(1,'rgba(232,184,74,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(lx,ly,24,0,Math.PI*2);ctx.fill();ctx.fillStyle='#d8aa52';ctx.beginPath();ctx.arc(lx,ly,3,0,Math.PI*2);ctx.fill();}
   }
 
@@ -2004,7 +2033,7 @@ function toggleGarage() {
 
 function boot() {
   initTopology();
-  roam = createFreeRoam(player, parkedCars, buildings, trees, isPositionOnSolidGround, showToast);
+  roam = createFreeRoam(player, parkedCars, buildings, trees, isPositionOnSolidGround, showToast, parkObstacles);
   const roamControls = document.createElement('div');
   roamControls.className = 'roam-controls';
   const enterButton = document.createElement('button');enterButton.textContent = 'Выйти / сесть · E';enterButton.addEventListener('click',()=>roam.interact());
