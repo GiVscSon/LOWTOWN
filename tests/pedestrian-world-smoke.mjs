@@ -16,6 +16,8 @@ const initialScale=walker.visualScale;
 for(let i=0;i<160;i++)movePedestrian(walker,3,0);
 this.report={
   parks:parkZones.length,
+  parkObstacles:parkObstacles.length,
+  physicalParkTrees:trees.filter(t=>t.park).length,
   archetypes:[...new Set(buildings.map(b=>b.archetype).filter(Boolean))],
   blockedBuildingCentre:isPedestrianBlocked(target.x+target.w*.5,target.y+target.h*.5),
   walkerBlocked:isPedestrianBlocked(walker.x,walker.y),
@@ -24,6 +26,8 @@ this.report={
 };`,sandbox);
 
 assert.ok(sandbox.report.parks>=16,'city needs frequent open civic spaces');
+assert.ok(sandbox.report.parkObstacles>=70,'visible park furniture needs collision geometry');
+assert.equal(sandbox.report.physicalParkTrees,sandbox.report.parks*12,'every rendered park tree must be physical');
 assert.ok(sandbox.report.archetypes.length>=6,'building silhouettes need multiple archetypes');
 assert.equal(sandbox.report.blockedBuildingCentre,true,'building must block pedestrians');
 assert.equal(sandbox.report.walkerBlocked,false,'pedestrian entered an obstacle');
