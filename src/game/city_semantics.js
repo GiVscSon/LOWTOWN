@@ -17,7 +17,7 @@ export const CITY_ROADS = Object.freeze([
   {id:'SHIPYARD_ROAD',name:'Shipyard Road',class:ROAD.STREET,zone:'IRON_HARBOR',speed:40,lanes:2,oneWay:false,points:[[1020,-100],[1500,-100],[2050,-100]]},
   {id:'HARBOR_SPINE',name:'Harbor Spine',class:ROAD.AVENUE,zone:'IRON_HARBOR',speed:60,lanes:2,oneWay:false,points:[[1500,-900],[1500,-500],[1500,-360],[1500,-100],[1500,80]]},
   {id:'PINE_ROUTE',name:'Pine Route',class:ROAD.ARTERIAL,zone:'NORTH_RIDGE',speed:80,lanes:2,oneWay:false,points:[[-120,1240],[-520,1400],[-120,1700],[300,1900],[800,2050]]},
-  {id:'NORTH_BRIDGE_ROAD',name:'North Bridge',class:ROAD.AVENUE,zone:'DOWNTOWN',speed:60,lanes:2,oneWay:false,points:[[-120,600],[-320,800],[-120,1240]]},
+  {id:'NORTH_BRIDGE_ROAD',name:'North Bridge',class:ROAD.AVENUE,zone:'DOWNTOWN',speed:60,lanes:2,oneWay:false,points:[[-120,600],[-120,800],[-120,1240]]},
   {id:'WESTERN_BOULEVARD',name:'Western Boulevard',class:ROAD.ARTERIAL,zone:'WEST_SIDE',speed:80,lanes:4,oneWay:false,points:[[-1960,-360],[-2360,-360],[-2760,-180],[-3040,160]]},
   {id:'WEST_RESIDENTIAL',name:'West Residential',class:ROAD.AVENUE,zone:'WEST_SIDE',speed:55,lanes:2,oneWay:false,points:[[-2360,-360],[-2360,160],[-2360,620],[-2080,900]]},
   {id:'SOUTH_RING',name:'South Ring Road',class:ROAD.ARTERIAL,zone:'SOUTH_SIDE',speed:75,lanes:4,oneWay:false,points:[[-1960,80],[-1960,1100],[-1500,1460],[-900,1560]]},
