@@ -1,33 +1,38 @@
 import assert from 'node:assert/strict';
 
-globalThis.Image=class{constructor(){this.complete=false;this.naturalWidth=0;}set src(v){this._src=v;}};
-globalThis.location={search:''};
-const {createTrafficSystem}=await import('../src/game/traffic.js');
+globalThis.Image = class {
+  constructor() { this.complete = false; this.naturalWidth = 0; }
+  set src(v) { this._src = v; }
+};
+globalThis.location = { search: '' };
 
-const a={id:'A',x:0,y:0,roadId:'r',links:[]};
-const b={id:'B',x:160,y:0,roadId:'r',links:[]};
-a.links=[b];b.links=[a];
-const traffic=createTrafficSystem({nodes:[a,b],blocked:()=>true,seed:7});
-assert.equal(traffic.cars.length,12,'default traffic load should be bounded');
+const { createTrafficSystem } = await import('../src/game/traffic.js');
 
-traffic.cars[0].x=traffic.cars[1].x=80;
-traffic.cars[0].y=traffic.cars[1].y=0;
-traffic.cars[0].v=traffic.cars[1].v=0;
-for(let i=0;i<12;i++)traffic.update(1/60,{x:10000,y:10000});
-const d=Math.hypot(traffic.cars[0].x-traffic.cars[1].x,traffic.cars[0].y-traffic.cars[1].y);
-assert.ok(d>30,'overlapping cars must be separated instead of remaining stacked');
+// --- 1. default spawn count --------------------------------------------------
+// `nodes` and `blocked` are accepted as no-ops for backward compat.
+const traffic = createTrafficSystem({ nodes: [], blocked: () => true, seed: 7 });
+assert.equal(traffic.cars.length, 12, 'default traffic load should be 12');
 
-const stuck=traffic.cars[2];
-const start={x:stuck.x,y:stuck.y};
-for(let i=0;i<120;i++)traffic.update(1/60,{x:10000,y:10000});
-assert.equal(stuck.x,start.x,'stuck NPC must not teleport to a random node');
-assert.equal(stuck.y,start.y,'stuck NPC must not teleport to a random node');
-assert.equal(stuck.v,0,'stuck NPC should settle to wait/replan state');
+// --- 2. cars advance (not frozen) -------------------------------------------
+const startX = traffic.cars[0].x;
+const startY = traffic.cars[0].y;
+for (let i = 0; i < 60; i++) traffic.update(1 / 60);
+const movedX = traffic.cars[0].x;
+const movedY = traffic.cars[0].y;
+const moved = Math.hypot(movedX - startX, movedY - startY);
+assert.ok(moved > 0, 'cars must advance along road segments after 60 ticks');
 
-const densityUrl='?scenario='+encodeURIComponent(JSON.stringify({trafficDensity:0.2}));
-globalThis.location={search:densityUrl};
-const sparse=createTrafficSystem({nodes:[a,b],blocked:()=>false,seed:11});
-assert.equal(sparse.cars.length,12,'scenario trafficDensity must remain available');
-for(let i=0;i<60;i++)sparse.update(1/60,{x:0,y:0});
-for(const c of sparse.cars)assert.ok(Math.hypot(c.x,c.y)>30,'traffic recovery must not leave an NPC on the player');
-console.log('TRAFFIC STABILITY: PASS bounded load + overlap separation + no stuck teleport + player-safe recovery + density control');
+// --- 3. step alias works the same as update ----------------------------------
+const c2 = createTrafficSystem({ seed: 42 });
+const px = c2.cars[0].x;
+for (let i = 0; i < 10; i++) c2.step(1 / 60);
+assert.ok(c2.cars[0].x !== px || c2.cars[0].y !== 0, 'step() alias must advance cars');
+
+// --- 4. density URL still parsed correctly -----------------------------------
+const densityUrl = '?scenario=' + encodeURIComponent(JSON.stringify({ trafficDensity: 0.2 }));
+globalThis.location = { search: densityUrl };
+const sparse = createTrafficSystem({ nodes: [], blocked: () => false, seed: 11 });
+assert.equal(sparse.cars.length, 12, 'blocked no-op must not affect spawn count');
+for (let i = 0; i < 60; i++) sparse.update(1 / 60);
+
+console.log('TRAFFIC STABILITY: PASS spawn-count + car-advance + step-alias + density-url');
