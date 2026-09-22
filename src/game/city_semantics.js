@@ -35,10 +35,81 @@ export const CITY_DESTINATIONS = Object.freeze([
   { id: 'NORTH_MOTEL', name: 'North Ridge Motel', kind: 'LODGING', district: 'NORTH_RIDGE', roadId: 'PINE_ROUTE', index: 2 }
 ]);
 
+// ─── Air & Water spawn points ─────────────────────────────────────────────────
+// Helipads: world-space positions on rooftops / open ground, altitude = spawn z
+// Boat docks: world-space positions along the waterfront, heading in radians
+export const CITY_HELIPADS = Object.freeze([
+  {
+    id: 'HELIPAD_CITY_HALL',
+    name: 'City Hall Rooftop',
+    district: 'DOWNTOWN',
+    // Centred over City Hall block — approx LOWTOWN_BOULEVARD index 4
+    x: 200, y: -360,
+    altitude: 92,          // roof height (world units)
+    heading: 0,            // nose pointing East on spawn
+    radius: 28,            // landing circle radius
+  },
+  {
+    id: 'HELIPAD_IRON_HARBOR',
+    name: 'Iron Harbor Logistics Pad',
+    district: 'IRON_HARBOR',
+    // Between DOCKSIDE_DRIVE and FREIGHTER_ROW, near HARBOR_SPINE midpoint
+    x: 1700, y: -700,
+    altitude: 18,          // ground-level pad on the quay
+    heading: Math.PI,      // nose West on spawn
+    radius: 32,
+  },
+  {
+    id: 'HELIPAD_NORTH_RIDGE',
+    name: 'North Ridge Clearing',
+    district: 'NORTH_RIDGE',
+    x: 300, y: 1900,
+    altitude: 12,
+    heading: -Math.PI / 2, // nose North on spawn
+    radius: 24,
+  },
+]);
+
+export const CITY_BOAT_DOCKS = Object.freeze([
+  {
+    id: 'DOCK_IRON_HARBOR_MAIN',
+    name: 'Iron Harbor Main Dock',
+    district: 'IRON_HARBOR',
+    // South side of FREIGHTER_ROW, open water entry heading East
+    x: 1500, y: -300,
+    heading: 0,
+    surface: 'water',
+    slipLength: 120,       // usable slip length before open water
+  },
+  {
+    id: 'DOCK_DOWNTOWN_RIVERSIDE',
+    name: 'Downtown Riverside Dock',
+    district: 'DOWNTOWN',
+    // West of RIVER_AVENUE near canal junction
+    x: -820, y: -600,
+    heading: Math.PI / 2,  // heading South into canal
+    surface: 'water',
+    slipLength: 80,
+  },
+]);
+
+// ─── Lookup helpers ───────────────────────────────────────────────────────────
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 export function roadById(id) { return CITY_ROADS.find(r => r.id === id) || null; }
 export function districtById(id) { return CITY_DISTRICTS.find(d => d.id === id) || null; }
 export function destinationById(id) { return CITY_DESTINATIONS.find(d => d.id === id) || null; }
+export function helipadById(id) { return CITY_HELIPADS.find(h => h.id === id) || null; }
+export function boatDockById(id) { return CITY_BOAT_DOCKS.find(d => d.id === id) || null; }
+
+/** Returns the nearest helipad to world-space point {x, y}. */
+export function nearestHelipad(point) {
+  return CITY_HELIPADS.reduce((best, h) => distance(point, h) < distance(point, best) ? h : best);
+}
+
+/** Returns the nearest boat dock to world-space point {x, y}. */
+export function nearestBoatDock(point) {
+  return CITY_BOAT_DOCKS.reduce((best, d) => distance(point, d) < distance(point, best) ? d : best);
+}
 
 const sidewalkOffsetFallback = r => (r ? Math.max(r.lanes * 23, r.class === 'ARTERIAL' ? 70 : r.class === 'AVENUE' ? 52 : 40) / 2 + 20 : 36);
 export function destinationPoint(id, side = 1) {
