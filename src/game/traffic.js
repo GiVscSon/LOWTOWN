@@ -12,7 +12,11 @@ function randomChoice(arr, rng = Math.random) {
   return arr[Math.floor(rng() * arr.length)];
 }
 
-export function createTrafficSystem({ nodes = [], count = 16, seed = 42 } = {}) {
+// `nodes` and `blocked` are accepted for backwards-compatibility with callers
+// compiled against the pre-unified API. The unified system sources its road
+// graph from city_semantics directly, so both params are intentional no-ops.
+export function createTrafficSystem({ nodes = [], count = 12, seed = 42, blocked = () => false } = {}) {
+  void nodes; void blocked; // acknowledged no-ops — see comment above
   let seedVal = seed;
   const rng = () => {
     seedVal = (seedVal * 9301 + 49297) % 233280;
@@ -58,7 +62,7 @@ export function createTrafficSystem({ nodes = [], count = 16, seed = 42 } = {}) 
     };
   }
 
-  const totalCars = Math.max(1, count || 16);
+  const totalCars = Math.max(1, count || 12);
   for (let i = 0; i < totalCars; i++) {
     cars.push(spawnCar(i));
   }
