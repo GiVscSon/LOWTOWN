@@ -168,6 +168,26 @@
       <button class="btn-top" id="btnRepairCar" style="padding: 10px; justify-content: center; background: rgba(74, 222, 128, 0.15); border-color: var(--accent-green); color: var(--accent-green); font-weight:800;">ПОЛНЫЙ РЕМОНТ И СБРОС РОЗЫСКА ($80)</button>
     </div>
   </div>
+  <!-- Sentry error monitoring -->
+  <script
+    src="https://browser.sentry-cdn.com/8.28.0/bundle.tracing.replay.min.js"
+    integrity="sha384-e3FHTOO4r8mHAUFqKagTMbkpg7cLPJFWCk03veBCxuwJ3YIPaQqxVq1QXaESmYPN"
+    crossorigin="anonymous"
+  ></script>
+  <script>
+    Sentry.init({
+      dsn: 'https://74b34f50ee8f6e657997e0ea3927ad5e@o4512098566340608.ingest.us.sentry.io/4512127932497920',
+      release: 'lowtown-unified',
+      environment: 'production',
+      tracesSampleRate: 0.15,
+      replaysOnErrorSampleRate: 1.0,
+      replaysSessionSampleRate: 0.05,
+      integrations: [
+        Sentry.browserTracingIntegration(),
+        Sentry.replayIntegration({ maskAllText: false, blockAllMedia: false }),
+      ],
+    });
+  </script>
   <script type="module" src="./src/main.js"></script>
 </body>
 </html>
