@@ -4,6 +4,8 @@ import { createDriveLab } from './game/test_drive_lab.js';
 import { resolveContact, resolveScenery } from './game/solid_contacts.js';
 import { coastPath, pointInCoast } from './game/coastline.js';
 import { createFreeRoam, drawTransport } from './game/free_roam.js';
+import { isLand } from './game/islands.js';
+import { pointInBuilding } from './game/world_geometry.js';
 import './game/test_drive.css';
 // LOWTOWN // THREE ISLANDS VISUAL OVERHAUL // GTA 2 RETRO-NOIR ENGINE
 // High-detail procedural pedestrian sprites, isometric vehicle chassis, wet road reflections, neon glow & audio
@@ -723,3 +725,139 @@ function initTopology() {
     });
   }
 }
+
+// ===== GAME LOOP =====
+initTopology();
+roam = createFreeRoam(player, parkedCars, buildings, trees, 
+  (x, y) => isLand(x, y) && !pointInBuilding(x, y), 
+  () => {}, 
+  parkObstacles);
+
+const driveLab = createDriveLab({ player, state, canvas, buildings, trafficCars, policeCars, routeInput, roam });
+
+let lastTime = performance.now();
+function gameLoop(now) {
+  const dt = Math.min(0.05, Math.max(0.001, (now - lastTime) / 1000));
+  lastTime = now;
+  
+  state.lastFrameTime = now;
+  window.__lowtownLastFrame = now;
+  
+  // Input handling
+  const input = {
+    throttle: state.keys.up ? 1 : (state.keys.down ? -1 : 0),
+    brake: state.keys.down ? 1 : 0,
+    steer: (state.keys.right ? 1 : 0) - (state.keys.left ? 1 : 0),
+    handbrake: state.keys.handbrake,
+    nitro: state.keys.nitro
+  };
+  
+  // Update player physics
+  const speed = Math.hypot(player.vx, player.vy);
+  const forward = Math.cos(player.angle);
+  const right = Math.sin(player.angle);
+  
+  if (input.throttle > 0) {
+    player.vx += forward * input.throttle * 120 * dt;
+    player.vy += right * input.throttle * 120 * dt;
+  }
+  if (input.brake > 0) {
+    const drag = 0.92;
+    player.vx *= drag;
+    player.vy *= drag;
+  }
+  if (input.steer !== 0 && speed > 0.5) {
+    const turnRate = input.steer * 3.5 * dt;
+    player.angle += turnRate * (speed / 100);
+  }
+  
+  // Apply velocity
+  player.x += player.vx * dt;
+  player.y += player.vy * dt;
+  
+  // Collision with buildings
+  resolveScenery(player, buildings, trees, [...breakableProps, ...parkObstacles]);
+  
+  // Traffic update
+  for (const car of trafficCars) {
+    car.x += car.speed * Math.cos(car.angle) * dt;
+    car.y += car.speed * Math.sin(car.angle) * dt;
+    
+    // Simple traffic bounds
+    if (car.x < car.minX || car.x > car.maxX) {
+      car.speed *= -1;
+      car.angle += Math.PI;
+    }
+  }
+  
+  // Camera follow player
+  const camX = player.x - canvas.width / 2;
+  const camY = player.y - canvas.height / 2;
+  
+  // Render
+  ctx.fillStyle = '#06090e';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  ctx.save();
+  ctx.translate(-camX, -camY);
+  
+  // Draw roads
+  ctx.fillStyle = PALETTE.asphalt;
+  for (const road of roads) {
+    if (road.dir === 'h') {
+      ctx.fillRect(road.x, road.y, road.w, road.h);
+    } else {
+      ctx.fillRect(road.x, road.y, road.w, road.h);
+    }
+  }
+  
+  // Draw buildings
+  for (const b of buildings) {
+    ctx.fillStyle = PALETTE.buildingWall;
+    ctx.fillRect(b.x, b.y, b.w, b.h);
+    ctx.fillStyle = PALETTE.buildingRoof;
+    ctx.fillRect(b.x + 4, b.y + 4, b.w - 8, b.h - 8);
+  }
+  
+  // Draw player car
+  ctx.save();
+  ctx.translate(player.x, player.y);
+  ctx.rotate(player.angle);
+  ctx.fillStyle = player.bodyColor;
+  ctx.fillRect(-player.width / 2, -player.height / 2, player.width, player.height);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(-player.width / 2 + 4, -player.height / 2 + 4, 8, 4);
+  ctx.fillStyle = '#f00';
+  ctx.fillRect(-player.width / 2 + 4, player.height / 2 - 8, 8, 4);
+  ctx.restore();
+  
+  // Draw traffic
+  for (const car of trafficCars) {
+    ctx.save();
+    ctx.translate(car.x, car.y);
+    ctx.rotate(car.angle);
+    ctx.fillStyle = car.color;
+    ctx.fillRect(-car.width / 2, -car.height / 2, car.width, car.height);
+    ctx.restore();
+  }
+  
+  ctx.restore();
+  
+  // Radar
+  radarCtx.fillStyle = '#06090e';
+  radarCtx.fillRect(0, 0, radarCanvas.width, radarCanvas.height);
+  radarCtx.save();
+  radarCtx.translate(radarCanvas.width / 2, radarCanvas.height / 2);
+  radarCtx.scale(0.02, 0.02);
+  radarCtx.fillStyle = '#e8b84a';
+  radarCtx.fillRect(player.x - 5, player.y - 5, 10, 10);
+  radarCtx.restore();
+  
+  // HUD speed
+  const speedEl = document.getElementById('hudSpeed');
+  if (speedEl) speedEl.textContent = Math.round(speed * 0.19);
+  
+  requestAnimationFrame(gameLoop);
+}
+
+requestAnimationFrame(gameLoop);
