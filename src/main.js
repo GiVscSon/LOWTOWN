@@ -139,12 +139,13 @@ class SynthAudio {
 
 const sound = new SynthAudio();
 
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-const radarCanvas = document.getElementById('radarCanvas');
-const radarCtx = radarCanvas.getContext('2d');
-const fullMapCanvas = document.getElementById('fullMapCanvas');
-const fullMapCtx = fullMapCanvas.getContext('2d');
+// Canvas & contexts — lazily initialized in browser check
+let canvas = null;
+let ctx = null;
+let radarCanvas = null;
+let radarCtx = null;
+let fullMapCanvas = null;
+let fullMapCtx = null;
 
 const WORLD_W = 10100;
 const WORLD_H = 11700;
@@ -705,6 +706,14 @@ function initTopology() {
 // ===== GAME LOOP =====
 // Only run in browser environment (not in Node.js test VMs)
 if (typeof window !== 'undefined' && window.document) {
+  // Initialize canvas & contexts
+  canvas = document.getElementById('gameCanvas');
+  ctx = canvas.getContext('2d');
+  radarCanvas = document.getElementById('radarCanvas');
+  radarCtx = radarCanvas.getContext('2d');
+  fullMapCanvas = document.getElementById('fullMapCanvas');
+  fullMapCtx = fullMapCanvas.getContext('2d');
+
   // Build authoritative road graph from CITY_ROADS (single source of truth)
   const roadNodes = buildRoadNetwork();
   const authoritySegments = authorityRoadSegments(roadNodes);
