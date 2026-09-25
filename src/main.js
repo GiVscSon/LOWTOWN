@@ -251,25 +251,42 @@ function pickTrafficSegment() {
 }
 
 // Helper: get next segment at junction (continue forward or turn)
-function getNextSegment(currentSeg, fromNode) {
+function getNextSegment(currentSeg, reachedNode) {
   const [a, b] = currentSeg;
-  const currentNode = (fromNode === a || fromNode === b) ? (fromNode === a ? b : a) : null;
-  if (!currentNode) return null;
-  if (!currentNode.links || currentNode.links.length === 0) return null;
-  // Prefer continuing straight - pick link with closest heading
-  const currentHeading = Math.atan2(b.y - a.y, b.x - a.x);
-  let bestLink = currentNode.links[0];
-  let bestDiff = Math.PI;
-  for (const link of currentNode.links) {
-    const linkHeading = Math.atan2(link.y - currentNode.y, link.x - currentNode.x);
-    let diff = Math.abs(linkHeading - currentHeading);
-    if (diff > Math.PI) diff = 2 * Math.PI - diff;
-    if (diff < bestDiff) {
-      bestDiff = diff;
-      bestLink = link;
+  if (reachedNode !== a && reachedNode !== b) return null;
+
+  const previousNode = reachedNode === a ? b : a;
+  const desiredHeading = Math.atan2(
+    reachedNode.y - previousNode.y,
+    reachedNode.x - previousNode.x
+  );
+
+  const allLinks = reachedNode.links || [];
+  const forwardLinks = allLinks.filter((node) => node !== previousNode);
+  const candidates = forwardLinks.length ? forwardLinks : allLinks;
+
+  let best = null;
+  let bestDifference = Infinity;
+
+  for (const nextNode of candidates) {
+    const heading = Math.atan2(
+      nextNode.y - reachedNode.y,
+      nextNode.x - reachedNode.x
+    );
+    const difference = Math.abs(
+      Math.atan2(
+        Math.sin(heading - desiredHeading),
+        Math.cos(heading - desiredHeading)
+      )
+    );
+
+    if (difference < bestDifference) {
+      bestDifference = difference;
+      best = nextNode;
     }
   }
-  return [currentNode, bestLink];
+
+  return best ? [reachedNode, best] : null;
 }
 
 // Initialize traffic cars on authoritative road segments
