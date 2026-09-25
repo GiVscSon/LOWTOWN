@@ -233,29 +233,6 @@ const expansionDistricts = [
   { id:'marina', x:7350, y:9200, w:2200, main:8500, far:9300, signs:['KINGSPORT MARINA','CASINO MIRAGE'], neon:'#e8b84a', roof:'#24242a' }
 ];
 
-const bridges = [
-  { id: 'b1', x: 2500, y: 1135, w: 350, h: ROAD_W, dir: 'h', name: 'Мост Железного Порта' },
-  { id: 'b2', x: 4850, y: 1135, w: 350, h: ROAD_W, dir: 'h', name: 'Мост Фонарного Залива' },
-  { id: 'b3', x: 2500, y: 4135, w: 350, h: ROAD_W, dir: 'h', name: 'Мост Красного Крюка' },
-  { id: 'b4', x: 4850, y: 4135, w: 350, h: ROAD_W, dir: 'h', name: 'Мост Чёрного Леса' },
-  { id: 'b5', x: 1200, y: 2500, w: ROAD_W, h: 700, dir: 'v', name: 'Дамба Старой Мельницы' },
-  { id: 'b6', x: 3850, y: 2500, w: ROAD_W, h: 700, dir: 'v', name: 'Портовый Виадук' },
-  { id: 'b7', x: 6200, y: 2500, w: ROAD_W, h: 700, dir: 'v', name: 'Высотная Эстакада' },
-  { id: 'b8', x: 1200, y: 5400, w: ROAD_W, h: 800, dir: 'v', name: 'Дамба Марроу' },
-  { id: 'b9', x: 3850, y: 5400, w: ROAD_W, h: 800, dir: 'v', name: 'Южный Грузовой Мост' },
-  { id: 'b10', x: 6200, y: 5400, w: ROAD_W, h: 800, dir: 'v', name: 'Вельветская Эстакада' }
-  ,{ id: 'b11', x: 7000, y: 1135, w: 350, h: ROAD_W, dir: 'h', name: 'Восточный Мост' }
-  ,{ id: 'b12', x: 7000, y: 4135, w: 350, h: ROAD_W, dir: 'h', name: 'Мост Синдер-Парк' }
-  ,{ id: 'b13', x: 7000, y: 7135, w: 350, h: ROAD_W, dir: 'h', name: 'Аэродромный Мост' }
-  ,{ id: 'b14', x: 1200, y: 8400, w: ROAD_W, h: 800, dir: 'v', name: 'Мемориальная Дамба' }
-  ,{ id: 'b15', x: 3850, y: 8400, w: ROAD_W, h: 800, dir: 'v', name: 'Мост Эшкрофт' }
-  ,{ id: 'b16', x: 6200, y: 8400, w: ROAD_W, h: 800, dir: 'v', name: 'Университетский Мост' }
-  ,{ id: 'b17', x: 8500, y: 8400, w: ROAD_W, h: 800, dir: 'v', name: 'Марина Скайвей' }
-  ,{ id: 'b18', x: 2500, y: 10135, w: 350, h: ROAD_W, dir: 'h', name: 'Мост Всех Святых' }
-  ,{ id: 'b19', x: 4850, y: 10135, w: 350, h: ROAD_W, dir: 'h', name: 'Речной Мост' }
-  ,{ id: 'b20', x: 7000, y: 10135, w: 350, h: ROAD_W, dir: 'h', name: 'Кингспортский Мост' }
-];
-
 const roads = [];
 const buildings = [];
 const breakableProps = [];
@@ -412,16 +389,23 @@ function initTopology() {
     );
   }
 
-  // Bridges
-  bridges.forEach(br => {
-    if (br.dir === 'v') {
-      bridgeRails.push({ x: br.x - 12, y: br.y, w: 14, h: br.h, axis: 'x' });
-      bridgeRails.push({ x: br.x + br.w - 2, y: br.y, w: 14, h: br.h, axis: 'x' });
-    } else {
-      bridgeRails.push({ x: br.x, y: br.y - 12, w: br.w, h: 14, axis: 'y' });
-      bridgeRails.push({ x: br.x, y: br.y + br.h - 2, w: br.w, h: 14, axis: 'y' });
+  // Bridges from CITY_ROADS (gradeSeparated) for bridge rails
+  for (const road of CITY_ROADS) {
+    if (!road.gradeSeparated) continue;
+    const halfWidth = collisionHalfWidth(road);
+    const segments = roadSegments(road);
+    for (const seg of segments) {
+      const dx = seg.b.x - seg.a.x;
+      const dy = seg.b.y - seg.a.y;
+      const len = Math.hypot(dx, dy);
+      if (len === 0) continue;
+      const nx = -dy / len;
+      const ny = dx / len;
+      // Two railings on each side
+      bridgeRails.push({ x: seg.a.x + nx * (halfWidth - 4), y: seg.a.y + ny * (halfWidth - 4), w: 14, h: len, axis: 'x' });
+      bridgeRails.push({ x: seg.a.x - nx * (halfWidth - 4), y: seg.a.y - ny * (halfWidth - 4), w: 14, h: len, axis: 'x' });
     }
-  });
+  }
 
   // Buildings with neon & AC units
   buildings.push(
@@ -847,14 +831,36 @@ if (typeof window !== 'undefined' && window.document) {
       }
     }
 
-    // Draw bridges
-    for (const bridge of bridges) {
-      if (bridge.dir === 'h') {
-        ctx.fillStyle = PALETTE.bridgeAsphalt;
-        ctx.fillRect(bridge.x, bridge.y, bridge.w, bridge.h);
-      } else {
-        ctx.fillStyle = PALETTE.bridgeAsphalt;
-        ctx.fillRect(bridge.x, bridge.y, bridge.w, bridge.h);
+    // Draw bridges from CITY_ROADS (gradeSeparated roads)
+    for (const road of CITY_ROADS) {
+      if (!road.gradeSeparated) continue;
+      const halfWidth = collisionHalfWidth(road);
+      const segments = roadSegments(road);
+      ctx.fillStyle = PALETTE.bridgeAsphalt;
+      for (const seg of segments) {
+        const dx = seg.b.x - seg.a.x;
+        const dy = seg.b.y - seg.a.y;
+        const len = Math.hypot(dx, dy);
+        if (len === 0) continue;
+        const nx = -dy / len * halfWidth;
+        const ny = dx / len * halfWidth;
+
+        ctx.beginPath();
+        ctx.moveTo(seg.a.x + nx, seg.a.y + ny);
+        ctx.lineTo(seg.b.x + nx, seg.b.y + ny);
+        ctx.lineTo(seg.b.x - nx, seg.b.y - ny);
+        ctx.lineTo(seg.a.x - nx, seg.a.y - ny);
+        ctx.closePath();
+        ctx.fill();
+      }
+      // Bridge railings
+      ctx.strokeStyle = PALETTE.bridgeRail;
+      ctx.lineWidth = 3;
+      for (const seg of segments) {
+        ctx.beginPath();
+        ctx.moveTo(seg.a.x, seg.a.y);
+        ctx.lineTo(seg.b.x, seg.b.y);
+        ctx.stroke();
       }
     }
 
