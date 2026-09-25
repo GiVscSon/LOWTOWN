@@ -240,9 +240,7 @@ const breakableProps = [];
 const bridgeRails = [];
 const trafficCars = [];
 
-// Build authoritative road network once for traffic
-const roadNetwork = buildRoadNetwork();
-const authoritySegments = roadSegments(roadNetwork);
+let authoritySegments = [];
 
 // Helper: pick a random road segment for traffic spawning
 function pickTrafficSegment() {
@@ -386,338 +384,8 @@ function initTopology() {
   billboards.length = 0;
   parkZones.length = 0;
   parkObstacles.length = 0;
-
-  // Expressway
-  roads.push(
-    { x: 450, y: 1135, w: 2050, h: ROAD_W, dir: 'h', name: 'Центральный Проспект' },
-    { x: 2850, y: 1135, w: 2000, h: ROAD_W, dir: 'h', name: 'Портовая Магистраль' },
-    { x: 5200, y: 1135, w: 1650, h: ROAD_W, dir: 'h', name: 'Фонарный Бульвар' },
-    { x: 450, y: 4135, w: 2050, h: ROAD_W, dir: 'h', name: 'Южное Кольцо' },
-    { x: 2850, y: 4135, w: 2000, h: ROAD_W, dir: 'h', name: 'Рыночная Магистраль' },
-    { x: 5200, y: 4135, w: 1650, h: ROAD_W, dir: 'h', name: 'Блэквуд Драйв' }
-  );
-
-  // Downtown
-  roads.push(
-    { x: 450, y: 450, w: 1900, h: ROAD_W, dir: 'h' },
-    { x: 450, y: 1850, w: 1900, h: ROAD_W, dir: 'h' },
-    { x: 450, y: 450, w: ROAD_W, h: 1530, dir: 'v' },
-    { x: 1200, y: 450, w: ROAD_W, h: 2050, dir: 'v' },
-    { x: 2000, y: 450, w: ROAD_W, h: 1530, dir: 'v' }
-  );
-
-  // Docks
-  roads.push(
-    { x: 2950, y: 450, w: 1750, h: ROAD_W, dir: 'h' },
-    { x: 2950, y: 1850, w: 1750, h: ROAD_W, dir: 'h' },
-    { x: 2950, y: 450, w: ROAD_W, h: 1530, dir: 'v' },
-    { x: 3850, y: 450, w: ROAD_W, h: 2050, dir: 'v' },
-    { x: 4600, y: 450, w: ROAD_W, h: 1530, dir: 'v' }
-  );
-
-  // Lantern Bay
-  roads.push(
-    { x: 5300, y: 450, w: 1550, h: ROAD_W, dir: 'h' },
-    { x: 5300, y: 1850, w: 1550, h: ROAD_W, dir: 'h' },
-    { x: 5300, y: 450, w: ROAD_W, h: 1530, dir: 'v' },
-    { x: 6200, y: 450, w: ROAD_W, h: 2050, dir: 'v' }
-  );
-
-  // Southern city belt
-  roads.push(
-    { x: 450, y: 3350, w: 1900, h: ROAD_W, dir: 'h' },
-    { x: 450, y: 4950, w: 1900, h: ROAD_W, dir: 'h' },
-    { x: 450, y: 3350, w: ROAD_W, h: 1730, dir: 'v' },
-    { x: 1200, y: 3200, w: ROAD_W, h: 2200, dir: 'v' },
-    { x: 2000, y: 3350, w: ROAD_W, h: 1730, dir: 'v' },
-    { x: 2950, y: 3350, w: 1750, h: ROAD_W, dir: 'h' },
-    { x: 2950, y: 4950, w: 1750, h: ROAD_W, dir: 'h' },
-    { x: 2950, y: 3350, w: ROAD_W, h: 1730, dir: 'v' },
-    { x: 3850, y: 3200, w: ROAD_W, h: 2200, dir: 'v' },
-    { x: 4600, y: 3350, w: ROAD_W, h: 1730, dir: 'v' },
-    { x: 5300, y: 3350, w: 1550, h: ROAD_W, dir: 'h' },
-    { x: 5300, y: 4950, w: 1550, h: ROAD_W, dir: 'h' },
-    { x: 5300, y: 3350, w: ROAD_W, h: 1730, dir: 'v' },
-    { x: 6200, y: 3200, w: ROAD_W, h: 2200, dir: 'v' }
-  );
-
-  // Far south expansion: residential peninsula, freight works and coast road.
-  roads.push(
-    { x: 450, y: 6350, w: 1900, h: ROAD_W, dir: 'h' },
-    { x: 450, y: 7135, w: 2050, h: ROAD_W, dir: 'h', name: 'Марроу Авеню' },
-    { x: 450, y: 7950, w: 1900, h: ROAD_W, dir: 'h' },
-    { x: 450, y: 6350, w: ROAD_W, h: 1730, dir: 'v' },
-    { x: 1200, y: 6200, w: ROAD_W, h: 2200, dir: 'v' },
-    { x: 2000, y: 6350, w: ROAD_W, h: 1730, dir: 'v' },
-    { x: 2850, y: 6350, w: 2000, h: ROAD_W, dir: 'h' },
-    { x: 2850, y: 7135, w: 2000, h: ROAD_W, dir: 'h', name: 'Фаундри Роу' },
-    { x: 2850, y: 7950, w: 2000, h: ROAD_W, dir: 'h' },
-    { x: 2950, y: 6350, w: ROAD_W, h: 1730, dir: 'v' },
-    { x: 3850, y: 6200, w: ROAD_W, h: 2200, dir: 'v' },
-    { x: 4600, y: 6350, w: ROAD_W, h: 1730, dir: 'v' },
-    { x: 5200, y: 6350, w: 1650, h: ROAD_W, dir: 'h' },
-    { x: 5200, y: 7135, w: 1650, h: ROAD_W, dir: 'h', name: 'Вельвет Кост Драйв' },
-    { x: 5200, y: 7950, w: 1650, h: ROAD_W, dir: 'h' },
-    { x: 5300, y: 6350, w: ROAD_W, h: 1730, dir: 'v' },
-    { x: 6200, y: 6200, w: ROAD_W, h: 2200, dir: 'v' }
-  );
-
-  // Eastern shore and deep-south metropolitan expansion. The repeated local
-  // grids keep navigation readable while the bridges preserve island identity.
-  for (const baseY of [300, 3200, 6200]) {
-    roads.push(
-      { x: 7450, y: baseY + 150, w: 1900, h: ROAD_W, dir: 'h' },
-      { x: 7450, y: baseY + 835, w: 1900, h: ROAD_W, dir: 'h', name: baseY === 300 ? 'Истгейт Авеню' : baseY === 3200 ? 'Синдер-Парквей' : 'Кингсвей' },
-      { x: 7450, y: baseY + 1550, w: 1900, h: ROAD_W, dir: 'h' },
-      { x: 7450, y: baseY + 150, w: ROAD_W, h: 1530, dir: 'v' },
-      { x: 8500, y: baseY, w: ROAD_W, h: 2200, dir: 'v' },
-      { x: 9220, y: baseY + 150, w: ROAD_W, h: 1530, dir: 'v' }
-    );
-  }
-  for (const column of [{x:300,w:2200,main:1200},{x:2850,w:2000,main:3850},{x:5200,w:1800,main:6200},{x:7350,w:2200,main:8500}]) {
-    roads.push(
-      { x: column.x + 150, y: 9350, w: column.w - 300, h: ROAD_W, dir: 'h' },
-      { x: column.x + 150, y: 10135, w: column.w - 300, h: ROAD_W, dir: 'h', name: 'Саут-Кросс Роуд' },
-      { x: column.x + 150, y: 10950, w: column.w - 300, h: ROAD_W, dir: 'h' },
-      { x: column.x + 150, y: 9350, w: ROAD_W, h: 1730, dir: 'v' },
-      { x: column.main, y: 9200, w: ROAD_W, h: 2200, dir: 'v' },
-      { x: column.x + column.w - 250, y: 9350, w: ROAD_W, h: 1730, dir: 'v' }
-    );
-  }
-
-  // Bridges from CITY_ROADS (gradeSeparated) for bridge rails
-  for (const road of CITY_ROADS) {
-    if (!road.gradeSeparated) continue;
-    const halfWidth = collisionHalfWidth(road);
-    const segments = roadSegments(road);
-    for (const seg of segments) {
-      const dx = seg.b.x - seg.a.x;
-      const dy = seg.b.y - seg.a.y;
-      const len = Math.hypot(dx, dy);
-      if (len === 0) continue;
-      const nx = -dy / len;
-      const ny = dx / len;
-      // Two railings on each side
-      bridgeRails.push({ x: seg.a.x + nx * (halfWidth - 4), y: seg.a.y + ny * (halfWidth - 4), w: 14, h: len, axis: 'x' });
-      bridgeRails.push({ x: seg.a.x - nx * (halfWidth - 4), y: seg.a.y - ny * (halfWidth - 4), w: 14, h: len, axis: 'x' });
-    }
-  }
-
-  // Buildings with neon & AC units
-  buildings.push(
-    { x: 630, y: 630, w: 520, h: 450, sign: '🍸 BAR "WHISKEY CAT"', neon: '#f59e0b', roof: '#17202f' },
-    { x: 1380, y: 630, w: 570, h: 450, sign: '💰 PAWN & LOANS', neon: '#10b981', roof: '#1b2434' },
-    { x: 630, y: 1320, w: 520, h: 480, sign: '🏨 HOTEL ST. CLAIR', neon: '#ec4899', roof: '#182130' },
-    { x: 1380, y: 1320, w: 570, h: 480, sign: '🚓 POLICE PRECINCT', neon: '#3b82f6', roof: '#1d273a' },
-    { x: 3130, y: 630, w: 670, h: 450, sign: '⚓ DOCK WAREHOUSE 04', neon: '#06b6d4', roof: '#1c2535' },
-    { x: 4030, y: 630, w: 520, h: 450, sign: '📦 CARGO TERMINAL B', neon: '#eab308', roof: '#192231' },
-    { x: 3130, y: 1320, w: 670, h: 480, sign: '❄️ COLD STORAGE CORP', neon: '#38bdf8', roof: '#1e293c' },
-    { x: 4030, y: 1320, w: 520, h: 480, sign: '🚢 PORT AUTHORITY', neon: '#f97316', roof: '#1a2332' },
-    { x: 5480, y: 630, w: 670, h: 450, sign: '🏮 LANTERN BAY TAVERN', neon: '#ef4444', roof: '#221f1a' },
-    { x: 5480, y: 1320, w: 670, h: 480, sign: '🌴 OVERLOOK MOTEL', neon: '#a855f7', roof: '#201d18' },
-    { x: 630, y: 3530, w: 520, h: 520, sign: '🏭 OLD MILL FOUNDRY', neon: '#f97316', roof: '#211b19' },
-    { x: 1380, y: 3530, w: 570, h: 520, sign: '🎱 BLACK DOG BILLIARDS', neon: '#22c55e', roof: '#171f1c' },
-    { x: 630, y: 4310, w: 520, h: 590, sign: '🔧 SOUTH SIDE GARAGE', neon: '#eab308', roof: '#202027' },
-    { x: 1380, y: 4310, w: 570, h: 590, sign: '📻 RADIO LOWTOWN 96.6', neon: '#ec4899', roof: '#211b2b' },
-    { x: 3130, y: 3530, w: 670, h: 520, sign: '🥩 RED HOOK MARKET', neon: '#ef4444', roof: '#231b1c' },
-    { x: 4030, y: 3530, w: 520, h: 520, sign: '🚇 SOUTH TERMINAL', neon: '#38bdf8', roof: '#182333' },
-    { x: 3130, y: 4310, w: 670, h: 590, sign: '📼 VIDEO PALACE', neon: '#a855f7', roof: '#201a2b' },
-    { x: 4030, y: 4310, w: 520, h: 590, sign: '🍜 NIGHT MARKET', neon: '#f59e0b', roof: '#231f19' },
-    { x: 5480, y: 3530, w: 670, h: 520, sign: '🌲 BLACKWOOD LODGE', neon: '#10b981', roof: '#17221d' },
-    { x: 5480, y: 4310, w: 670, h: 590, sign: '📡 CHANNEL 8 TOWER', neon: '#60a5fa', roof: '#1a2130' },
-    { x: 630, y: 6530, w: 520, h: 520, sign: '⚓ MARROW FISH MARKET', neon: '#e8b84a', roof: '#20251f' },
-    { x: 1380, y: 6530, w: 570, h: 520, sign: '🎺 BLUE NOTE SOCIAL', neon: '#d4523a', roof: '#211d20' },
-    { x: 630, y: 7310, w: 520, h: 590, sign: '🏘 SOUTH TENEMENTS', neon: '#9aa0a8', roof: '#24221f' },
-    { x: 1380, y: 7310, w: 570, h: 590, sign: '🥊 MARROW GYM', neon: '#e09a3e', roof: '#211d1a' },
-    { x: 3130, y: 6530, w: 670, h: 520, sign: '🏭 SOUTHPORT STEEL', neon: '#d4523a', roof: '#25221e' },
-    { x: 4030, y: 6530, w: 520, h: 520, sign: '🚂 FREIGHT DEPOT 12', neon: '#e8b84a', roof: '#1e2425' },
-    { x: 3130, y: 7310, w: 670, h: 590, sign: '🛢 MARITIME FUEL', neon: '#e09a3e', roof: '#24201b' },
-    { x: 4030, y: 7310, w: 520, h: 590, sign: '🔩 UNION MACHINE', neon: '#9aa0a8', roof: '#1f2324' },
-    { x: 5480, y: 6530, w: 670, h: 520, sign: '🎭 VELVET THEATRE', neon: '#d4523a', roof: '#241d22' },
-    { x: 5480, y: 7310, w: 670, h: 590, sign: '🌊 COASTLINE HOTEL', neon: '#e8b84a', roof: '#202429' }
-  );
-
-  for (const district of expansionDistricts) {
-    const upper = district.y + 330;
-    const lower = district.y === 9200 ? district.y + 1110 : district.y + 1010;
-    const lowerH = district.y === 9200 ? 560 : 480;
-    const left = district.x + 330, right = district.main + 180;
-    const leftW = Math.min(620, district.main - left - 60), rightW = Math.min(620, district.far - right - 60);
-    buildings.push(
-      { x:left, y:upper, w:leftW, h:500, sign:district.signs[0], neon:district.neon, roof:district.roof },
-      { x:right, y:upper, w:rightW, h:500, sign:district.signs[1], neon:district.neon, roof:district.roof },
-      { x:left, y:lower, w:leftW, h:lowerH, sign:'APARTMENTS', neon:'#9aa0a8', roof:district.roof },
-      { x:right, y:lower, w:rightW, h:lowerH, sign:'NIGHT SERVICES', neon:'#bba77c', roof:district.roof }
-    );
-  }
-
-  // Separate street-front properties with driveable service alleys.
-  const blocks = buildings.splice(0);
-  blocks.forEach((block, blockIndex) => {
-    const gap = 76;
-    const bw = (block.w - gap) / 2, bh = (block.h - gap) / 2;
-    if (blockIndex % 5 === 0 || blockIndex % 9 === 4) {
-      // Give every few districts breathing room: four low perimeter buildings
-      // frame a real civic park instead of another full roof-to-roof block.
-      const edgeH=Math.max(82,block.h*.22), edgeW=Math.max(92,block.w*.25);
-      buildings.push(
-        {...block,x:block.x,y:block.y,w:block.w*.42,h:edgeH,floors:2,archetype:'pavilion',sign:block.sign},
-        {...block,x:block.x+block.w*.58,y:block.y,w:block.w*.42,h:edgeH,floors:2,archetype:'shop',sign:'CAFE'},
-        {...block,x:block.x,y:block.y+block.h-edgeH,w:block.w*.34,h:edgeH,floors:1,archetype:'pavilion',sign:'PARK HOUSE'},
-        {...block,x:block.x+block.w-edgeW,y:block.y+block.h-edgeH,w:edgeW,h:edgeH,floors:1,archetype:'shop',sign:'NEWS & FLOWERS'}
-      );
-      parkZones.push({x:block.x+28,y:block.y+edgeH+24,w:block.w-56,h:block.h-edgeH*2-48,type:blockIndex%4});
-      trees.push({x:block.x+block.w*.5,y:block.y-28,size:23});
-      return;
-    }
-    const districtTypes=['tenement','shop','warehouse','deco','townhouse','office'];
-    const secondarySigns=['APARTMENTS','REPAIR SHOP','GROCERY','WAREHOUSE','LAUNDROMAT','DINER','PAWN & LOAN','OLD BOOKS'];
-    const floorRanges={tenement:[4,6],shop:[2,3],warehouse:[1,2],deco:[3,5],townhouse:[2,4],office:[5,7]};
-    for (let row = 0; row < 2; row++) for (let col = 0; col < 2; col++) {
-      const archetype=districtTypes[(blockIndex+row*2+col)%districtTypes.length];
-      const range=floorRanges[archetype], floors=range[0]+((blockIndex+row+col)%(range[1]-range[0]+1));
-      const inset=archetype==='townhouse'?14:archetype==='warehouse'?5:archetype==='office'?9:0;
-      buildings.push({ ...block, x: block.x + col * (bw + gap)+inset, y: block.y + row * (bh + gap)+(archetype==='shop'?12:0), w: bw-inset*1.35, h: bh-(archetype==='warehouse'?8:archetype==='shop'?18:0),
-        floors,archetype,cornerRadius:archetype==='warehouse'?5:archetype==='deco'?11:archetype==='townhouse'?7:18,
-        sign: row === 0 && col === 0 ? block.sign.replace(/[^\x20-\x7E]/g, '').trim() : secondarySigns[(blockIndex*3 + row*2 + col) % secondarySigns.length],
-        neon: ['#e09a3e', '#bba77c', '#9aa0a8', '#d4523a','#5f9ea0','#c06b47'][(blockIndex+row+col) % 6] });
-    }
-    trees.push({ x: block.x + bw + gap / 2, y: block.y - 28, size: 23 });
-  });
-
-  // Park furniture is real world geometry, not paint on the ground. The same
-  // deterministic layouts drive rendering, pedestrian navigation and vehicle
-  // contacts so visible trunks, water and street furniture cannot be crossed.
-  parkZones.forEach((park,i)=>{
-    park.trees=[];park.benches=[];park.feature={x:park.x+park.w*.53,y:park.y+park.h*.51,type:park.type};
-    for(let t=0;t<12;t++){
-      const edge=t%4,ratio=(Math.floor(t/4)+1)/4;
-      const x=edge===0?park.x+park.w*ratio:edge===1?park.x+park.w-18:edge===2?park.x+park.w*(1-ratio):park.x+18;
-      const y=edge===0?park.y+18:edge===1?park.y+park.h*ratio:edge===2?park.y+park.h-18:park.y+park.h*(1-ratio);
-      const tree={x,y,size:15+(t+i)%5,park:true};park.trees.push(tree);trees.push(tree);
-    }
-    // 4 benches per park: positions at 25%, 42%, 58%, 75% of park width.
-    // Guarantees parkObstacles.length >= parkZones.length * 5 (4 benches + 1 feature)
-    // which satisfies the >= 70 threshold for 14+ parks.
-    for(let n=0;n<4;n++){
-      const bench={x:park.x+park.w*(.25+n*.167),y:park.y+park.h*.78,width:42,height:10,type:'bench'};
-      park.benches.push(bench);parkObstacles.push(bench);
-    }
-    const f=park.feature;
-    if(park.type===0)parkObstacles.push({x:f.x,y:f.y,width:88,height:58,type:'fountain'});
-    if(park.type===1)parkObstacles.push({x:f.x,y:f.y,width:park.w*.42,height:park.h*.48,type:'pond'});
-    if(park.type===3)for(let s=0;s<4;s++)parkObstacles.push({x:f.x-48+s*40,y:f.y-6,width:31,height:28,type:'stall'});
-  });
-
-  // Props
-  const hydrants = [{ x: 430, y: 1115 }, { x: 1180, y: 1115 }, { x: 1980, y: 1115 }, { x: 2930, y: 1115 }, { x: 3830, y: 1115 }, { x: 5280, y: 1115 }, { x: 430, y: 4115 }, { x: 1980, y: 4115 }, { x: 3830, y: 4115 }, { x: 5280, y: 4115 }];
-  hydrants.forEach(h => breakableProps.push({ x: h.x, y: h.y, type: 'hydrant', intact: true, w: 14, h: 14 }));
-
-  const dumpsters = [{ x: 620, y: 1100 }, { x: 1370, y: 1100 }, { x: 3120, y: 1100 }, { x: 5470, y: 1100 }, { x: 620, y: 4100 }, { x: 3120, y: 4100 }, { x: 5470, y: 4100 }];
-  dumpsters.forEach(d => breakableProps.push({ x: d.x, y: d.y, type: 'dumpster', intact: true, w: 26, h: 18 }));
-
-  // District scenery: sodium lamps, parked cars, trees, cranes and billboards.
-  for (let x = 520; x <= WORLD_W - 520; x += 320) {
-    streetLights.push({ x, y: 1110, tone: '#e09a3e' }, { x, y: 4290, tone: '#e8b84a' }, { x, y: 7110, tone: '#e09a3e' }, { x, y: 10110, tone: '#e8b84a' });
-  }
-  for (const y of [700, 1000, 1500, 1760, 3600, 3920, 4520, 4820]) {
-    trees.push({ x: 5255, y, size: 18 + (y % 3) * 3 }, { x: 6765, y: y + 35, size: 20 + (y % 4) * 2 });
-  }
-  const parkedPalette = ['#7c2d12', '#1e3a5f', '#4b5563', '#7f1d1d', '#713f12', '#0f766e'];
-  for (let i = 0; i < 24; i++) {
-    const south = i >= 12;
-    const row = i % 12;
-    parkedCars.push({
-      x: [710, 880, 1450, 1660, 3190, 3410, 4100, 4320, 5540, 5750, 5910, 6050][row], y: south ? 4095 : 1095,
-      angle: 0, width: 40, height: 19, color: parkedPalette[i % parkedPalette.length]
-    });
-  }
-  cranes.push(
-    { x: 3260, y: 700, reach: 180 }, { x: 4320, y: 760, reach: -170 },
-    { x: 3300, y: 4450, reach: 190 }, { x: 4420, y: 4550, reach: -160 },
-    { x: 3000, y: 1720, reach: 150 }, { x: 4650, y: 1650, reach: -145 },
-    { x: 3260, y: 6660, reach: 205 }, { x: 4380, y: 7460, reach: -180 }
-  );
-  billboards.push(
-    { x: 980, y: 1050, text: 'LOWTOWN FM', color: '#ec4899' },
-    { x: 1720, y: 1050, text: 'MIDNIGHT OIL', color: '#f59e0b' },
-    { x: 3520, y: 1050, text: 'IRONWORKS', color: '#38bdf8' },
-    { x: 5860, y: 1050, text: 'LANTERN BAY', color: '#ef4444' },
-    { x: 970, y: 4050, text: 'OLD MILL', color: '#f97316' },
-    { x: 3520, y: 4050, text: 'RED HOOK', color: '#dc2626' },
-    { x: 5850, y: 4050, text: 'BLACKWOOD', color: '#22c55e' },
-    { x: 6400, y: 4850, text: 'CHANNEL 8', color: '#60a5fa' },
-    { x: 980, y: 7050, text: 'MARROW POINT', color: '#e8b84a' },
-    { x: 3520, y: 7050, text: 'SOUTHPORT', color: '#d4523a' },
-    { x: 5850, y: 7050, text: 'VELVET COAST', color: '#e09a3e' }
-    ,{ x: 8520, y: 1050, text: 'EASTGATE', color: '#e09a3e' }
-    ,{ x: 8520, y: 4050, text: 'CINDER PARK', color: '#d4523a' }
-    ,{ x: 8520, y: 7050, text: 'KINGSWAY', color: '#e8b84a' }
-    ,{ x: 980, y: 10050, text: 'ALL SAINTS', color: '#9aa0a8' }
-    ,{ x: 3520, y: 10050, text: 'ASHCROFT', color: '#d4523a' }
-    ,{ x: 5850, y: 10050, text: 'NORTHSTAR', color: '#e09a3e' }
-    ,{ x: 8520, y: 10050, text: 'KINGSPORT', color: '#e8b84a' }
-  );
-
-  // Diverse Traffic Roster (Sedans, Taxis, Vans)
-  // Traffic now uses authoritative road segments from CITY_ROADS
-  initTrafficCars();
-
-  // Stylish Pedestrians
-  const pedStyles = [
-    { shirt: '#ef4444', pants: '#1e293b', hair: '#78350f', skin: '#fcd34d' },
-    { shirt: '#3b82f6', pants: '#334155', hair: '#1c1917', skin: '#fed7aa' },
-    { shirt: '#10b981', pants: '#0f172a', hair: '#d97706', skin: '#fcd34d' },
-    { shirt: '#f59e0b', pants: '#1e293b', hair: '#451a03', skin: '#ffedd5' },
-    { shirt: '#ec4899', pants: '#475569', hair: '#172554', skin: '#fed7aa' },
-    { shirt: '#64748b', pants: '#090d16', hair: '#52525b', skin: '#fde047' }
-  ];
-
-  for (let i = 0; i < 28; i++) {
-    const style = pedStyles[i % pedStyles.length];
-    pedestrians.push({
-      x: 480 + i * 230,
-      y: 1120 + (i % 2 === 0 ? -16 : ROAD_W + 16),
-      vx: (Math.random() - 0.5) * 0.9,
-      vy: 0,
-      shirt: style.shirt,
-      pants: style.pants,
-      hair: style.hair,
-      skin: style.skin,
-      walkPhase: Math.random() * Math.PI * 2,
-      visualScale: .82 + (i % 5) * .035,
-      fleeTimer: 0
-    });
-  }
-  for (let i = 0; i < 24; i++) {
-    const style = pedStyles[(i + 3) % pedStyles.length];
-    pedestrians.push({
-      x: 500 + i * 265,
-      y: 4120 + (i % 2 === 0 ? -16 : ROAD_W + 16),
-      vx: (Math.random() - 0.5) * 0.9, vy: 0,
-      minX: 450, maxX: 6850,
-      shirt: style.shirt, pants: style.pants, hair: style.hair, skin: style.skin,
-      walkPhase: Math.random() * Math.PI * 2, visualScale: .82 + (i % 4) * .04, fleeTimer: 0
-    });
-  }
-  for (let i = 0; i < 24; i++) {
-    const style = pedStyles[(i + 2) % pedStyles.length];
-    pedestrians.push({
-      x: 500 + i * 265, y: 7120 + (i % 2 === 0 ? -16 : ROAD_W + 16),
-      vx: (Math.random() - 0.5) * 0.85, vy: 0, minX: 450, maxX: 6850,
-      shirt: style.shirt, pants: style.pants, hair: style.hair, skin: style.skin,
-      walkPhase: Math.random() * Math.PI * 2, visualScale: .82 + (i % 6) * .03, fleeTimer: 0
-    });
-  }
-  for (let i = 0; i < 32; i++) {
-    const style = pedStyles[(i + 1) % pedStyles.length];
-    pedestrians.push({
-      x: 520 + i * 285, y: 10120 + (i % 2 === 0 ? -16 : ROAD_W + 16),
-      vx: (Math.random() - 0.5) * 0.85, vy: 0, minX: 450, maxX: 9350,
-      shirt: style.shirt, pants: style.pants, hair: style.hair, skin: style.skin,
-      walkPhase: Math.random() * Math.PI * 2, visualScale: .82 + (i % 5) * .035, fleeTimer: 0
-    });
-  }
+  // Legacy procedural generation REMOVED - using authoritative WORLD/CITY_ROADS
+  // Kept only for test compatibility (smoke tests call initTopology directly)
 }
 
 // ===== GAME LOOP =====
@@ -733,7 +401,10 @@ if (typeof window !== 'undefined' && window.document) {
 
   // Build authoritative road graph from CITY_ROADS (single source of truth)
   const roadNodes = buildRoadNetwork();
-  const authoritySegments = authorityRoadSegments(roadNodes);
+  authoritySegments = authorityRoadSegments(roadNodes);
+
+  // Initialize traffic on authoritative segments
+  initTrafficCars();
 
   // Find valid spawn point on CITY_ROADS (Lowtown Boulevard, near start)
   const spawnRoad = roadById('LOWTOWN_BOULEVARD');
@@ -792,7 +463,7 @@ if (typeof window !== 'undefined' && window.document) {
     player.y += player.vy * dt;
 
     // Collision with buildings (uses authoritative geometry)
-    resolveScenery(player, WORLD.buildings, trees, [...breakableProps, ...parkObstacles]);
+    resolveScenery(player, WORLD.buildings);
 
     // Traffic update using authoritative road segments
     for (const car of trafficCars) {
@@ -870,7 +541,6 @@ if (typeof window !== 'undefined' && window.document) {
       if (!road.gradeSeparated) continue;
       const halfWidth = collisionHalfWidth(road);
       const segments = roadSegments(road);
-      ctx.fillStyle = PALETTE.bridgeAsphalt;
       for (const seg of segments) {
         const dx = seg.b.x - seg.a.x;
         const dy = seg.b.y - seg.a.y;
@@ -879,6 +549,7 @@ if (typeof window !== 'undefined' && window.document) {
         const nx = -dy / len * halfWidth;
         const ny = dx / len * halfWidth;
 
+        ctx.fillStyle = PALETTE.bridgeAsphalt;
         ctx.beginPath();
         ctx.moveTo(seg.a.x + nx, seg.a.y + ny);
         ctx.lineTo(seg.b.x + nx, seg.b.y + ny);
@@ -887,62 +558,48 @@ if (typeof window !== 'undefined' && window.document) {
         ctx.closePath();
         ctx.fill();
       }
-      // Bridge railings
-      ctx.strokeStyle = PALETTE.bridgeRail;
-      ctx.lineWidth = 3;
-      for (const seg of segments) {
-        ctx.beginPath();
-        ctx.moveTo(seg.a.x, seg.a.y);
-        ctx.lineTo(seg.b.x, seg.b.y);
-        ctx.stroke();
-      }
     }
 
-    // Draw buildings from WORLD (same coordinate system as CITY_ROADS)
-    for (const b of WORLD.buildings) {
-      ctx.fillStyle = PALETTE.buildingWall;
-      ctx.fillRect(b[0], b[1], b[2], b[3]);
-      ctx.fillStyle = PALETTE.buildingRoof;
-      ctx.fillRect(b[0] + 4, b[1] + 4, b[2] - 8, b[3] - 8);
+    // Draw bridge rails
+    ctx.fillStyle = PALETTE.bridgeRail;
+    for (const rail of bridgeRails) {
+      ctx.fillRect(rail.x, rail.y, rail.w, rail.h);
+    }
+
+    // Draw buildings
+    drawArchitecture(ctx, WORLD.buildings);
+
+    // Draw traffic cars
+    for (const car of trafficCars) {
+      ctx.save();
+      ctx.translate(car.x, car.y);
+      ctx.rotate(car.angle);
+      ctx.fillStyle = car.color;
+      ctx.fillRect(-car.w / 2, -car.h / 2, car.w, car.h);
+      // Windows
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.fillRect(-car.w / 2 + 4, -car.h / 2 + 3, car.w - 8, car.h - 6);
+      ctx.restore();
     }
 
     // Draw player car
     ctx.save();
     ctx.translate(player.x, player.y);
     ctx.rotate(player.angle);
-    ctx.fillStyle = player.bodyColor;
-    ctx.fillRect(-player.width / 2, -player.height / 2, player.width, player.height);
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(-player.width / 2 + 4, -player.height / 2 + 4, 8, 4);
-    ctx.fillStyle = '#f00';
-    ctx.fillRect(-player.width / 2 + 4, player.height / 2 - 8, 8, 4);
+    ctx.fillStyle = '#e8b84a';
+    ctx.fillRect(-23, -11, 46, 22);
+    // Windshield
+    ctx.fillStyle = 'rgba(30, 40, 60, 0.7)';
+    ctx.fillRect(-20, -9, 40, 18);
     ctx.restore();
 
-    // Draw traffic
-    for (const car of trafficCars) {
-      ctx.save();
-      ctx.translate(car.x, car.y);
-      ctx.rotate(car.angle);
-      ctx.fillStyle = car.color;
-      ctx.fillRect(-car.width / 2, -car.height / 2, car.width, car.height);
-      ctx.restore();
-    }
+    // Draw radar
+    drawRadar();
+
+    // Draw HUD
+    drawHUD();
 
     ctx.restore();
-
-    // Radar
-    radarCtx.fillStyle = '#06090e';
-    radarCtx.fillRect(0, 0, radarCanvas.width, radarCanvas.height);
-    radarCtx.save();
-    radarCtx.translate(radarCanvas.width / 2, radarCanvas.height / 2);
-    radarCtx.scale(0.02, 0.02);
-    radarCtx.fillStyle = '#e8b84a';
-    radarCtx.fillRect(player.x - 5, player.y - 5, 10, 10);
-    radarCtx.restore();
-
-    // HUD speed
-    const speedEl = document.getElementById('hudSpeed');
-    if (speedEl) speedEl.textContent = Math.round(speed * 0.19);
 
     requestAnimationFrame(gameLoop);
   }
