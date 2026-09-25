@@ -238,6 +238,84 @@ const buildings = [];
 const breakableProps = [];
 const bridgeRails = [];
 const trafficCars = [];
+
+// Build authoritative road network once for traffic
+const roadNetwork = buildRoadNetwork();
+const authoritySegments = roadSegments(roadNetwork);
+
+// Helper: pick a random road segment for traffic spawning
+function pickTrafficSegment() {
+  if (authoritySegments.length === 0) return null;
+  return authoritySegments[Math.floor(Math.random() * authoritySegments.length)];
+}
+
+// Helper: get next segment at junction (continue forward or turn)
+function getNextSegment(currentSeg, fromNode) {
+  const [a, b] = currentSeg;
+  const currentNode = (fromNode === a || fromNode === b) ? (fromNode === a ? b : a) : null;
+  if (!currentNode) return null;
+  if (!currentNode.links || currentNode.links.length === 0) return null;
+  // Prefer continuing straight - pick link with closest heading
+  const currentHeading = Math.atan2(b.y - a.y, b.x - a.x);
+  let bestLink = currentNode.links[0];
+  let bestDiff = Math.PI;
+  for (const link of currentNode.links) {
+    const linkHeading = Math.atan2(link.y - currentNode.y, link.x - currentNode.x);
+    let diff = Math.abs(linkHeading - currentHeading);
+    if (diff > Math.PI) diff = 2 * Math.PI - diff;
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      bestLink = link;
+    }
+  }
+  return [currentNode, bestLink];
+}
+
+// Initialize traffic cars on authoritative road segments
+function initTrafficCars() {
+  trafficCars.length = 0;
+  
+  // Spawn 30 traffic cars distributed across road segments
+  const carTypes = [
+    { color: '#e8b84a', type: 'sedan', w: 50, h: 28 },
+    { color: '#3b82f6', type: 'coupe', w: 48, h: 26 },
+    { color: '#10b981', type: 'hatchback', w: 46, h: 26 },
+    { color: '#f59e0b', type: 'suv', w: 52, h: 30 },
+    { color: '#ec4899', type: 'sports', w: 48, h: 25 },
+    { color: '#64748b', type: 'van', w: 56, h: 32 }
+  ];
+  
+  for (let i = 0; i < 30; i++) {
+    const seg = pickTrafficSegment();
+    if (!seg) continue;
+    const [a, b] = seg;
+    const t = Math.random();
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 10) continue;
+    const heading = Math.atan2(dy, dx);
+    const model = carTypes[i % carTypes.length];
+    trafficCars.push({
+      x: a.x + dx * t,
+      y: a.y + dy * t,
+      angle: Math.random() < 0.5 ? heading : heading + Math.PI,
+      speed: (Math.random() < 0.5 ? 1 : -1) * (1.5 + Math.random() * 0.6),
+      color: model.color, type: model.type, width: model.w, height: model.h,
+      currentSegment: seg,
+      segmentProgress: t, // 0 to 1 along current segment
+      segmentLength: len,
+      waitingAtJunction: false
+    });
+  }
+  
+  // Remove cars too close to player spawn
+  for (let i = trafficCars.length - 1; i >= 0; i--) {
+    const car = trafficCars[i];
+    car.isTraffic = true; car.trafficId = `traffic-${i}`; car.waitingAtEdge = false;
+    if (Math.hypot(car.x - player.x, car.y - player.y) < 230) trafficCars.splice(i, 1);
+  }
+}
 const policeCars = [];
 const pedestrians = [];
 const skidmarks = [];
@@ -564,98 +642,8 @@ function initTopology() {
   );
 
   // Diverse Traffic Roster (Sedans, Taxis, Vans)
-  const carTypes = [
-    { type: 'sedan', color: '#334155', w: 46, h: 22 },
-    { type: 'taxi', color: '#eab308', w: 46, h: 22 },
-    { type: 'sports', color: '#dc2626', w: 48, h: 23 },
-    { type: 'coupe', color: '#2563eb', w: 44, h: 21 },
-    { type: 'wagon', color: '#475569', w: 50, h: 23 },
-    { type: 'black', color: '#0f172a', w: 46, h: 22 }
-  ];
-
-  for (let i = 0; i < 12; i++) {
-    const isEast = i % 2 === 0;
-    const model = carTypes[i % carTypes.length];
-    trafficCars.push({
-      x: 500 + i * 360,
-      y: isEast ? 1165 : 1205,
-      angle: isEast ? 0 : Math.PI,
-      speed: (isEast ? 1 : -1) * (2.0 + Math.random() * 0.5),
-      color: model.color,
-      type: model.type,
-      width: model.w,
-      height: model.h,
-      minX: 450,
-      maxX: 6850
-    });
-  }
-  for (let i = 0; i < 10; i++) {
-    const isEast = i % 2 === 0;
-    const model = carTypes[(i + 2) % carTypes.length];
-    trafficCars.push({
-      x: 520 + i * 455,
-      y: isEast ? 4165 : 4205,
-      angle: isEast ? 0 : Math.PI,
-      speed: (isEast ? 1 : -1) * (1.9 + Math.random() * 0.6),
-      color: model.color, type: model.type, width: model.w, height: model.h,
-      axis: 'x', minX: 450, maxX: 6850
-    });
-  }
-  for (let i = 0; i < 10; i++) {
-    const isEast = i % 2 === 0;
-    const model = carTypes[(i + 4) % carTypes.length];
-    trafficCars.push({
-      x: 520 + i * 410, y: isEast ? 7165 : 7205,
-      angle: isEast ? 0 : Math.PI,
-      speed: (isEast ? 1 : -1) * (1.8 + Math.random() * 0.55),
-      color: model.color, type: model.type, width: model.w, height: model.h,
-      axis: 'x', minX: 450, maxX: 6850
-    });
-  }
-  [1200, 3850, 6200].forEach((x, lane) => {
-    for (let i = 0; i < 4; i++) {
-      const isSouth = i % 2 === 0;
-      const model = carTypes[(lane * 2 + i) % carTypes.length];
-      trafficCars.push({
-        x: x + (isSouth ? 32 : 88), y: 700 + i * 1050,
-        angle: isSouth ? Math.PI / 2 : -Math.PI / 2,
-        speed: (isSouth ? 1 : -1) * (1.6 + Math.random() * 0.5),
-        color: model.color, type: model.type, width: model.w, height: model.h,
-        axis: 'y', minY: 450, maxY: 5250
-      });
-    }
-  });
-  for (let i = 0; i < 12; i++) {
-    const isEast = i % 2 === 0;
-    const model = carTypes[(i + 1) % carTypes.length];
-    trafficCars.push({
-      x: 520 + i * 515, y: isEast ? 10165 : 10205,
-      angle: isEast ? 0 : Math.PI,
-      speed: (isEast ? 1 : -1) * (1.8 + Math.random() * 0.5),
-      color: model.color, type: model.type, width: model.w, height: model.h,
-      axis: 'x', minX: 450, maxX: 9350
-    });
-  }
-  for (let i = 0; i < 6; i++) {
-    const isSouth = i % 2 === 0;
-    const model = carTypes[(i + 3) % carTypes.length];
-    trafficCars.push({
-      x: 8500 + (isSouth ? 32 : 88), y: 650 + i * 1320,
-      angle: isSouth ? Math.PI / 2 : -Math.PI / 2,
-      speed: (isSouth ? 1 : -1) * (1.65 + Math.random() * 0.45),
-      color: model.color, type: model.type, width: model.w, height: model.h,
-      axis: 'y', minY: 450, maxY: 11100
-    });
-  }
-
-  // Traffic actors carry an explicit identity so lane followers are not
-  // repeatedly pushed sideways by the generic collision solver. Keep the
-  // opening junction clear for a fair first frame and deterministic autotest.
-  for (let i = trafficCars.length - 1; i >= 0; i--) {
-    const car = trafficCars[i];
-    car.isTraffic = true; car.trafficId = `traffic-${i}`; car.waitingAtEdge = false;
-    if (Math.hypot(car.x - player.x, car.y - player.y) < 230) trafficCars.splice(i, 1);
-  }
+  // Traffic now uses authoritative road segments from CITY_ROADS
+  initTrafficCars();
 
   // Stylish Pedestrians
   const pedStyles = [
@@ -782,18 +770,38 @@ if (typeof window !== 'undefined' && window.document) {
 
     // Traffic update using authoritative road segments
     for (const car of trafficCars) {
-      car.x += car.speed * Math.cos(car.angle) * dt;
-      car.y += car.speed * Math.sin(car.angle) * dt;
-
-      // Keep traffic on roads using authoritative geometry
-      const hit = car.minX !== undefined ? null : undefined; // trafficCars use minX/maxX for horizontal, minY/maxY for vertical
-      if (car.minX !== undefined && (car.x < car.minX || car.x > car.maxX)) {
-        car.speed *= -1;
-        car.angle += Math.PI;
-      }
-      if (car.minY !== undefined && (car.y < car.minY || car.y > car.maxY)) {
-        car.speed *= -1;
-        car.angle += Math.PI;
+      if (!car.currentSegment) continue;
+      
+      const [a, b] = car.currentSegment;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const segmentLength = car.segmentLength || Math.hypot(dx, dy);
+      const segmentHeading = Math.atan2(dy, dx);
+      
+      // Move along segment
+      const distanceThisFrame = car.speed * dt;
+      car.segmentProgress += distanceThisFrame / segmentLength;
+      
+      // Update position along segment
+      const progress = Math.max(0, Math.min(1, car.segmentProgress));
+      car.x = a.x + dx * progress;
+      car.y = a.y + dy * progress;
+      car.angle = segmentHeading + (car.speed < 0 ? Math.PI : 0);
+      
+      // Check if reached end of segment
+      if (car.segmentProgress <= 0 || car.segmentProgress >= 1) {
+        // At junction - pick next segment
+        const fromNode = car.segmentProgress <= 0 ? a : b;
+        const nextSeg = getNextSegment(car.currentSegment, fromNode);
+        if (nextSeg) {
+          car.currentSegment = nextSeg;
+          car.segmentProgress = car.segmentProgress <= 0 ? 1 : 0;
+          car.segmentLength = Math.hypot(nextSeg[1].x - nextSeg[0].x, nextSeg[1].y - nextSeg[0].y);
+        } else {
+          // Dead end - reverse direction
+          car.speed *= -1;
+          car.segmentProgress = Math.max(0, Math.min(1, car.segmentProgress));
+        }
       }
     }
 
