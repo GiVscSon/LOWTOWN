@@ -6,6 +6,10 @@ import { coastPath, pointInCoast } from './game/coastline.js';
 import { createFreeRoam, drawTransport } from './game/free_roam.js';
 import { isLand } from './game/islands.js';
 import { pointInBuilding } from './game/world_geometry.js';
+import { CITY_ROADS, roadById } from './game/city_semantics.js';
+import { collisionHalfWidth, roadSegments } from './game/road_geometry.js';
+import { buildRoadNetwork, roadSegments as authorityRoadSegments } from './game/road_authority.js';
+import { WORLD } from './game/world.js';
 import './game/test_drive.css';
 // LOWTOWN // THREE ISLANDS VISUAL OVERHAUL // GTA 2 RETRO-NOIR ENGINE
 // High-detail procedural pedestrian sprites, isometric vehicle chassis, wet road reflections, neon glow & audio
@@ -727,13 +731,25 @@ function initTopology() {
 }
 
 // ===== GAME LOOP =====
-initTopology();
-roam = createFreeRoam(player, parkedCars, buildings, trees, 
+// Build authoritative road graph from CITY_ROADS (single source of truth)
+const roadNodes = buildRoadNetwork();
+const authoritySegments = authorityRoadSegments(roadNodes);
+
+// Find valid spawn point on CITY_ROADS (Lowtown Boulevard, near start)
+const spawnRoad = roadById('LOWTOWN_BOULEVARD');
+const spawnPoint = spawnRoad ? { x: spawnRoad.points[4][0], y: spawnRoad.points[4][1], heading: 0 } : { x: -120, y: -360, heading: 0 };
+player.x = spawnPoint.x;
+player.y = spawnPoint.y;
+player.angle = spawnPoint.heading;
+player.vx = 0;
+player.vy = 0;
+
+roam = createFreeRoam(player, parkedCars, WORLD.buildings, trees, 
   (x, y) => isLand(x, y) && !pointInBuilding(x, y), 
   () => {}, 
   parkObstacles);
 
-const driveLab = createDriveLab({ player, state, canvas, buildings, trafficCars, policeCars, routeInput, roam });
+const driveLab = createDriveLab({ player, state, canvas, buildings: WORLD.buildings, trafficCars, policeCars, routeInput, roam });
 
 let lastTime = performance.now();
 function gameLoop(now) {
@@ -775,16 +791,21 @@ function gameLoop(now) {
   player.x += player.vx * dt;
   player.y += player.vy * dt;
   
-  // Collision with buildings
-  resolveScenery(player, buildings, trees, [...breakableProps, ...parkObstacles]);
+  // Collision with buildings (uses authoritative geometry)
+  resolveScenery(player, WORLD.buildings, trees, [...breakableProps, ...parkObstacles]);
   
-  // Traffic update
+  // Traffic update using authoritative road segments
   for (const car of trafficCars) {
     car.x += car.speed * Math.cos(car.angle) * dt;
     car.y += car.speed * Math.sin(car.angle) * dt;
     
-    // Simple traffic bounds
-    if (car.x < car.minX || car.x > car.maxX) {
+    // Keep traffic on roads using authoritative geometry
+    const hit = car.minX !== undefined ? null : undefined; // trafficCars use minX/maxX for horizontal, minY/maxY for vertical
+    if (car.minX !== undefined && (car.x < car.minX || car.x > car.maxX)) {
+      car.speed *= -1;
+      car.angle += Math.PI;
+    }
+    if (car.minY !== undefined && (car.y < car.minY || car.y > car.maxY)) {
       car.speed *= -1;
       car.angle += Math.PI;
     }
@@ -801,22 +822,46 @@ function gameLoop(now) {
   ctx.save();
   ctx.translate(-camX, -camY);
   
-  // Draw roads
-  ctx.fillStyle = PALETTE.asphalt;
-  for (const road of roads) {
-    if (road.dir === 'h') {
-      ctx.fillRect(road.x, road.y, road.w, road.h);
-    } else {
-      ctx.fillRect(road.x, road.y, road.w, road.h);
+  // Draw roads from AUTHORITATIVE CITY_ROADS geometry
+  for (const road of CITY_ROADS) {
+    const halfWidth = collisionHalfWidth(road);
+    const segments = roadSegments(road);
+    ctx.fillStyle = PALETTE.asphalt;
+    for (const seg of segments) {
+      const dx = seg.b.x - seg.a.x;
+      const dy = seg.b.y - seg.a.y;
+      const len = Math.hypot(dx, dy);
+      if (len === 0) continue;
+      const nx = -dy / len * halfWidth;
+      const ny = dx / len * halfWidth;
+      
+      ctx.beginPath();
+      ctx.moveTo(seg.a.x + nx, seg.a.y + ny);
+      ctx.lineTo(seg.b.x + nx, seg.b.y + ny);
+      ctx.lineTo(seg.b.x - nx, seg.b.y - ny);
+      ctx.lineTo(seg.a.x - nx, seg.a.y - ny);
+      ctx.closePath();
+      ctx.fill();
     }
   }
   
-  // Draw buildings
-  for (const b of buildings) {
+  // Draw bridges
+  for (const bridge of bridges) {
+    if (bridge.dir === 'h') {
+      ctx.fillStyle = PALETTE.bridgeAsphalt;
+      ctx.fillRect(bridge.x, bridge.y, bridge.w, bridge.h);
+    } else {
+      ctx.fillStyle = PALETTE.bridgeAsphalt;
+      ctx.fillRect(bridge.x, bridge.y, bridge.w, bridge.h);
+    }
+  }
+  
+  // Draw buildings from WORLD (same coordinate system as CITY_ROADS)
+  for (const b of WORLD.buildings) {
     ctx.fillStyle = PALETTE.buildingWall;
-    ctx.fillRect(b.x, b.y, b.w, b.h);
+    ctx.fillRect(b[0], b[1], b[2], b[3]);
     ctx.fillStyle = PALETTE.buildingRoof;
-    ctx.fillRect(b.x + 4, b.y + 4, b.w - 8, b.h - 8);
+    ctx.fillRect(b[0] + 4, b[1] + 4, b[2] - 8, b[3] - 8);
   }
   
   // Draw player car
