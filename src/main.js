@@ -191,7 +191,9 @@ const state = {
   isMapOpen: false,
   isGarageOpen: false,
   lastFrameTime: performance.now(),
-  keys: { up: false, down: false, left: false, right: false, handbrake: false, nitro: false }
+  keys: { up: false, down: false, left: false, right: false, handbrake: false, nitro: false },
+  // Force rebuild marker: 2026-09-26
+  _buildMarker: Date.now()
 };
 
 const player = {
