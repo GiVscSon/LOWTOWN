@@ -48,7 +48,7 @@ export function nextTrafficSegment(car){
   return [reached,pick.node];
 }
 
-function poseFor(car){
+export function syncTrafficCarPose(car){
   const [a,b]=car.currentSegment;
   const dx=b.x-a.x,dy=b.y-a.y;
   const len=Math.hypot(dx,dy)||1;
@@ -80,7 +80,7 @@ export function initializeTrafficCar(car){
   car.speed=Math.max(0,Math.abs(car.speed??car.cruiseSpeed));
   car.laneOffset=Math.max(7,Math.min(LANE_WIDTH*.7,Math.abs(car.laneOffset??LANE_WIDTH*.52)));
   car.turnCounter=car.turnCounter||0;
-  return poseFor(car);
+  return syncTrafficCarPose(car);
 }
 
 function directedKey(car){
@@ -109,6 +109,8 @@ export function stepTrafficFleet(cars,dt=1/60){
       const factor=clamp((nearest-24)/71,0,1);
       target*=factor;
     }
+    car.collisionHold=Math.max(0,(car.collisionHold||0)-h);
+    if(car.collisionHold>0) target=Math.min(target,(car.cruiseSpeed||70)*.22);
     const accel=target<car.speed?150:55;
     const delta=clamp(target-car.speed,-accel*h,accel*h);
     car.speed=Math.max(0,car.speed+delta);
@@ -141,7 +143,7 @@ export function stepTrafficFleet(cars,dt=1/60){
       car.segmentLength=Math.max(1,dist(car.currentSegment[0],car.currentSegment[1]));
     }
 
-    poseFor(car);
+    syncTrafficCarPose(car);
   }
 
   return cars;

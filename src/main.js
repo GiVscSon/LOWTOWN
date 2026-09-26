@@ -12,6 +12,7 @@ import { buildRoadNetwork, roadSegments as authorityRoadSegments } from './game/
 import { WORLD } from './game/world.js';
 import { createTransportController } from './game/transport_controller.js';
 import { initializeTrafficCar, stepTrafficFleet } from './game/runtime_traffic.js';
+import { resolveRuntimeVehicleCollisions } from './game/runtime_vehicle_collisions.js';
 import { createAIDriver } from './game/ai_driver.js';
 import './game/test_drive.css';
 // LOWTOWN // THREE ISLANDS VISUAL OVERHAUL // GTA 2 RETRO-NOIR ENGINE
@@ -244,6 +245,12 @@ const buildings = [];
 const breakableProps = [];
 const bridgeRails = [];
 const trafficCars = [];
+const runtimeCollisionStats = {
+  playerHits: 0,
+  trafficContacts: 0,
+  totalDamage: 0,
+  maxImpulse: 0
+};
 
 let authoritySegments = [];
 
@@ -831,6 +838,24 @@ if (typeof window !== 'undefined' && window.document) {
         // Runtime traffic follows directed road segments with right-lane offset,
         // safe headway and no endpoint teleport when a car reaches a junction.
         stepTrafficFleet(trafficCars, dt);
+
+        // Dynamic vehicle contacts are resolved after route motion. NPCs remain
+        // constrained to their road segments while the player receives a real
+        // 2-D impulse and HP damage on meaningful impacts.
+        if (!autoTest.enabled && !integrationTest.enabled) {
+          const collisionFrame = resolveRuntimeVehicleCollisions(player, trafficCars, dt, {
+            onPlayerImpact: ({ damage }) => {
+              player.hp = Math.max(0, player.hp - damage);
+              sound.playImpact();
+            }
+          });
+          runtimeCollisionStats.playerHits += collisionFrame.playerHits;
+          runtimeCollisionStats.trafficContacts += collisionFrame.trafficContacts;
+          runtimeCollisionStats.totalDamage += collisionFrame.damage;
+          runtimeCollisionStats.maxImpulse = Math.max(runtimeCollisionStats.maxImpulse, collisionFrame.maxImpulse);
+          if (typeof window !== 'undefined') window.__LOWTOWN_COLLISIONS = runtimeCollisionStats;
+        }
+
         // Camera is calculated in CSS pixels, not backing-store pixels.
         // This keeps the player centered on DPR 2/3 phones and tablets.
         const viewW = Math.max(320, canvas.clientWidth || window.innerWidth || 1280);
