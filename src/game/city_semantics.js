@@ -81,8 +81,9 @@ export function buildCityGraph() {
     for (let j = i + 1; j < nodes.length; j++) {
       const a = nodes[i], b = nodes[j];
       if (a.roadId === b.roadId) continue;
-      const roadA = roadById(a.roadId), roadB = roadById(b.roadId);
-      if (roadA?.gradeSeparated || roadB?.gradeSeparated) continue;
+      // Exact shared vertices are real junctions even when one road is
+      // grade-separated elsewhere. Grade separation only suppresses undeclared
+      // mid-segment crossings, not explicit endpoint connections.
       if (distance(a, b) <= 0.001) {
         if (!a.links.includes(b)) a.links.push(b);
         if (!b.links.includes(a)) b.links.push(a);
