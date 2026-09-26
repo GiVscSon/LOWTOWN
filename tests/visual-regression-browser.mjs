@@ -44,6 +44,19 @@ try{
     );
     await page.waitForTimeout(1200);
 
+    const trafficBefore=await page.evaluate(()=>Object.fromEntries(
+      (window.__LOWTOWN_TRAFFIC?.cars||[]).map(car=>[car.trafficId,{x:car.x,y:car.y}])
+    ));
+    await page.waitForTimeout(900);
+    const trafficAfter=await page.evaluate(()=>Object.fromEntries(
+      (window.__LOWTOWN_TRAFFIC?.cars||[]).map(car=>[car.trafficId,{x:car.x,y:car.y}])
+    ));
+    const trafficIds=Object.keys(trafficBefore).filter(id=>trafficAfter[id]);
+    const movingTraffic=trafficIds.filter(id=>{
+      const a=trafficBefore[id],b=trafficAfter[id];
+      return Math.hypot(b.x-a.x,b.y-a.y)>8;
+    }).length;
+
     const metrics=await page.evaluate(()=>{
       const canvas=document.getElementById('gameCanvas');
       if(!canvas)throw new Error('gameCanvas missing');
@@ -107,8 +120,10 @@ try{
     assert.ok(metrics.brightRatio>0.006,`${cfg.name}: scene is nearly black: ${(metrics.brightRatio*100).toFixed(2)}% bright samples`);
     assert.ok(metrics.centerGoldPixels>20&&metrics.centerGoldRatio>0.002,
       `${cfg.name}: player car is not visually present near viewport center (gold=${metrics.centerGoldPixels}, ratio=${metrics.centerGoldRatio})`);
+    assert.ok(trafficIds.length>=18,`${cfg.name}: runtime traffic population is too small: ${trafficIds.length}`);
+    assert.ok(movingTraffic>=6,`${cfg.name}: traffic is visually static: only ${movingTraffic}/${trafficIds.length} cars moved`);
 
-    console.log('LOWTOWN VISUAL FRAME',cfg.name,JSON.stringify(metrics));
+    console.log('LOWTOWN VISUAL FRAME',cfg.name,JSON.stringify({...metrics,trafficCount:trafficIds.length,movingTraffic}));
     await context.close();
   }
   console.log('LOWTOWN VISUAL REGRESSION GATE: PASS');

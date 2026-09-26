@@ -32,6 +32,8 @@ jobs:
         run: node tests/ai-route-lock-smoke.mjs
       - name: Traffic stability
         run: node tests/traffic-stability-smoke.mjs
+      - name: Runtime traffic behavior
+        run: node tests/runtime-traffic-behavior-smoke.mjs
       - name: Gameplay loop
         run: node tests/gameplay-loop-smoke.mjs
       - name: World connectivity
