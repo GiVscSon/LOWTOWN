@@ -546,6 +546,16 @@ function installTestHooks(roadNodes = [], roadLines = []) {
     });
     integrationTest.ai.start(integrationTest.transport.state);
     const ts = integrationTest.transport.state;
+    // Start aligned with the first planned road segment. A random safe-start
+    // heading can otherwise point exactly opposite the first route edge,
+    // trapping the predictive controller in TURN_AROUND with zero throttle.
+    const route = integrationTest.ai.state.route || [];
+    if (route.length >= 2) {
+      ts.a = Math.atan2(route[1].y - route[0].y, route[1].x - route[0].x);
+      ts.vx = 0;
+      ts.vy = 0;
+      ts.v = 0;
+    }
     ts.lastSafe = { x: ts.x, y: ts.y, a: ts.a };
     player.x=ts.x; player.y=ts.y; player.angle=ts.a; player.vx=ts.vx||0; player.vy=ts.vy||0;
 
