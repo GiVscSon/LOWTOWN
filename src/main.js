@@ -390,6 +390,24 @@ function initTopology() {
   // Kept only for test compatibility (smoke tests call initTopology directly)
 }
 
+function drawRadar() {
+  const r = radarCanvas;
+  const rc = radarCtx;
+  rc.fillStyle = '#06090e';
+  rc.fillRect(0, 0, r.width, r.height);
+  rc.save();
+  rc.translate(r.width / 2, r.height / 2);
+  rc.scale(0.02, 0.02);
+  rc.fillStyle = '#e8b84a';
+  rc.fillRect(player.x - 5, player.y - 5, 10, 10);
+  rc.restore();
+}
+
+function drawHUD() {
+  const speedEl = document.getElementById('hudSpeed');
+  if (speedEl) speedEl.textContent = Math.round(Math.hypot(player.vx, player.vy) * 0.19);
+}
+
 // ===== GAME LOOP =====
 // Only run in browser environment (not in Node.js test VMs)
 if (typeof window !== 'undefined' && window.document) {
