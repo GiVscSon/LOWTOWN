@@ -154,8 +154,8 @@ const WORLD_H = 11700;
 const ROAD_W = 130;
 
 const PALETTE = {
-  waterDark: '#06141b',
-  waterShore: '#12313a',
+  waterDark: '#0a222b',
+  waterShore: '#1a414b',
   asphalt: '#111417',
   asphaltWet: '#1a1d1e',
   roadMarkingYellow: '#d4a34b',
@@ -306,13 +306,13 @@ function initTrafficCars() {
 
   const nearby = authoritySegments.filter(([a,b]) => {
     const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
-    return Math.hypot(mx-player.x,my-player.y) < 1250;
+    return Math.hypot(mx-player.x,my-player.y) < 760;
   });
   const localPool = nearby.length ? nearby : authoritySegments;
-  const total = 46;
+  const total = 54;
 
   for (let i = 0; i < total; i++) {
-    const pool = i < 32 ? localPool : authoritySegments;
+    const pool = i < 40 ? localPool : authoritySegments;
     const seg = pool[Math.floor(Math.random() * pool.length)] || pickTrafficSegment();
     if (!seg) continue;
     const [a, b] = seg;
@@ -328,7 +328,7 @@ function initTrafficCars() {
       x: a.x + dx * t,
       y: a.y + dy * t,
       angle: heading + (forward < 0 ? Math.PI : 0),
-      speed: forward * (58 + Math.random() * 42),
+      speed: forward * (72 + Math.random() * 48),
       color: model.color, type: model.type, width: model.w, height: model.h,
       currentSegment: seg,
       segmentProgress: t,
@@ -874,9 +874,24 @@ if (typeof window !== 'undefined' && window.document) {
         const viewH = Math.max(240, canvas.clientHeight || window.innerHeight || 720);
         const zoom = viewW < 700 ? 0.70 : viewW < 1100 ? 0.78 : 0.86;
 
-        // Water / night foundation.
+        // Water / night foundation. Keep enough blue-green separation from
+        // asphalt that the coastline reads immediately, even on dark mobile screens.
         ctx.fillStyle = PALETTE.waterDark;
         ctx.fillRect(0, 0, viewW, viewH);
+        ctx.save();
+        ctx.globalAlpha = .34;
+        ctx.strokeStyle = '#2e6772';
+        ctx.lineWidth = 1.2;
+        const waveOffset = (now * 0.022) % 64;
+        for (let sy = -32 + waveOffset; sy < viewH + 48; sy += 64) {
+          for (let sx = -40; sx < viewW + 60; sx += 92) {
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.quadraticCurveTo(sx + 18, sy - 4, sx + 38, sy);
+            ctx.stroke();
+          }
+        }
+        ctx.restore();
 
         ctx.save();
         ctx.translate(viewW / 2, viewH / 2);
@@ -887,17 +902,36 @@ if (typeof window !== 'undefined' && window.document) {
         // nearly-black strokes floating on a black canvas.
         for (const island of ISLANDS) {
           ctx.save();
+          // Shallow-water halo.
           ctx.beginPath();
-          ctx.ellipse(island.center.x, island.center.y, island.rx + 20, island.ry + 20, 0, 0, Math.PI * 2);
-          ctx.fillStyle = island.colors?.shore || PALETTE.waterShore;
+          ctx.ellipse(island.center.x, island.center.y, island.rx + 44, island.ry + 44, 0, 0, Math.PI * 2);
+          ctx.fillStyle = PALETTE.waterShore;
           ctx.fill();
+
+          // Sand/concrete shoreline band.
+          ctx.beginPath();
+          ctx.ellipse(island.center.x, island.center.y, island.rx + 18, island.ry + 18, 0, 0, Math.PI * 2);
+          ctx.fillStyle = island.colors?.shore || '#756452';
+          ctx.fill();
+
+          // Island land mass.
           ctx.beginPath();
           ctx.ellipse(island.center.x, island.center.y, island.rx, island.ry, 0, 0, Math.PI * 2);
           ctx.fillStyle = island.colors?.land || '#202326';
           ctx.fill();
-          ctx.strokeStyle = 'rgba(224,154,62,.16)';
-          ctx.lineWidth = 4;
+          ctx.strokeStyle = 'rgba(236,181,100,.32)';
+          ctx.lineWidth = 5;
           ctx.stroke();
+
+          // Broken foam/highlight line, subtle enough for night.
+          ctx.save();
+          ctx.setLineDash([20,14]);
+          ctx.strokeStyle = 'rgba(124,190,195,.34)';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.ellipse(island.center.x, island.center.y, island.rx + 30, island.ry + 30, 0, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
           ctx.restore();
         }
 
