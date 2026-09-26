@@ -21,7 +21,8 @@ function physicsStep(state,dt,input,physics){
 
 export function predictVehicle(state,seconds,input={},physics=state.physics,options={}){
   const safeSeconds=clamp(finite(seconds),0,10);
-  const isCar=state.type===TRANSPORT_TYPES.CAR;
+  const resolvedType=state.type||physics?.type||TRANSPORT_TYPES.CAR;
+  const isCar=resolvedType===TRANSPORT_TYPES.CAR;
   const arcadeCar=isCar&&physics?.model==='arcade-bicycle-swept';
   // Cars use the same maximum integration substep as the live controller.
   // This keeps the prediction numerically aligned instead of merely using the
@@ -30,7 +31,7 @@ export function predictVehicle(state,seconds,input={},physics=state.physics,opti
   const useActuator=options.useActuatorDelay!==false&&!!state.actuatorState;
   const response=useActuator?{...DEFAULT_RESPONSE,...(state.actuatorResponse||{}),...(options.actuatorResponse||{})}:null;
   const controlDt=useActuator?Math.max(1/60,finite(options.controlDt,1/60)):physicsDt;
-  let current={...state,telemetry:state.telemetry?{...state.telemetry}:state.telemetry};
+  let current={...state,type:resolvedType,vehicleId:state.vehicleId||physics?.vehicleId||'sedan',telemetry:state.telemetry?{...state.telemetry}:state.telemetry};
   let actuator=useActuator?{...state.actuatorState}:null;
   const points=[];const blocked=typeof options.blocked==='function'?options.blocked:null;
   let collision=false,collisionT=safeSeconds,stepIndex=0,minWall=Infinity;
