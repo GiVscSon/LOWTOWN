@@ -793,8 +793,14 @@ if (typeof window !== 'undefined' && window.document) {
           ctx.fillRect(rail.x, rail.y, rail.w, rail.h);
         }
 
-        // Draw buildings
-        drawArchitecture(ctx, WORLD.buildings);
+        // Draw buildings. WORLD stores compact [x,y,w,h] tuples while
+        // architecture.js renders one rich building object at a time.
+        WORLD.buildings.forEach((raw, index) => {
+          const b = Array.isArray(raw)
+            ? { x: raw[0], y: raw[1], w: raw[2], h: raw[3], sign: index % 3 === 0 ? 'LOWTOWN' : index % 3 === 1 ? 'OPEN' : '24H' }
+            : raw;
+          if ([b?.x,b?.y,b?.w,b?.h].every(Number.isFinite)) drawArchitecture(ctx, b, index);
+        });
 
         // Draw traffic cars
         for (const car of trafficCars) {
