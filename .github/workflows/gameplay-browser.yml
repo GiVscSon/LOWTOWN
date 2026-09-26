@@ -25,6 +25,8 @@ jobs:
         run: node tests/ai-15s-browser-smoke.mjs
       - name: End-to-end DROP payout and DIST gate
         run: node tests/gameplay-browser-acceptance.mjs
+      - name: Runtime vehicle collision browser gate
+        run: node tests/runtime-collision-browser.mjs
       - name: Mobile + desktop visual regression guard
         run: node tests/visual-regression-browser.mjs
       - name: Upload visual guard screenshots
