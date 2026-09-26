@@ -294,8 +294,7 @@ function getNextSegment(currentSeg, reachedNode) {
 // Initialize traffic cars on authoritative road segments
 function initTrafficCars() {
   trafficCars.length = 0;
-  
-  // Spawn 30 traffic cars distributed across road segments
+
   const carTypes = [
     { color: '#e8b84a', type: 'sedan', w: 50, h: 28 },
     { color: '#3b82f6', type: 'coupe', w: 48, h: 26 },
@@ -304,9 +303,17 @@ function initTrafficCars() {
     { color: '#ec4899', type: 'sports', w: 48, h: 25 },
     { color: '#64748b', type: 'van', w: 56, h: 32 }
   ];
-  
-  for (let i = 0; i < 30; i++) {
-    const seg = pickTrafficSegment();
+
+  const nearby = authoritySegments.filter(([a,b]) => {
+    const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+    return Math.hypot(mx-player.x,my-player.y) < 1250;
+  });
+  const localPool = nearby.length ? nearby : authoritySegments;
+  const total = 46;
+
+  for (let i = 0; i < total; i++) {
+    const pool = i < 32 ? localPool : authoritySegments;
+    const seg = pool[Math.floor(Math.random() * pool.length)] || pickTrafficSegment();
     if (!seg) continue;
     const [a, b] = seg;
     const t = Math.random();
@@ -315,25 +322,28 @@ function initTrafficCars() {
     const len = Math.hypot(dx, dy);
     if (len < 10) continue;
     const heading = Math.atan2(dy, dx);
+    const forward = Math.random() < .5 ? 1 : -1;
     const model = carTypes[i % carTypes.length];
     trafficCars.push({
       x: a.x + dx * t,
       y: a.y + dy * t,
-      angle: Math.random() < 0.5 ? heading : heading + Math.PI,
-      speed: (Math.random() < 0.5 ? 1 : -1) * (62 + Math.random() * 34),
+      angle: heading + (forward < 0 ? Math.PI : 0),
+      speed: forward * (58 + Math.random() * 42),
       color: model.color, type: model.type, width: model.w, height: model.h,
       currentSegment: seg,
-      segmentProgress: t, // 0 to 1 along current segment
+      segmentProgress: t,
       segmentLength: len,
-      waitingAtJunction: false
+      waitingAtJunction: false,
+      isTraffic: true,
+      trafficId: `traffic-${i}`,
+      waitingAtEdge: false
     });
   }
-  
-  // Remove cars too close to player spawn
+
+  // Keep the immediate spawn bubble readable, but retain dense traffic nearby.
   for (let i = trafficCars.length - 1; i >= 0; i--) {
     const car = trafficCars[i];
-    car.isTraffic = true; car.trafficId = `traffic-${i}`; car.waitingAtEdge = false;
-    if (Math.hypot(car.x - player.x, car.y - player.y) < 230) trafficCars.splice(i, 1);
+    if (Math.hypot(car.x - player.x, car.y - player.y) < 105) trafficCars.splice(i, 1);
   }
 }
 const policeCars = [];
@@ -714,34 +724,41 @@ if (typeof window !== 'undefined' && window.document) {
     setStage('authority-segs');
     authoritySegments = authorityRoadSegments(roadNodes);
 
-    // Initialize traffic on authoritative segments
-    setStage('init-traffic');
-    initTrafficCars();
-    if (!pedestrians.length) {
-      const pedRoads=CITY_ROADS.filter(r=>Array.isArray(r.points)&&r.points.length>1);
-      for(let i=0;i<24&&pedRoads.length;i++){
-        const road=pedRoads[i%pedRoads.length], point=road.points[(i*3)%road.points.length];
-        const px=point[0]+((i%2)?22:-22), py=point[1]+((i%3)-1)*14;
-        pedestrians.push({x:px,y:py,a:0,speed:0,id:`ped-${i}`});
-      }
-    }
-    setStage('traffic-ok');
-
-    // Find valid spawn point on CITY_ROADS (Lowtown Boulevard, near start)
+    // Start on the north waterfront. This is a valid road point with water
+    // immediately beyond the island edge, so the first frame reads as an island city.
     setStage('spawn');
-    const spawnRoad = roadById('LOWTOWN_BOULEVARD');
-    if (spawnRoad && spawnRoad.points && spawnRoad.points.length > 2) {
-      // Use a road vertex that is clear of the legacy building footprints.
-      player.x = spawnRoad.points[2][0];
-      player.y = spawnRoad.points[2][1];
+    const spawnRoad = roadById('CENTRAL_AVENUE');
+    if (spawnRoad?.points?.length) {
+      player.x = spawnRoad.points[0][0];
+      player.y = spawnRoad.points[0][1];
+      player.angle = Math.PI / 2;
     } else {
-      player.x = -760;
-      player.y = -360;
+      player.x = -120;
+      player.y = -1160;
+      player.angle = Math.PI / 2;
     }
-    player.angle = 0;
     player.vx = 0;
     player.vy = 0;
     setStage('spawn-ok');
+
+    // Populate after spawn so the visible neighborhood feels alive instead of
+    // scattering almost all actors across the full graph.
+    setStage('init-traffic');
+    initTrafficCars();
+    pedestrians.length = 0;
+    const pedRoads=CITY_ROADS.filter(r=>Array.isArray(r.points)&&r.points.length>1);
+    const localPedPoints=[];
+    for(const road of pedRoads) for(const point of road.points) {
+      if(Math.hypot(point[0]-player.x,point[1]-player.y)<1050) localPedPoints.push({road,point});
+    }
+    const pedPool=localPedPoints.length?localPedPoints:pedRoads.flatMap(road=>road.points.map(point=>({road,point})));
+    for(let i=0;i<36&&pedPool.length;i++){
+      const entry=pedPool[(i*7)%pedPool.length], point=entry.point;
+      const side=(i%2)?1:-1;
+      const px=point[0]+side*(24+(i%3)*5), py=point[1]+((i%5)-2)*10;
+      pedestrians.push({x:px,y:py,a:(i%4)*Math.PI/2,speed:0,id:`ped-${i}`});
+    }
+    setStage('traffic-ok');
 
     // Initialize free roam and drive lab (with valid canvas reference)
     setStage('create-roam');
@@ -950,6 +967,21 @@ if (typeof window !== 'undefined' && window.document) {
           ctx.fillRect(rail.x, rail.y, rail.w, rail.h);
         }
 
+        // Street lamps / sodium glow bring the road grid out of the darkness.
+        for (const [lx,ly] of WORLD.lamps || []) {
+          ctx.save();
+          ctx.strokeStyle='rgba(82,76,66,.9)';
+          ctx.lineWidth=2;
+          ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx,ly-18);ctx.stroke();
+          const glow=ctx.createRadialGradient(lx,ly-20,1,lx,ly-20,34);
+          glow.addColorStop(0,'rgba(224,154,62,.42)');
+          glow.addColorStop(.35,'rgba(224,154,62,.14)');
+          glow.addColorStop(1,'rgba(224,154,62,0)');
+          ctx.fillStyle=glow;ctx.beginPath();ctx.arc(lx,ly-20,34,0,Math.PI*2);ctx.fill();
+          ctx.fillStyle='#f3b75d';ctx.beginPath();ctx.arc(lx,ly-20,2.6,0,Math.PI*2);ctx.fill();
+          ctx.restore();
+        }
+
         // Draw buildings. WORLD stores compact [x,y,w,h] tuples while
         // architecture.js renders one rich building object at a time.
         WORLD.buildings.forEach((raw, index) => {
@@ -978,11 +1010,17 @@ if (typeof window !== 'undefined' && window.document) {
           ctx.restore();
         }
 
-        // Draw lightweight pedestrians
-        ctx.fillStyle='#b8a58a';
+        // Draw lightweight pedestrians with a small shadow and coat silhouette.
         for(const ped of pedestrians){
-          ctx.beginPath();ctx.arc(ped.x,ped.y,4,0,Math.PI*2);ctx.fill();
-          ctx.fillStyle='#5f6770';ctx.fillRect(ped.x-3,ped.y+4,6,9);ctx.fillStyle='#b8a58a';
+          ctx.save();
+          ctx.translate(ped.x,ped.y);
+          ctx.fillStyle='rgba(0,0,0,.38)';
+          ctx.beginPath();ctx.ellipse(3,10,6,3,0,0,Math.PI*2);ctx.fill();
+          ctx.fillStyle='#b8a58a';
+          ctx.beginPath();ctx.arc(0,0,4.2,0,Math.PI*2);ctx.fill();
+          ctx.fillStyle=(Number(ped.id?.split('-')[1])||0)%3===0?'#6d5547':'#4f5d68';
+          ctx.fillRect(-3.5,4,7,11);
+          ctx.restore();
         }
 
         // Draw player car last so it stays readable against buildings/traffic.
