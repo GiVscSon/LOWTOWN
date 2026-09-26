@@ -295,7 +295,7 @@ function getNextSegment(currentSeg, reachedNode) {
 function initTrafficCars() {
   trafficCars.length = 0;
   
-  // Spawn 30 traffic cars distributed across road segments
+  // Keep a useful local traffic population near the actual player spawn while\n  // retaining vehicles across the rest of the authoritative road graph
   const carTypes = [
     { color: '#e8b84a', type: 'sedan', w: 50, h: 28 },
     { color: '#3b82f6', type: 'coupe', w: 48, h: 26 },
@@ -333,7 +333,7 @@ function initTrafficCars() {
   for (let i = trafficCars.length - 1; i >= 0; i--) {
     const car = trafficCars[i];
     car.isTraffic = true; car.trafficId = `traffic-${i}`; car.waitingAtEdge = false;
-    if (Math.hypot(car.x - player.x, car.y - player.y) < 230) trafficCars.splice(i, 1);
+    if (Math.hypot(car.x - player.x, car.y - player.y) < 130) trafficCars.splice(i, 1);
   }
 }
 const policeCars = [];
@@ -714,9 +714,8 @@ if (typeof window !== 'undefined' && window.document) {
     setStage('authority-segs');
     authoritySegments = authorityRoadSegments(roadNodes);
 
-    // Initialize traffic on authoritative segments
-    setStage('init-traffic');
-    initTrafficCars();
+    // Pedestrians are geometry-driven and can initialize before player spawn.
+    setStage('init-pedestrians');
     if (!pedestrians.length) {
       const pedRoads=CITY_ROADS.filter(r=>Array.isArray(r.points)&&r.points.length>1);
       for(let i=0;i<24&&pedRoads.length;i++){
@@ -725,9 +724,10 @@ if (typeof window !== 'undefined' && window.document) {
         pedestrians.push({x:px,y:py,a:0,speed:0,id:`ped-${i}`});
       }
     }
-    setStage('traffic-ok');
 
-    // Find valid spawn point on CITY_ROADS (Lowtown Boulevard, near start)
+    // Find valid spawn point on CITY_ROADS (Lowtown Boulevard, near start).
+    // Traffic is intentionally initialized AFTER this so local density is based
+    // on the real spawn, not the old placeholder player coordinates.
     setStage('spawn');
     const spawnRoad = roadById('LOWTOWN_BOULEVARD');
     if (spawnRoad && spawnRoad.points && spawnRoad.points.length > 2) {
@@ -742,6 +742,10 @@ if (typeof window !== 'undefined' && window.document) {
     player.vx = 0;
     player.vy = 0;
     setStage('spawn-ok');
+
+    setStage('init-traffic');
+    initTrafficCars();
+    setStage('traffic-ok');
 
     // Initialize free roam and drive lab (with valid canvas reference)
     setStage('create-roam');
