@@ -11,6 +11,7 @@ import { carriagewayHalfWidth, collisionHalfWidth, supportHalfWidth, roadSegment
 import { buildRoadNetwork, roadSegments as authorityRoadSegments } from './game/road_authority.js';
 import { WORLD } from './game/world.js';
 import { createTransportController } from './game/transport_controller.js';
+import { initializeTrafficCar, stepTrafficFleet } from './game/runtime_traffic.js';
 import { createAIDriver } from './game/ai_driver.js';
 import './game/test_drive.css';
 // LOWTOWN // THREE ISLANDS VISUAL OVERHAUL // GTA 2 RETRO-NOIR ENGINE
@@ -294,8 +295,7 @@ function getNextSegment(currentSeg, reachedNode) {
 // Initialize traffic cars on authoritative road segments
 function initTrafficCars() {
   trafficCars.length = 0;
-  
-  // Keep a useful local traffic population near the actual player spawn while\n  // retaining vehicles across the rest of the authoritative road graph
+
   const carTypes = [
     { color: '#e8b84a', type: 'sedan', w: 50, h: 28 },
     { color: '#3b82f6', type: 'coupe', w: 48, h: 26 },
@@ -304,37 +304,47 @@ function initTrafficCars() {
     { color: '#ec4899', type: 'sports', w: 48, h: 25 },
     { color: '#64748b', type: 'van', w: 56, h: 32 }
   ];
-  
-  for (let i = 0; i < 30; i++) {
-    const seg = pickTrafficSegment();
-    if (!seg) continue;
-    const [a, b] = seg;
-    const t = Math.random();
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const len = Math.hypot(dx, dy);
-    if (len < 10) continue;
-    const heading = Math.atan2(dy, dx);
-    const model = carTypes[i % carTypes.length];
-    trafficCars.push({
-      x: a.x + dx * t,
-      y: a.y + dy * t,
-      angle: Math.random() < 0.5 ? heading : heading + Math.PI,
-      speed: (Math.random() < 0.5 ? 1 : -1) * (62 + Math.random() * 34),
-      color: model.color, type: model.type, width: model.w, height: model.h,
-      currentSegment: seg,
-      segmentProgress: t, // 0 to 1 along current segment
-      segmentLength: len,
-      waitingAtJunction: false
-    });
+
+  const localSegments = authoritySegments.filter(([a,b]) => {
+    const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+    return Math.hypot(mx-player.x,my-player.y) <= 1050 && Math.hypot(b.x-a.x,b.y-a.y) > 10;
+  });
+  const localPool = localSegments.length ? localSegments : authoritySegments;
+  const totalCars = 34;
+
+  for (let i = 0; i < totalCars; i++) {
+    const pool = i < 22 ? localPool : authoritySegments;
+    const source = pool[Math.floor(Math.random() * pool.length)] || pickTrafficSegment();
+    if (!source) continue;
+    const [a,b] = source;
+    const len=Math.hypot(b.x-a.x,b.y-a.y);
+    if(len<10) continue;
+
+    const forward=Math.random()<.5;
+    const seg=forward?[a,b]:[b,a];
+    const t=.08+Math.random()*.84;
+    const model=carTypes[i%carTypes.length];
+    const cruise=62+Math.random()*34;
+    const car={
+      x:0,y:0,angle:0,
+      speed:cruise,
+      cruiseSpeed:cruise,
+      color:model.color,type:model.type,width:model.w,height:model.h,
+      currentSegment:seg,
+      segmentProgress:t,
+      segmentLength:len,
+      laneOffset:12,
+      waitingAtJunction:false,
+      braking:false,
+      isTraffic:true,
+      trafficId:`traffic-${i}`,
+      waitingAtEdge:false
+    };
+    initializeTrafficCar(car);
+    if(Math.hypot(car.x-player.x,car.y-player.y)>=125) trafficCars.push(car);
   }
-  
-  // Remove cars too close to player spawn
-  for (let i = trafficCars.length - 1; i >= 0; i--) {
-    const car = trafficCars[i];
-    car.isTraffic = true; car.trafficId = `traffic-${i}`; car.waitingAtEdge = false;
-    if (Math.hypot(car.x - player.x, car.y - player.y) < 130) trafficCars.splice(i, 1);
-  }
+
+  if (typeof window !== 'undefined') window.__LOWTOWN_TRAFFIC = { cars: trafficCars };
 }
 const policeCars = [];
 const pedestrians = [];
@@ -818,43 +828,9 @@ if (typeof window !== 'undefined' && window.document) {
         // deterministic mission probe cannot be invalidated by legacy art blocks.
         if (!autoTest.enabled && !integrationTest.enabled) resolveScenery(player, WORLD.buildings);
 
-        // Traffic update using authoritative road segments
-        for (const car of trafficCars) {
-          if (!car.currentSegment) continue;
-
-          const [a, b] = car.currentSegment;
-          const dx = b.x - a.x;
-          const dy = b.y - a.y;
-          const segmentLength = car.segmentLength || Math.hypot(dx, dy);
-          const segmentHeading = Math.atan2(dy, dx);
-
-          // Move along segment
-          const distanceThisFrame = car.speed * dt;
-          car.segmentProgress += distanceThisFrame / segmentLength;
-
-          // Update position along segment
-          const progress = Math.max(0, Math.min(1, car.segmentProgress));
-          car.x = a.x + dx * progress;
-          car.y = a.y + dy * progress;
-          car.angle = segmentHeading + (car.speed < 0 ? Math.PI : 0);
-
-          // Check if reached end of segment
-          if (car.segmentProgress <= 0 || car.segmentProgress >= 1) {
-            // At junction - pick next segment
-            const fromNode = car.segmentProgress <= 0 ? a : b;
-            const nextSeg = getNextSegment(car.currentSegment, fromNode);
-            if (nextSeg) {
-              car.currentSegment = nextSeg;
-              car.segmentProgress = car.segmentProgress <= 0 ? 1 : 0;
-              car.segmentLength = Math.hypot(nextSeg[1].x - nextSeg[0].x, nextSeg[1].y - nextSeg[0].y);
-            } else {
-              // Dead end - reverse direction
-              car.speed *= -1;
-              car.segmentProgress = Math.max(0, Math.min(1, car.segmentProgress));
-            }
-          }
-        }
-
+        // Runtime traffic follows directed road segments with right-lane offset,
+        // safe headway and no endpoint teleport when a car reaches a junction.
+        stepTrafficFleet(trafficCars, dt);
         // Camera is calculated in CSS pixels, not backing-store pixels.
         // This keeps the player centered on DPR 2/3 phones and tablets.
         const viewW = Math.max(320, canvas.clientWidth || window.innerWidth || 1280);
