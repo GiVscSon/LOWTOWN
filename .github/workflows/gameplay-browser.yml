@@ -25,3 +25,12 @@ jobs:
         run: node tests/ai-15s-browser-smoke.mjs
       - name: End-to-end DROP payout and DIST gate
         run: node tests/gameplay-browser-acceptance.mjs
+      - name: Mobile + desktop visual regression guard
+        run: node tests/visual-regression-browser.mjs
+      - name: Upload visual guard screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lowtown-visual-guard
+          path: test-results/visual-*.png
+          if-no-files-found: ignore
