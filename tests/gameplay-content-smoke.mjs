@@ -57,9 +57,18 @@ assert.ok(aiStub.state.goal && Number.isFinite(aiStub.state.goal.x) && Number.is
 assert.equal(aiStub.state.routeLocked, true);
 
 delete globalThis.__LOWTOWN_AI;
-missions.next();
+// Finish the active DROP before unlocking the next job. next() intentionally
+// refuses to skip an incomplete mission.
+missions.update({ x: second.x, y: second.y });
+assert.equal(missions.state().complete, true, 'DROP must complete at its final destination');
+assert.equal(missions.next(), true);
 assert.equal(missions.state().id, 'RUN');
-missions.next();
+for (const id of missions.state().route) {
+  const p = destinationPoint(id);
+  missions.update({ x: p.x, y: p.y });
+}
+assert.equal(missions.state().complete, true, 'RUN must complete before GETAWAY unlocks');
+assert.equal(missions.next(), true);
 assert.equal(missions.state().id, 'GETAWAY');
 missions.reset();
 assert.equal(missions.state().stage, 0);
