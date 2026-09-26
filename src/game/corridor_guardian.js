@@ -49,5 +49,6 @@ export function createCorridorGuardian({enter=78, emergency=112, restore=52}={})
     }
     return c;
   }
-  return {state,apply};
+  function status(){ return { ...state }; }
+  return {state,apply,status};
 }
