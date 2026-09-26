@@ -1,3 +1,5 @@
+import { LANE_WIDTH, SIDEWALK_WIDTH, CURB_MARGIN, CLASS_MIN_CARRIAGEWAY } from './road_constants.js';
+
 const ROAD = Object.freeze({ ARTERIAL: 'ARTERIAL', AVENUE: 'AVENUE', STREET: 'STREET', SERVICE: 'SERVICE' });
 const USE = Object.freeze({ VEHICLE: 'VEHICLE', PEDESTRIAN: 'PEDESTRIAN', BOTH: 'BOTH' });
 
@@ -54,7 +56,13 @@ export function roadById(id) { return CITY_ROADS.find(r => r.id === id) || null;
 export function districtById(id) { return CITY_DISTRICTS.find(d => d.id === id) || null; }
 export function destinationById(id) { return CITY_DESTINATIONS.find(d => d.id === id) || null; }
 
-const sidewalkOffsetFallback = r => (r ? Math.max(r.lanes * 23, r.class === 'ARTERIAL' ? 70 : r.class === 'AVENUE' ? 52 : 40) / 2 + 20 : 36);
+const carriagewayWidthLocal = r => r ? Math.max((r.lanes || 2) * LANE_WIDTH, CLASS_MIN_CARRIAGEWAY[r.class] || CLASS_MIN_CARRIAGEWAY.STREET) : 0;
+const sidewalkOffsetFallback = r => r ? carriagewayWidthLocal(r) / 2 + CURB_MARGIN + SIDEWALK_WIDTH : 36;
+const laneCenterOffsetLocal = (r, lane = 0) => {
+  const lanes = Math.max(1, r?.lanes || 2);
+  const clamped = Math.max(0, Math.min(lanes - 1, Number(lane) || 0));
+  return clamped * LANE_WIDTH - ((lanes - 1) * LANE_WIDTH) / 2;
+};
 export function destinationPoint(id, side = 1) {
   const d = destinationById(id), r = d && roadById(d.roadId);
   if (!d || !r) return null;
@@ -102,6 +110,40 @@ export function roadPoint(roadId, index, lateralOffset = 0) {
   const dx = forward[0] - base[0], dy = forward[1] - base[1], len = Math.hypot(dx, dy) || 1;
   const nx = -dy / len, ny = dx / len;
   return { x: cur[0] + nx * lateralOffset, y: cur[1] + ny * lateralOffset, heading: Math.atan2(dy, dx) };
+}
+
+
+export function vehicleLanePoint(roadId, index, lane = 0) {
+  const road = roadById(roadId);
+  if (!road) return null;
+  return roadPoint(roadId, index, laneCenterOffsetLocal(road, lane));
+}
+
+export function sidewalkPoint(roadId, index, side = 1) {
+  const road = roadById(roadId);
+  if (!road) return null;
+  const sign = side < 0 ? -1 : 1;
+  return roadPoint(roadId, index, sign * sidewalkOffsetFallback(road));
+}
+
+function routeWithOffset(startPoint, endPoint, offsetForRoad) {
+  const route = shortestRoute(startPoint, endPoint);
+  return route.map(node => {
+    const road = roadById(node.roadId);
+    if (!road) return { ...node };
+    const offset = offsetForRoad(road, node);
+    const point = roadPoint(node.roadId, node.index, offset);
+    return point ? { ...point, id: node.id, roadId: node.roadId, index: node.index, zone: node.zone, class: node.class } : { ...node };
+  });
+}
+
+export function vehicleRoute(startPoint, endPoint) {
+  return routeWithOffset(startPoint, endPoint, road => laneCenterOffsetLocal(road, 0));
+}
+
+export function pedestrianRoute(startPoint, endPoint, side = 1) {
+  const sign = side < 0 ? -1 : 1;
+  return routeWithOffset(startPoint, endPoint, road => sign * sidewalkOffsetFallback(road));
 }
 
 export function nearestRoadNode(point, graph = buildCityGraph()) {
