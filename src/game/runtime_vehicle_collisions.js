@@ -81,6 +81,14 @@ export function resolveRuntimeVehicleCollisions(player,cars,dt=1/60,{onPlayerImp
       result.maxImpulse=Math.max(result.maxImpulse,finite(hit.impulse));
       applyTrafficProxy(a,pa);
       applyTrafficProxy(b,pb);
+
+      // Pure crossing/sideswipe overlaps can have near-zero normal closing
+      // speed even though two chassis occupy the same space. Damp both cars
+      // briefly so they do not ghost through each other at an intersection.
+      if(finite(hit.impulse)<1&&finite(hit.penetration)>0.5){
+        a.speed*=0.62;
+        b.speed*=0.62;
+      }
       a.collisionHold=Math.max(finite(a.collisionHold),0.28);
       b.collisionHold=Math.max(finite(b.collisionHold),0.28);
     }
