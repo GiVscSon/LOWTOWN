@@ -458,184 +458,191 @@ if (typeof window !== 'undefined' && window.document) {
     setStage('raf-schedule');
     let lastTime = performance.now();
     function gameLoop(now) {
-      const dt = Math.min(0.05, Math.max(0.001, (now - lastTime) / 1000));
-      lastTime = now;
+      try {
+        const dt = Math.min(0.05, Math.max(0.001, (now - lastTime) / 1000));
+        lastTime = now;
 
-      state.lastFrameTime = now;
-      window.__lowtownLastFrame = now;
+        state.lastFrameTime = now;
+        window.__lowtownLastFrame = now;
 
-      // Input handling
-      const input = {
-        throttle: state.keys.up ? 1 : (state.keys.down ? -1 : 0),
-        brake: state.keys.down ? 1 : 0,
-        steer: (state.keys.right ? 1 : 0) - (state.keys.left ? 1 : 0),
-        handbrake: state.keys.handbrake,
-        nitro: state.keys.nitro
-      };
+        // Input handling
+        const input = {
+          throttle: state.keys.up ? 1 : (state.keys.down ? -1 : 0),
+          brake: state.keys.down ? 1 : 0,
+          steer: (state.keys.right ? 1 : 0) - (state.keys.left ? 1 : 0),
+          handbrake: state.keys.handbrake,
+          nitro: state.keys.nitro
+        };
 
-      // Update player physics
-      const speed = Math.hypot(player.vx, player.vy);
-      const forward = Math.cos(player.angle);
-      const right = Math.sin(player.angle);
+        // Update player physics
+        const speed = Math.hypot(player.vx, player.vy);
+        const forward = Math.cos(player.angle);
+        const right = Math.sin(player.angle);
 
-      if (input.throttle > 0) {
-        player.vx += forward * input.throttle * 120 * dt;
-        player.vy += right * input.throttle * 120 * dt;
-      }
-      if (input.brake > 0) {
-        const drag = 0.92;
-        player.vx *= drag;
-        player.vy *= drag;
-      }
-      if (input.steer !== 0 && speed > 0.5) {
-        const turnRate = input.steer * 3.5 * dt;
-        player.angle += turnRate * (speed / 100);
-      }
+        if (input.throttle > 0) {
+          player.vx += forward * input.throttle * 120 * dt;
+          player.vy += right * input.throttle * 120 * dt;
+        }
+        if (input.brake > 0) {
+          const drag = 0.92;
+          player.vx *= drag;
+          player.vy *= drag;
+        }
+        if (input.steer !== 0 && speed > 0.5) {
+          const turnRate = input.steer * 3.5 * dt;
+          player.angle += turnRate * (speed / 100);
+        }
 
-      // Apply velocity
-      player.x += player.vx * dt;
-      player.y += player.vy * dt;
+        // Apply velocity
+        player.x += player.vx * dt;
+        player.y += player.vy * dt;
 
-      // Collision with buildings (uses authoritative geometry)
-      resolveScenery(player, WORLD.buildings);
+        // Collision with buildings (uses authoritative geometry)
+        resolveScenery(player, WORLD.buildings);
 
-      // Traffic update using authoritative road segments
-      for (const car of trafficCars) {
-        if (!car.currentSegment) continue;
+        // Traffic update using authoritative road segments
+        for (const car of trafficCars) {
+          if (!car.currentSegment) continue;
 
-        const [a, b] = car.currentSegment;
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const segmentLength = car.segmentLength || Math.hypot(dx, dy);
-        const segmentHeading = Math.atan2(dy, dx);
+          const [a, b] = car.currentSegment;
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const segmentLength = car.segmentLength || Math.hypot(dx, dy);
+          const segmentHeading = Math.atan2(dy, dx);
 
-        // Move along segment
-        const distanceThisFrame = car.speed * dt;
-        car.segmentProgress += distanceThisFrame / segmentLength;
+          // Move along segment
+          const distanceThisFrame = car.speed * dt;
+          car.segmentProgress += distanceThisFrame / segmentLength;
 
-        // Update position along segment
-        const progress = Math.max(0, Math.min(1, car.segmentProgress));
-        car.x = a.x + dx * progress;
-        car.y = a.y + dy * progress;
-        car.angle = segmentHeading + (car.speed < 0 ? Math.PI : 0);
+          // Update position along segment
+          const progress = Math.max(0, Math.min(1, car.segmentProgress));
+          car.x = a.x + dx * progress;
+          car.y = a.y + dy * progress;
+          car.angle = segmentHeading + (car.speed < 0 ? Math.PI : 0);
 
-        // Check if reached end of segment
-        if (car.segmentProgress <= 0 || car.segmentProgress >= 1) {
-          // At junction - pick next segment
-          const fromNode = car.segmentProgress <= 0 ? a : b;
-          const nextSeg = getNextSegment(car.currentSegment, fromNode);
-          if (nextSeg) {
-            car.currentSegment = nextSeg;
-            car.segmentProgress = car.segmentProgress <= 0 ? 1 : 0;
-            car.segmentLength = Math.hypot(nextSeg[1].x - nextSeg[0].x, nextSeg[1].y - nextSeg[0].y);
-          } else {
-            // Dead end - reverse direction
-            car.speed *= -1;
-            car.segmentProgress = Math.max(0, Math.min(1, car.segmentProgress));
+          // Check if reached end of segment
+          if (car.segmentProgress <= 0 || car.segmentProgress >= 1) {
+            // At junction - pick next segment
+            const fromNode = car.segmentProgress <= 0 ? a : b;
+            const nextSeg = getNextSegment(car.currentSegment, fromNode);
+            if (nextSeg) {
+              car.currentSegment = nextSeg;
+              car.segmentProgress = car.segmentProgress <= 0 ? 1 : 0;
+              car.segmentLength = Math.hypot(nextSeg[1].x - nextSeg[0].x, nextSeg[1].y - nextSeg[0].y);
+            } else {
+              // Dead end - reverse direction
+              car.speed *= -1;
+              car.segmentProgress = Math.max(0, Math.min(1, car.segmentProgress));
+            }
           }
         }
-      }
 
-      // Camera follow player
-      const camX = player.x - canvas.width / 2;
-      const camY = player.y - canvas.height / 2;
+        // Camera follow player
+        const camX = player.x - canvas.width / 2;
+        const camY = player.y - canvas.height / 2;
 
-      // Render
-      ctx.fillStyle = '#06090e';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Render
+        ctx.fillStyle = '#06090e';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      ctx.save();
-      ctx.translate(-camX, -camY);
-
-      // Draw roads from AUTHORITATIVE CITY_ROADS geometry
-      for (const road of CITY_ROADS) {
-        const halfWidth = collisionHalfWidth(road);
-        const segments = roadSegments(road);
-        ctx.fillStyle = PALETTE.asphalt;
-        for (const seg of segments) {
-          const dx = seg.b.x - seg.a.x;
-          const dy = seg.b.y - seg.a.y;
-          const len = Math.hypot(dx, dy);
-          if (len === 0) continue;
-          const nx = -dy / len * halfWidth;
-          const ny = dx / len * halfWidth;
-
-          ctx.beginPath();
-          ctx.moveTo(seg.a.x + nx, seg.a.y + ny);
-          ctx.lineTo(seg.b.x + nx, seg.b.y + ny);
-          ctx.lineTo(seg.b.x - nx, seg.b.y - ny);
-          ctx.lineTo(seg.a.x - nx, seg.a.y - ny);
-          ctx.closePath();
-          ctx.fill();
-        }
-      }
-
-      // Draw bridges from CITY_ROADS (gradeSeparated roads)
-      for (const road of CITY_ROADS) {
-        if (!road.gradeSeparated) continue;
-        const halfWidth = collisionHalfWidth(road);
-        const segments = roadSegments(road);
-        for (const seg of segments) {
-          const dx = seg.b.x - seg.a.x;
-          const dy = seg.b.y - seg.a.y;
-          const len = Math.hypot(dx, dy);
-          if (len === 0) continue;
-          const nx = -dy / len * halfWidth;
-          const ny = dx / len * halfWidth;
-
-          ctx.fillStyle = PALETTE.bridgeAsphalt;
-          ctx.beginPath();
-          ctx.moveTo(seg.a.x + nx, seg.a.y + ny);
-          ctx.lineTo(seg.b.x + nx, seg.b.y + ny);
-          ctx.lineTo(seg.b.x - nx, seg.b.y - ny);
-          ctx.lineTo(seg.a.x - nx, seg.a.y - ny);
-          ctx.closePath();
-          ctx.fill();
-        }
-      }
-
-      // Draw bridge rails
-      ctx.fillStyle = PALETTE.bridgeRail;
-      for (const rail of bridgeRails) {
-        ctx.fillRect(rail.x, rail.y, rail.w, rail.h);
-      }
-
-      // Draw buildings
-      drawArchitecture(ctx, WORLD.buildings);
-
-      // Draw traffic cars
-      for (const car of trafficCars) {
         ctx.save();
-        ctx.translate(car.x, car.y);
-        ctx.rotate(car.angle);
-        ctx.fillStyle = car.color;
-        ctx.fillRect(-car.w / 2, -car.h / 2, car.w, car.h);
-        // Windows
-        ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.fillRect(-car.w / 2 + 4, -car.h / 2 + 3, car.w - 8, car.h - 6);
+        ctx.translate(-camX, -camY);
+
+        // Draw roads from AUTHORITATIVE CITY_ROADS geometry
+        for (const road of CITY_ROADS) {
+          const halfWidth = collisionHalfWidth(road);
+          const segments = roadSegments(road);
+          ctx.fillStyle = PALETTE.asphalt;
+          for (const seg of segments) {
+            const dx = seg.b.x - seg.a.x;
+            const dy = seg.b.y - seg.a.y;
+            const len = Math.hypot(dx, dy);
+            if (len === 0) continue;
+            const nx = -dy / len * halfWidth;
+            const ny = dx / len * halfWidth;
+
+            ctx.beginPath();
+            ctx.moveTo(seg.a.x + nx, seg.a.y + ny);
+            ctx.lineTo(seg.b.x + nx, seg.b.y + ny);
+            ctx.lineTo(seg.b.x - nx, seg.b.y - ny);
+            ctx.lineTo(seg.a.x - nx, seg.a.y - ny);
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
+
+        // Draw bridges from CITY_ROADS (gradeSeparated roads)
+        for (const road of CITY_ROADS) {
+          if (!road.gradeSeparated) continue;
+          const halfWidth = collisionHalfWidth(road);
+          const segments = roadSegments(road);
+          for (const seg of segments) {
+            const dx = seg.b.x - seg.a.x;
+            const dy = seg.b.y - seg.a.y;
+            const len = Math.hypot(dx, dy);
+            if (len === 0) continue;
+            const nx = -dy / len * halfWidth;
+            const ny = dx / len * halfWidth;
+
+            ctx.fillStyle = PALETTE.bridgeAsphalt;
+            ctx.beginPath();
+            ctx.moveTo(seg.a.x + nx, seg.a.y + ny);
+            ctx.lineTo(seg.b.x + nx, seg.b.y + ny);
+            ctx.lineTo(seg.b.x - nx, seg.b.y - ny);
+            ctx.lineTo(seg.a.x - nx, seg.a.y - ny);
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
+
+        // Draw bridge rails
+        ctx.fillStyle = PALETTE.bridgeRail;
+        for (const rail of bridgeRails) {
+          ctx.fillRect(rail.x, rail.y, rail.w, rail.h);
+        }
+
+        // Draw buildings
+        drawArchitecture(ctx, WORLD.buildings);
+
+        // Draw traffic cars
+        for (const car of trafficCars) {
+          ctx.save();
+          ctx.translate(car.x, car.y);
+          ctx.rotate(car.angle);
+          ctx.fillStyle = car.color;
+          ctx.fillRect(-car.w / 2, -car.h / 2, car.w, car.h);
+          // Windows
+          ctx.fillStyle = 'rgba(255,255,255,0.3)';
+          ctx.fillRect(-car.w / 2 + 4, -car.h / 2 + 3, car.w - 8, car.h - 6);
+          ctx.restore();
+        }
+
+        // Draw player car
+        ctx.save();
+        ctx.translate(player.x, player.y);
+        ctx.rotate(player.angle);
+        ctx.fillStyle = '#e8b84a';
+        ctx.fillRect(-23, -11, 46, 22);
+        // Windshield
+        ctx.fillStyle = 'rgba(30, 40, 60, 0.7)';
+        ctx.fillRect(-20, -9, 40, 18);
         ctx.restore();
+
+        // Draw radar
+        drawRadar();
+
+        // Draw HUD
+        drawHUD();
+
+        ctx.restore();
+
+        requestAnimationFrame(gameLoop);
+      } catch (e) {
+        window.__lowtownLastError = String(e && e.stack || e);
+        if (typeof window.__lowtownFail === 'function')
+          window.__lowtownFail('frame: ' + (e && e.message || e));
+        // НЕ перепланировать → watchdog покажет текст
       }
-
-      // Draw player car
-      ctx.save();
-      ctx.translate(player.x, player.y);
-      ctx.rotate(player.angle);
-      ctx.fillStyle = '#e8b84a';
-      ctx.fillRect(-23, -11, 46, 22);
-      // Windshield
-      ctx.fillStyle = 'rgba(30, 40, 60, 0.7)';
-      ctx.fillRect(-20, -9, 40, 18);
-      ctx.restore();
-
-      // Draw radar
-      drawRadar();
-
-      // Draw HUD
-      drawHUD();
-
-      ctx.restore();
-
-      requestAnimationFrame(gameLoop);
     }
 
     requestAnimationFrame(gameLoop);
