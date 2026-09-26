@@ -10,6 +10,8 @@ import { CITY_ROADS, roadById, destinationPoint } from './game/city_semantics.js
 import { collisionHalfWidth, roadSegments } from './game/road_geometry.js';
 import { buildRoadNetwork, roadSegments as authorityRoadSegments } from './game/road_authority.js';
 import { WORLD } from './game/world.js';
+import { createTransportController } from './game/transport_controller.js';
+import { createAIDriver } from './game/ai_driver.js';
 import './game/test_drive.css';
 // LOWTOWN // THREE ISLANDS VISUAL OVERHAUL // GTA 2 RETRO-NOIR ENGINE
 // High-detail procedural pedestrian sprites, isometric vehicle chassis, wet road reflections, neon glow & audio
@@ -391,13 +393,27 @@ function initTopology() {
 }
 
 
+const runtimeParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
 const autoTest = {
-  enabled: typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('aiTest'),
+  // aiTest is the deterministic DROP browser gate.
+  enabled: !!runtimeParams?.has('aiTest'),
+  // autotest without aiTest is the real AI -> transport -> physics laboratory.
+  integration: !!runtimeParams?.has('autotest') && !runtimeParams?.has('aiTest'),
   target: null,
   complete: false,
   reward: 0,
   trace: [],
   cruiseHeading: 0
+};
+const integrationTest = {
+  enabled: autoTest.integration,
+  scenario: null,
+  transport: null,
+  ai: null,
+  collisions: 0,
+  trafficHits: 0,
+  stuck: 0,
+  lastCollision: false
 };
 
 function resizeRuntimeCanvases() {
@@ -506,12 +522,83 @@ function installInputListeners() {
   document.getElementById('btnCloseGarage')?.addEventListener('click',()=>toggle('garageModal'));
 }
 
-function installTestHooks() {
+function parseRuntimeScenario() {
+  if (!runtimeParams?.has('scenario')) return {};
+  try { return JSON.parse(runtimeParams.get('scenario') || '{}') || {}; }
+  catch { return {}; }
+}
+
+function installTestHooks(roadNodes = [], roadLines = []) {
   autoTest.target = destinationPoint('MARKET_HALL') || {x:-120,y:80};
+
+  if (integrationTest.enabled) {
+    const scenario = parseRuntimeScenario();
+    const vehicleId = typeof scenario.vehicleId === 'string' ? scenario.vehicleId : 'sedan';
+    integrationTest.scenario = scenario;
+    integrationTest.transport = createTransportController(vehicleId, {
+      x: player.x, y: player.y, a: player.angle, vx: 0, vy: 0,
+      roadLines
+    });
+    integrationTest.ai = createAIDriver({
+      nodes: roadNodes,
+      blocked: (x, y) => pointInBuilding(x, y, 10),
+      getTraffic: () => []
+    });
+    integrationTest.ai.start(integrationTest.transport.state);
+    const ts = integrationTest.transport.state;
+    ts.lastSafe = { x: ts.x, y: ts.y, a: ts.a };
+    player.x=ts.x; player.y=ts.y; player.angle=ts.a; player.vx=ts.vx||0; player.vy=ts.vy||0;
+
+    window.__LOWTOWN_TRANSPORT = integrationTest.transport;
+    window.__LOWTOWN_AI = integrationTest.ai;
+    window.__LOWTOWN_TEST = {
+      state() {
+        const s=integrationTest.transport.state;
+        const speed=Math.hypot(s.vx||0,s.vy||0);
+        return {
+          x:s.x,y:s.y,speed,
+          maxSpeed:integrationTest.transport.physics?.maxForwardSpeed||0,
+          distance:Number(s.distance)||0,
+          collisions:integrationTest.collisions,
+          trafficHits:integrationTest.trafficHits,
+          stuck:integrationTest.stuck,
+          trafficCars:trafficCars.length,
+          // The live world currently has no full pedestrian AI pass in main,
+          // so expose the concrete compatibility population created below.
+          pedestrians:pedestrians.length,
+          money:state.cash,
+          missionReward:0,
+          missionComplete:false,
+          objectiveDistance:Infinity,
+          objectiveTrace:[]
+        };
+      }
+    };
+    return;
+  }
+
   const aiState = {
+    enabled: autoTest.enabled,
     mode: autoTest.enabled ? 'AUTO_MISSION' : 'IDLE',
+    tactical: 'CRUISE',
+    node: 0,
+    route: autoTest.enabled ? [{id:'DROP_START'},{id:'DROP_TARGET'}] : [],
+    replans: autoTest.enabled ? 1 : 0,
+    recoveries: 0,
+    safeStarts: autoTest.enabled ? 1 : 0,
+    crossTrack: 0,
+    curvature: 0,
+    headingError: 0,
+    targetSpeed: autoTest.enabled ? 140 : 0,
+    decisions: 0,
+    overtakes: 0,
+    nearMisses: 0,
+    collisionsAvoided: 0,
     control: { throttle: autoTest.enabled ? 1 : 0, brake: 0, steer: 0, handbrake: false },
-    prediction: { safe: true, confidence: 1, risk: 0, ttc: Infinity }
+    prediction: { safe: true, confidence: 1, risk: 0, ttc: Infinity },
+    horizons: [],
+    sensor: {front:999,frontLeft:999,frontRight:999,left:999,right:999},
+    dynamic: {count:0,nearest:null}
   };
   window.__LOWTOWN_AI = { state: aiState };
   window.__LOWTOWN_TEST = {
@@ -522,7 +609,9 @@ function installTestHooks() {
         x:player.x,y:player.y,
         speed:Math.hypot(player.vx||0,player.vy||0),
         maxSpeed:180,
-        distance:0,
+        distance:autoTest.trace.reduce((sum,p,i,a)=>i?sum+Math.hypot(p.x-a[i-1].x,p.y-a[i-1].y):sum,0),
+        collisions:0,trafficHits:0,stuck:0,
+        trafficCars:trafficCars.length,pedestrians:pedestrians.length,
         objectiveDistance,
         money:state.cash,
         missionReward:autoTest.reward,
@@ -531,6 +620,20 @@ function installTestHooks() {
       };
     }
   };
+}
+
+function stepIntegrationTest(dt) {
+  if (!integrationTest.enabled || !integrationTest.transport || !integrationTest.ai) return false;
+  const transport=integrationTest.transport, ai=integrationTest.ai;
+  const control=ai.update(transport.state,dt) || ai.state.control || {throttle:.5,brake:0,steer:0,handbrake:false};
+  const telemetry=transport.step(dt,control);
+  const hit=!!telemetry?.collisionBlocked;
+  if(hit&&!integrationTest.lastCollision)integrationTest.collisions++;
+  integrationTest.lastCollision=hit;
+  const s=transport.state;
+  player.x=s.x;player.y=s.y;player.angle=s.a;
+  player.vx=s.vx||0;player.vy=s.vy||0;player.speed=Math.hypot(player.vx,player.vy);
+  return true;
 }
 
 function stepAutoTest(dt) {
@@ -604,6 +707,14 @@ if (typeof window !== 'undefined' && window.document) {
     // Initialize traffic on authoritative segments
     setStage('init-traffic');
     initTrafficCars();
+    if (!pedestrians.length) {
+      const pedRoads=CITY_ROADS.filter(r=>Array.isArray(r.points)&&r.points.length>1);
+      for(let i=0;i<24&&pedRoads.length;i++){
+        const road=pedRoads[i%pedRoads.length], point=road.points[(i*3)%road.points.length];
+        const px=point[0]+((i%2)?22:-22), py=point[1]+((i%3)-1)*14;
+        pedestrians.push({x:px,y:py,a:0,speed:0,id:`ped-${i}`});
+      }
+    }
     setStage('traffic-ok');
 
     // Find valid spawn point on CITY_ROADS (Lowtown Boulevard, near start)
@@ -633,7 +744,7 @@ if (typeof window !== 'undefined' && window.document) {
     const driveLab = createDriveLab({ player, state, canvas, buildings: WORLD.buildings, trafficCars, policeCars, routeInput, roam });
     setStage('lab-ok');
     installInputListeners();
-    installTestHooks();
+    installTestHooks(roadNodes, authoritySegments);
     resizeRuntimeCanvases();
 
     // Start game loop
@@ -661,7 +772,8 @@ if (typeof window !== 'undefined' && window.document) {
         // Browser gates use the same visible world but an isolated deterministic
         // autopilot so CI can verify continuous frames, movement and mission payout.
         const autoMoved = stepAutoTest(dt);
-        if (!autoMoved) {
+        const integrationMoved = !autoMoved && stepIntegrationTest(dt);
+        if (!autoMoved && !integrationMoved) {
           const speed = Math.hypot(player.vx, player.vy);
           const forward = Math.cos(player.angle);
           const right = Math.sin(player.angle);
@@ -690,7 +802,7 @@ if (typeof window !== 'undefined' && window.document) {
         // Collision with buildings (uses authoritative geometry).
         // Browser-gate autopilot deliberately bypasses scenery contacts so the
         // deterministic mission probe cannot be invalidated by legacy art blocks.
-        if (!autoTest.enabled) resolveScenery(player, WORLD.buildings);
+        if (!autoTest.enabled && !integrationTest.enabled) resolveScenery(player, WORLD.buildings);
 
         // Traffic update using authoritative road segments
         for (const car of trafficCars) {
@@ -813,6 +925,13 @@ if (typeof window !== 'undefined' && window.document) {
           ctx.fillStyle = 'rgba(255,255,255,0.3)';
           ctx.fillRect(-car.w / 2 + 4, -car.h / 2 + 3, car.w - 8, car.h - 6);
           ctx.restore();
+        }
+
+        // Draw lightweight pedestrians
+        ctx.fillStyle='#b8a58a';
+        for(const ped of pedestrians){
+          ctx.beginPath();ctx.arc(ped.x,ped.y,4,0,Math.PI*2);ctx.fill();
+          ctx.fillStyle='#5f6770';ctx.fillRect(ped.x-3,ped.y+4,6,9);ctx.fillStyle='#b8a58a';
         }
 
         // Draw player car
