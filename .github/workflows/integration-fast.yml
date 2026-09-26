@@ -1,0 +1,72 @@
+name: LOWTOWN Fast Integration
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  fast-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Persistent world
+        run: node tests/world-state-smoke.mjs
+      - name: Road topology
+        run: node tests/road-topology-smoke.mjs
+      - name: Vehicle road collision
+        run: node tests/vehicle-road-collision-smoke.mjs
+      - name: Mobile controls
+        run: node tests/mobile-controls-v2-contract.mjs
+      - name: City semantics
+        run: node tests/city-semantics-smoke.mjs
+      - name: Gameplay content
+        run: node tests/gameplay-content-smoke.mjs
+      - name: AI route lock
+        run: node tests/ai-route-lock-smoke.mjs
+      - name: Traffic stability
+        run: node tests/traffic-stability-smoke.mjs
+      - name: Gameplay loop
+        run: node tests/gameplay-loop-smoke.mjs
+      - name: World connectivity
+        run: node tests/world-connectivity-diagnostic.mjs
+      - name: World stress
+        run: node tests/world-stress-smoke.mjs
+      - name: Ferry transport
+        run: node tests/transport-smoke.mjs
+      - name: Islands
+        run: node tests/islands-smoke.mjs
+      - name: Navigation
+        run: node tests/navigation-brain-smoke.mjs
+      - name: Free-will driver
+        run: node tests/free-will-driver-smoke.mjs
+      - name: Autonomy stack
+        run: node tests/autonomy-stack-smoke.mjs
+      - name: City director
+        run: node tests/city-director-smoke.mjs
+      - name: AI safety
+        run: node tests/ai-safety-layer-smoke.mjs
+      - name: AI diagnostics
+        run: node tests/ai-diagnostics-smoke.mjs
+      - name: AI expansion
+        run: node tests/ai-expansion-smoke.mjs
+      - name: Scenario generator
+        run: node tests/scenario-generator-smoke.mjs
+      - name: Corridor guardian
+        run: node tests/corridor-guardian-smoke.mjs
+      - name: Black Box
+        run: node tests/black-box-telemetry-smoke.mjs
+      - name: Scenario feedback
+        run: node tests/scenario-feedback-smoke.mjs
+      - name: Trajectory lab
+        run: node tests/trajectory-lab-smoke.mjs
+      - name: Turn arbitration
+        run: node tests/turn-arbitration-smoke.mjs
+      - name: Benchmark
+        run: node tests/benchmark-smoke.mjs

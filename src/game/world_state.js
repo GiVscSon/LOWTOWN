@@ -11,6 +11,7 @@ const DEFAULT_STATE=Object.freeze({
 });
 
 function clamp(v,min,max){return Math.max(min,Math.min(max,v));}
+const wantedForHeat=(heat)=>heat<12?0:heat<30?1:heat<50?2:heat<70?3:heat<=88?4:5;
 
 function clean(raw={}){
   const s={...DEFAULT_STATE,...raw};
@@ -33,8 +34,8 @@ export function createWorldState(storage=globalThis.localStorage){
   const patch=(next)=>{state=clean({...state,...next});save();return snapshot();};
   const addCash=(amount)=>patch({cash:state.cash+(Number(amount)||0)});
   const completeJob=(reward=0)=>patch({cash:state.cash+Math.max(0,Number(reward)||0),completedJobs:state.completedJobs+1,heat:Math.max(0,state.heat-8)});
-  const addHeat=(amount=0)=>{const heat=clamp(state.heat+(Number(amount)||0),0,100);return patch({heat,wanted:heat<12?0:heat<30?1:heat<50?2:heat<70?3:heat<88?4:5});};
-  const cool=(seconds=1)=>patch({heat:Math.max(0,state.heat-Math.max(0,Number(seconds)||0)*1.2)});
+  const addHeat=(amount=0)=>{const heat=clamp(state.heat+(Number(amount)||0),0,100);return patch({heat,wanted:wantedForHeat(heat)});};
+  const cool=(seconds=1)=>{const heat=Math.max(0,state.heat-Math.max(0,Number(seconds)||0)*1.2);return patch({heat,wanted:wantedForHeat(heat)});};
   const discover=(district)=>{if(typeof district!=='string'||state.discovered.includes(district))return snapshot();return patch({discovered:[...state.discovered,district]});};
   const reset=()=>{state=clean();save();return snapshot();};
   const snapshot=()=>JSON.parse(JSON.stringify(state));

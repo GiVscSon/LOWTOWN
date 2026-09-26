@@ -2,7 +2,7 @@ import { ISLANDS, isLand } from './islands.js';
 
 const FERRY_ROUTES = [
   // Docks sit on opposite shores; the sampled middle of the route remains water.
-  { id:'LOWTOWN_IRON_FERRY', from:'LOWTOWN', to:'IRON_HARBOR', a:{x:750,y:-300}, b:{x:975,y:-300}, speed:105 }
+  { id:'LOWTOWN_IRON_FERRY', from:'LOWTOWN', to:'IRON_HARBOR', a:{x:755,y:-150}, b:{x:965,y:-150}, speed:105 }
 ];
 const AIR_ROUTES = [
   { id:'LOWTOWN_NORTH_AIR', from:'LOWTOWN', to:'NORTH_RIDGE', a:{x:120,y:640}, b:{x:300,y:1360}, speed:420 },

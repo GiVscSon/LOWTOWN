@@ -32,7 +32,11 @@ export function resolveContact(a, b, fixed = false) {
 }
 export function resolveScenery(car, buildings, trees = [], props = []) {
   let hit = false;
-  for (const b of buildings) {
+  for (const source of buildings) {
+    const b = Array.isArray(source)
+      ? { x: source[0], y: source[1], w: source[2], h: source[3] }
+      : { x: source.x, y: source.y, w: source.w ?? source.width, h: source.h ?? source.height };
+    if (![b.x,b.y,b.w,b.h].every(Number.isFinite)) continue;
     if (Math.abs(car.x - b.x - b.w / 2) > b.w / 2 + 40 || Math.abs(car.y - b.y - b.h / 2) > b.h / 2 + 40) continue;
     hit = resolveContact(car, { x: b.x + b.w / 2, y: b.y + b.h / 2, width: b.w, height: b.h }, true) || hit;
   }

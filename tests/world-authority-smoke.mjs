@@ -39,8 +39,21 @@ for (const [index, building] of WORLD.buildings.entries()) {
 }
 
 const topology = buildLayeredRoadTopology();
-assert.equal(topology.length, graph.length, 'road authority is not using the city graph');
+// Runtime authority is geometry-derived and may contain extra nodes inserted at
+// real segment intersections. It must cover at least the semantic graph rather
+// than matching its legacy node count exactly.
+assert.ok(topology.length >= graph.length, 'road authority lost semantic road coverage');
 assert.ok(topology.every(node => node.level === ROAD_LEVELS.STREET), 'road authority contains unexpected road levels');
 assert.equal(new Set(topology.map(node => node.id)).size, topology.length, 'road authority node ids are not unique');
+const authoritySeen = new Set([topology[0].id]);
+const authorityQueue = [topology[0]];
+while (authorityQueue.length) {
+  const node = authorityQueue.shift();
+  for (const next of node.links) if (!authoritySeen.has(next.id)) {
+    authoritySeen.add(next.id);
+    authorityQueue.push(next);
+  }
+}
+assert.equal(authoritySeen.size, topology.length, 'road authority graph is disconnected');
 
 console.log(`WORLD_AUTHORITY_OK roads=${CITY_ROADS.length} nodes=${graph.length} destinations=${CITY_DESTINATIONS.length} buildings=${WORLD.buildings.length}`);

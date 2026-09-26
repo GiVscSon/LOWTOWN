@@ -1,7 +1,7 @@
 // Mobile controls v2 - Ergonomic split layout
 // Direct hardware bridge + multi-touch
 
-const setKey = (code, down) => {
+const setKey=(code, down) => {
   const direct = window.__LOWTOWN_DIRECT_INPUT__;
   if (direct) {
     direct.enabled = true;
@@ -71,7 +71,7 @@ export function setupMobileControlsV2() {
     aiBtn.addEventListener('click', () => {
       if (window.__LOWTOWN_AI?.state) {
         let ai = window.__LOWTOWN_AI.state.active;
-        ai = !ai;
+        ai=!ai;
         window.__LOWTOWN_AI.state.active = ai;
       }
     });
