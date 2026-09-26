@@ -1,6 +1,45 @@
 import { isLand } from './islands.js';
 import { pointInBuilding } from './vehicle_collision.js';
 
+
+const finite = (v, fallback = 0) => Number.isFinite(Number(v)) ? Number(v) : fallback;
+
+export function createCharacterState({ x = 0, y = 0, a = 0, walkSpeed = 34, acceleration = 120, turnRate = 9, radius = 10 } = {}) {
+  return {
+    x: finite(x), y: finite(y), a: finite(a),
+    vx: 0, vy: 0,
+    speed: Math.max(0, finite(walkSpeed, 34)),
+    walkSpeed: Math.max(0, finite(walkSpeed, 34)),
+    acceleration: Math.max(0, finite(acceleration, 120)),
+    turnRate: Math.max(0, finite(turnRate, 9)),
+    radius: Math.max(1, finite(radius, 10)),
+    distance: 0,
+    animTime: 0
+  };
+}
+
+export function stepCharacterPhysics(character, dt = 1 / 60, input = {}, blocked = () => false) {
+  const h = Math.max(0.001, Math.min(finite(dt, 1 / 60), 0.1));
+  const ix = finite(input.x, 0), iy = finite(input.y, 0);
+  const len = Math.hypot(ix, iy);
+  if (len <= 1e-6) {
+    character.vx = 0; character.vy = 0; character.speed = 0;
+    return character;
+  }
+  const nx = ix / len, ny = iy / len;
+  const speed = Math.max(0, finite(character.walkSpeed, finite(character.speed, 34)));
+  const dx = nx * speed * h, dy = ny * speed * h;
+  const nextX = finite(character.x) + dx, nextY = finite(character.y) + dy;
+  if (!blocked(nextX, nextY, character)) {
+    character.x = nextX; character.y = nextY;
+    character.distance = Math.max(0, finite(character.distance)) + Math.hypot(dx, dy);
+  }
+  character.vx = nx * speed; character.vy = ny * speed;
+  character.speed = speed; character.a = Math.atan2(ny, nx);
+  character.animTime = finite(character.animTime) + h * Math.max(1, speed / 10);
+  return character;
+}
+
 export const PLAYER_MODES = Object.freeze({
   DRIVING: 'DRIVING',
   ON_FOOT: 'ON_FOOT'
