@@ -776,6 +776,11 @@ if (typeof window !== 'undefined' && window.document) {
     setStage('lab-ok');
     installInputListeners();
     installTestHooks(roadNodes, authoritySegments);
+    if (typeof window !== 'undefined') {
+      window.__LOWTOWN_PLAYER = player;
+      window.__LOWTOWN_TRAFFIC = { cars: trafficCars };
+      window.__LOWTOWN_COLLISIONS = runtimeCollisionStats;
+    }
     resizeRuntimeCanvases();
 
     // Start game loop
