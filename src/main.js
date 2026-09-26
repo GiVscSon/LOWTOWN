@@ -393,8 +393,13 @@ function initTopology() {
 // ===== GAME LOOP =====
 // Only run in browser environment (not in Node.js test VMs)
 if (typeof window !== 'undefined' && window.document) {
-  // Lazy-initialize canvas & contexts on first frame (fix: avoid top-level init)
-  let canvas = null, ctx = null, radarCanvas = null, radarCtx = null, fullMapCanvas = null, fullMapCtx = null;
+  // Initialize canvas & contexts
+  canvas = document.getElementById('gameCanvas');
+  ctx = canvas.getContext('2d');
+  radarCanvas = document.getElementById('radarCanvas');
+  radarCtx = radarCanvas.getContext('2d');
+  fullMapCanvas = document.getElementById('fullMapCanvas');
+  fullMapCtx = fullMapCanvas.getContext('2d');
 
   // Build authoritative road graph from CITY_ROADS (single source of truth)
   const roadNodes = buildRoadNetwork();
@@ -421,17 +426,6 @@ if (typeof window !== 'undefined' && window.document) {
 
   let lastTime = performance.now();
   function gameLoop(now) {
-    // Lazy canvas initialization on first frame
-    if (!canvas) {
-      canvas = document.getElementById('gameCanvas');
-      ctx = canvas.getContext('2d');
-      radarCanvas = document.getElementById('radarCanvas');
-      radarCtx = radarCanvas.getContext('2d');
-      fullMapCanvas = document.getElementById('fullMapCanvas');
-      fullMapCtx = fullMapCanvas.getContext('2d');
-      // Update driveLab with canvas reference
-      driveLab.canvas = canvas;
-    }
     const dt = Math.min(0.05, Math.max(0.001, (now - lastTime) / 1000));
     lastTime = now;
 
