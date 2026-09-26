@@ -4,7 +4,7 @@ import { createDriveLab } from './game/test_drive_lab.js';
 import { resolveContact, resolveScenery } from './game/solid_contacts.js';
 import { coastPath, pointInCoast } from './game/coastline.js';
 import { createFreeRoam, drawTransport } from './game/free_roam.js';
-import { isLand } from './game/islands.js';
+import { isLand, ISLANDS, BRIDGES } from './game/islands.js';
 import { pointInBuilding } from './game/world_geometry.js';
 import { CITY_ROADS, roadById, destinationPoint } from './game/city_semantics.js';
 import { collisionHalfWidth, roadSegments } from './game/road_geometry.js';
@@ -320,7 +320,7 @@ function initTrafficCars() {
       x: a.x + dx * t,
       y: a.y + dy * t,
       angle: Math.random() < 0.5 ? heading : heading + Math.PI,
-      speed: (Math.random() < 0.5 ? 1 : -1) * (1.5 + Math.random() * 0.6),
+      speed: (Math.random() < 0.5 ? 1 : -1) * (62 + Math.random() * 34),
       color: model.color, type: model.type, width: model.w, height: model.h,
       currentSegment: seg,
       segmentProgress: t, // 0 to 1 along current segment
@@ -851,37 +851,72 @@ if (typeof window !== 'undefined' && window.document) {
           }
         }
 
-        // Camera follow player
-        const camX = player.x - canvas.width / 2;
-        const camY = player.y - canvas.height / 2;
+        // Camera is calculated in CSS pixels, not backing-store pixels.
+        // This keeps the player centered on DPR 2/3 phones and tablets.
+        const viewW = Math.max(320, canvas.clientWidth || window.innerWidth || 1280);
+        const viewH = Math.max(240, canvas.clientHeight || window.innerHeight || 720);
+        const zoom = viewW < 700 ? 0.70 : viewW < 1100 ? 0.78 : 0.86;
 
-        // Render
-        ctx.fillStyle = '#06090e';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Water / night foundation.
+        ctx.fillStyle = PALETTE.waterDark;
+        ctx.fillRect(0, 0, viewW, viewH);
 
         ctx.save();
-        ctx.translate(-camX, -camY);
+        ctx.translate(viewW / 2, viewH / 2);
+        ctx.scale(zoom, zoom);
+        ctx.translate(-player.x, -player.y);
 
-        // Draw roads from AUTHORITATIVE CITY_ROADS geometry
+        // Real island silhouettes first, so roads read as roads instead of
+        // nearly-black strokes floating on a black canvas.
+        for (const island of ISLANDS) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.ellipse(island.center.x, island.center.y, island.rx + 20, island.ry + 20, 0, 0, Math.PI * 2);
+          ctx.fillStyle = island.colors?.shore || PALETTE.waterShore;
+          ctx.fill();
+          ctx.beginPath();
+          ctx.ellipse(island.center.x, island.center.y, island.rx, island.ry, 0, 0, Math.PI * 2);
+          ctx.fillStyle = island.colors?.land || '#202326';
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(224,154,62,.16)';
+          ctx.lineWidth = 4;
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // Roads: concrete/curb support, asphalt carriageway, then lane markings.
         for (const road of CITY_ROADS) {
           const halfWidth = collisionHalfWidth(road);
           const segments = roadSegments(road);
-          ctx.fillStyle = PALETTE.asphalt;
           for (const seg of segments) {
-            const dx = seg.b.x - seg.a.x;
-            const dy = seg.b.y - seg.a.y;
-            const len = Math.hypot(dx, dy);
-            if (len === 0) continue;
-            const nx = -dy / len * halfWidth;
-            const ny = dx / len * halfWidth;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
 
+            ctx.strokeStyle = road.gradeSeparated ? '#515862' : PALETTE.curb;
+            ctx.lineWidth = halfWidth * 2 + 20;
             ctx.beginPath();
-            ctx.moveTo(seg.a.x + nx, seg.a.y + ny);
-            ctx.lineTo(seg.b.x + nx, seg.b.y + ny);
-            ctx.lineTo(seg.b.x - nx, seg.b.y - ny);
-            ctx.lineTo(seg.a.x - nx, seg.a.y - ny);
-            ctx.closePath();
-            ctx.fill();
+            ctx.moveTo(seg.a.x, seg.a.y);
+            ctx.lineTo(seg.b.x, seg.b.y);
+            ctx.stroke();
+
+            ctx.strokeStyle = road.gradeSeparated ? PALETTE.bridgeAsphalt : PALETTE.asphaltWet;
+            ctx.lineWidth = halfWidth * 2;
+            ctx.beginPath();
+            ctx.moveTo(seg.a.x, seg.a.y);
+            ctx.lineTo(seg.b.x, seg.b.y);
+            ctx.stroke();
+
+            if (!road.gradeSeparated) {
+              ctx.save();
+              ctx.setLineDash([18, 18]);
+              ctx.strokeStyle = road.class === 'ARTERIAL' ? PALETTE.roadMarkingYellow : PALETTE.roadMarkingWhite;
+              ctx.lineWidth = 2.2;
+              ctx.beginPath();
+              ctx.moveTo(seg.a.x, seg.a.y);
+              ctx.lineTo(seg.b.x, seg.b.y);
+              ctx.stroke();
+              ctx.restore();
+            }
           }
         }
 
@@ -924,16 +959,22 @@ if (typeof window !== 'undefined' && window.document) {
           if ([b?.x,b?.y,b?.w,b?.h].every(Number.isFinite)) drawArchitecture(ctx, b, index);
         });
 
-        // Draw traffic cars
+        // Draw traffic cars. Runtime models store width/height, not w/h.
         for (const car of trafficCars) {
+          const w = car.width || car.w || 48;
+          const h = car.height || car.h || 26;
           ctx.save();
           ctx.translate(car.x, car.y);
           ctx.rotate(car.angle);
-          ctx.fillStyle = car.color;
-          ctx.fillRect(-car.w / 2, -car.h / 2, car.w, car.h);
-          // Windows
-          ctx.fillStyle = 'rgba(255,255,255,0.3)';
-          ctx.fillRect(-car.w / 2 + 4, -car.h / 2 + 3, car.w - 8, car.h - 6);
+          ctx.fillStyle = 'rgba(0,0,0,.35)';
+          ctx.fillRect(-w / 2 + 4, -h / 2 + 5, w, h);
+          ctx.fillStyle = car.color || '#64748b';
+          ctx.fillRect(-w / 2, -h / 2, w, h);
+          ctx.fillStyle = 'rgba(15,24,32,.82)';
+          ctx.fillRect(-w * .18, -h / 2 + 3, w * .42, h - 6);
+          ctx.fillStyle = '#efe2b0';
+          ctx.fillRect(w / 2 - 4, -h / 2 + 3, 3, 4);
+          ctx.fillRect(w / 2 - 4, h / 2 - 7, 3, 4);
           ctx.restore();
         }
 
@@ -944,15 +985,30 @@ if (typeof window !== 'undefined' && window.document) {
           ctx.fillStyle='#5f6770';ctx.fillRect(ped.x-3,ped.y+4,6,9);ctx.fillStyle='#b8a58a';
         }
 
-        // Draw player car
+        // Draw player car last so it stays readable against buildings/traffic.
         ctx.save();
         ctx.translate(player.x, player.y);
         ctx.rotate(player.angle);
-        ctx.fillStyle = '#e8b84a';
-        ctx.fillRect(-23, -11, 46, 22);
-        // Windshield
-        ctx.fillStyle = 'rgba(30, 40, 60, 0.7)';
-        ctx.fillRect(-20, -9, 40, 18);
+        ctx.shadowColor = 'rgba(0,0,0,.7)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 5;
+        ctx.fillStyle = player.bodyColor || '#e8b84a';
+        ctx.beginPath();
+        ctx.roundRect(-25, -12, 50, 24, 6);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetY = 0;
+        ctx.fillStyle = '#15202a';
+        ctx.fillRect(-12, -9, 24, 18);
+        ctx.fillStyle = '#fff0b0';
+        ctx.fillRect(20, -8, 4, 5);
+        ctx.fillRect(20, 3, 4, 5);
+        ctx.fillStyle = '#d4523a';
+        ctx.fillRect(-24, -8, 3, 5);
+        ctx.fillRect(-24, 3, 3, 5);
+        ctx.strokeStyle = 'rgba(255,255,255,.32)';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(-23, -10, 46, 20);
         ctx.restore();
 
         // Draw radar
