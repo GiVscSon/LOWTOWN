@@ -154,8 +154,8 @@ const WORLD_H = 11700;
 const ROAD_W = 130;
 
 const PALETTE = {
-  waterDark: '#0a222b',
-  waterShore: '#1a414b',
+  waterDark: '#06141b',
+  waterShore: '#12313a',
   asphalt: '#111417',
   asphaltWet: '#1a1d1e',
   roadMarkingYellow: '#d4a34b',
@@ -294,7 +294,8 @@ function getNextSegment(currentSeg, reachedNode) {
 // Initialize traffic cars on authoritative road segments
 function initTrafficCars() {
   trafficCars.length = 0;
-
+  
+  // Spawn 30 traffic cars distributed across road segments
   const carTypes = [
     { color: '#e8b84a', type: 'sedan', w: 50, h: 28 },
     { color: '#3b82f6', type: 'coupe', w: 48, h: 26 },
@@ -303,17 +304,9 @@ function initTrafficCars() {
     { color: '#ec4899', type: 'sports', w: 48, h: 25 },
     { color: '#64748b', type: 'van', w: 56, h: 32 }
   ];
-
-  const nearby = authoritySegments.filter(([a,b]) => {
-    const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
-    return Math.hypot(mx-player.x,my-player.y) < 760;
-  });
-  const localPool = nearby.length ? nearby : authoritySegments;
-  const total = 54;
-
-  for (let i = 0; i < total; i++) {
-    const pool = i < 40 ? localPool : authoritySegments;
-    const seg = pool[Math.floor(Math.random() * pool.length)] || pickTrafficSegment();
+  
+  for (let i = 0; i < 30; i++) {
+    const seg = pickTrafficSegment();
     if (!seg) continue;
     const [a, b] = seg;
     const t = Math.random();
@@ -322,28 +315,25 @@ function initTrafficCars() {
     const len = Math.hypot(dx, dy);
     if (len < 10) continue;
     const heading = Math.atan2(dy, dx);
-    const forward = Math.random() < .5 ? 1 : -1;
     const model = carTypes[i % carTypes.length];
     trafficCars.push({
       x: a.x + dx * t,
       y: a.y + dy * t,
-      angle: heading + (forward < 0 ? Math.PI : 0),
-      speed: forward * (72 + Math.random() * 48),
+      angle: Math.random() < 0.5 ? heading : heading + Math.PI,
+      speed: (Math.random() < 0.5 ? 1 : -1) * (62 + Math.random() * 34),
       color: model.color, type: model.type, width: model.w, height: model.h,
       currentSegment: seg,
-      segmentProgress: t,
+      segmentProgress: t, // 0 to 1 along current segment
       segmentLength: len,
-      waitingAtJunction: false,
-      isTraffic: true,
-      trafficId: `traffic-${i}`,
-      waitingAtEdge: false
+      waitingAtJunction: false
     });
   }
-
-  // Keep the immediate spawn bubble readable, but retain dense traffic nearby.
+  
+  // Remove cars too close to player spawn
   for (let i = trafficCars.length - 1; i >= 0; i--) {
     const car = trafficCars[i];
-    if (Math.hypot(car.x - player.x, car.y - player.y) < 105) trafficCars.splice(i, 1);
+    car.isTraffic = true; car.trafficId = `traffic-${i}`; car.waitingAtEdge = false;
+    if (Math.hypot(car.x - player.x, car.y - player.y) < 230) trafficCars.splice(i, 1);
   }
 }
 const policeCars = [];
@@ -724,41 +714,34 @@ if (typeof window !== 'undefined' && window.document) {
     setStage('authority-segs');
     authoritySegments = authorityRoadSegments(roadNodes);
 
-    // Start on the north waterfront. This is a valid road point with water
-    // immediately beyond the island edge, so the first frame reads as an island city.
-    setStage('spawn');
-    const spawnRoad = roadById('CENTRAL_AVENUE');
-    if (spawnRoad?.points?.length) {
-      player.x = spawnRoad.points[0][0];
-      player.y = spawnRoad.points[0][1];
-      player.angle = Math.PI / 2;
-    } else {
-      player.x = -120;
-      player.y = -1160;
-      player.angle = Math.PI / 2;
+    // Initialize traffic on authoritative segments
+    setStage('init-traffic');
+    initTrafficCars();
+    if (!pedestrians.length) {
+      const pedRoads=CITY_ROADS.filter(r=>Array.isArray(r.points)&&r.points.length>1);
+      for(let i=0;i<24&&pedRoads.length;i++){
+        const road=pedRoads[i%pedRoads.length], point=road.points[(i*3)%road.points.length];
+        const px=point[0]+((i%2)?22:-22), py=point[1]+((i%3)-1)*14;
+        pedestrians.push({x:px,y:py,a:0,speed:0,id:`ped-${i}`});
+      }
     }
+    setStage('traffic-ok');
+
+    // Find valid spawn point on CITY_ROADS (Lowtown Boulevard, near start)
+    setStage('spawn');
+    const spawnRoad = roadById('LOWTOWN_BOULEVARD');
+    if (spawnRoad && spawnRoad.points && spawnRoad.points.length > 2) {
+      // Use a road vertex that is clear of the legacy building footprints.
+      player.x = spawnRoad.points[2][0];
+      player.y = spawnRoad.points[2][1];
+    } else {
+      player.x = -760;
+      player.y = -360;
+    }
+    player.angle = 0;
     player.vx = 0;
     player.vy = 0;
     setStage('spawn-ok');
-
-    // Populate after spawn so the visible neighborhood feels alive instead of
-    // scattering almost all actors across the full graph.
-    setStage('init-traffic');
-    initTrafficCars();
-    pedestrians.length = 0;
-    const pedRoads=CITY_ROADS.filter(r=>Array.isArray(r.points)&&r.points.length>1);
-    const localPedPoints=[];
-    for(const road of pedRoads) for(const point of road.points) {
-      if(Math.hypot(point[0]-player.x,point[1]-player.y)<1050) localPedPoints.push({road,point});
-    }
-    const pedPool=localPedPoints.length?localPedPoints:pedRoads.flatMap(road=>road.points.map(point=>({road,point})));
-    for(let i=0;i<36&&pedPool.length;i++){
-      const entry=pedPool[(i*7)%pedPool.length], point=entry.point;
-      const side=(i%2)?1:-1;
-      const px=point[0]+side*(24+(i%3)*5), py=point[1]+((i%5)-2)*10;
-      pedestrians.push({x:px,y:py,a:(i%4)*Math.PI/2,speed:0,id:`ped-${i}`});
-    }
-    setStage('traffic-ok');
 
     // Initialize free roam and drive lab (with valid canvas reference)
     setStage('create-roam');
@@ -874,24 +857,9 @@ if (typeof window !== 'undefined' && window.document) {
         const viewH = Math.max(240, canvas.clientHeight || window.innerHeight || 720);
         const zoom = viewW < 700 ? 0.70 : viewW < 1100 ? 0.78 : 0.86;
 
-        // Water / night foundation. Keep enough blue-green separation from
-        // asphalt that the coastline reads immediately, even on dark mobile screens.
+        // Water / night foundation.
         ctx.fillStyle = PALETTE.waterDark;
         ctx.fillRect(0, 0, viewW, viewH);
-        ctx.save();
-        ctx.globalAlpha = .34;
-        ctx.strokeStyle = '#2e6772';
-        ctx.lineWidth = 1.2;
-        const waveOffset = (now * 0.022) % 64;
-        for (let sy = -32 + waveOffset; sy < viewH + 48; sy += 64) {
-          for (let sx = -40; sx < viewW + 60; sx += 92) {
-            ctx.beginPath();
-            ctx.moveTo(sx, sy);
-            ctx.quadraticCurveTo(sx + 18, sy - 4, sx + 38, sy);
-            ctx.stroke();
-          }
-        }
-        ctx.restore();
 
         ctx.save();
         ctx.translate(viewW / 2, viewH / 2);
@@ -902,36 +870,17 @@ if (typeof window !== 'undefined' && window.document) {
         // nearly-black strokes floating on a black canvas.
         for (const island of ISLANDS) {
           ctx.save();
-          // Shallow-water halo.
           ctx.beginPath();
-          ctx.ellipse(island.center.x, island.center.y, island.rx + 44, island.ry + 44, 0, 0, Math.PI * 2);
-          ctx.fillStyle = PALETTE.waterShore;
+          ctx.ellipse(island.center.x, island.center.y, island.rx + 20, island.ry + 20, 0, 0, Math.PI * 2);
+          ctx.fillStyle = island.colors?.shore || PALETTE.waterShore;
           ctx.fill();
-
-          // Sand/concrete shoreline band.
-          ctx.beginPath();
-          ctx.ellipse(island.center.x, island.center.y, island.rx + 18, island.ry + 18, 0, 0, Math.PI * 2);
-          ctx.fillStyle = island.colors?.shore || '#756452';
-          ctx.fill();
-
-          // Island land mass.
           ctx.beginPath();
           ctx.ellipse(island.center.x, island.center.y, island.rx, island.ry, 0, 0, Math.PI * 2);
           ctx.fillStyle = island.colors?.land || '#202326';
           ctx.fill();
-          ctx.strokeStyle = 'rgba(236,181,100,.32)';
-          ctx.lineWidth = 5;
+          ctx.strokeStyle = 'rgba(224,154,62,.16)';
+          ctx.lineWidth = 4;
           ctx.stroke();
-
-          // Broken foam/highlight line, subtle enough for night.
-          ctx.save();
-          ctx.setLineDash([20,14]);
-          ctx.strokeStyle = 'rgba(124,190,195,.34)';
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.ellipse(island.center.x, island.center.y, island.rx + 30, island.ry + 30, 0, 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.restore();
           ctx.restore();
         }
 
@@ -1001,21 +950,6 @@ if (typeof window !== 'undefined' && window.document) {
           ctx.fillRect(rail.x, rail.y, rail.w, rail.h);
         }
 
-        // Street lamps / sodium glow bring the road grid out of the darkness.
-        for (const [lx,ly] of WORLD.lamps || []) {
-          ctx.save();
-          ctx.strokeStyle='rgba(82,76,66,.9)';
-          ctx.lineWidth=2;
-          ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx,ly-18);ctx.stroke();
-          const glow=ctx.createRadialGradient(lx,ly-20,1,lx,ly-20,34);
-          glow.addColorStop(0,'rgba(224,154,62,.42)');
-          glow.addColorStop(.35,'rgba(224,154,62,.14)');
-          glow.addColorStop(1,'rgba(224,154,62,0)');
-          ctx.fillStyle=glow;ctx.beginPath();ctx.arc(lx,ly-20,34,0,Math.PI*2);ctx.fill();
-          ctx.fillStyle='#f3b75d';ctx.beginPath();ctx.arc(lx,ly-20,2.6,0,Math.PI*2);ctx.fill();
-          ctx.restore();
-        }
-
         // Draw buildings. WORLD stores compact [x,y,w,h] tuples while
         // architecture.js renders one rich building object at a time.
         WORLD.buildings.forEach((raw, index) => {
@@ -1044,17 +978,11 @@ if (typeof window !== 'undefined' && window.document) {
           ctx.restore();
         }
 
-        // Draw lightweight pedestrians with a small shadow and coat silhouette.
+        // Draw lightweight pedestrians
+        ctx.fillStyle='#b8a58a';
         for(const ped of pedestrians){
-          ctx.save();
-          ctx.translate(ped.x,ped.y);
-          ctx.fillStyle='rgba(0,0,0,.38)';
-          ctx.beginPath();ctx.ellipse(3,10,6,3,0,0,Math.PI*2);ctx.fill();
-          ctx.fillStyle='#b8a58a';
-          ctx.beginPath();ctx.arc(0,0,4.2,0,Math.PI*2);ctx.fill();
-          ctx.fillStyle=(Number(ped.id?.split('-')[1])||0)%3===0?'#6d5547':'#4f5d68';
-          ctx.fillRect(-3.5,4,7,11);
-          ctx.restore();
+          ctx.beginPath();ctx.arc(ped.x,ped.y,4,0,Math.PI*2);ctx.fill();
+          ctx.fillStyle='#5f6770';ctx.fillRect(ped.x-3,ped.y+4,6,9);ctx.fillStyle='#b8a58a';
         }
 
         // Draw player car last so it stays readable against buildings/traffic.
