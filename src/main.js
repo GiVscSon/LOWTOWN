@@ -7,7 +7,7 @@ import { createFreeRoam, drawTransport } from './game/free_roam.js';
 import { isLand, ISLANDS, BRIDGES } from './game/islands.js';
 import { pointInBuilding } from './game/world_geometry.js';
 import { CITY_ROADS, roadById, destinationPoint } from './game/city_semantics.js';
-import { collisionHalfWidth, roadSegments } from './game/road_geometry.js';
+import { carriagewayHalfWidth, collisionHalfWidth, supportHalfWidth, roadSegments } from './game/road_geometry.js';
 import { buildRoadNetwork, roadSegments as authorityRoadSegments } from './game/road_authority.js';
 import { WORLD } from './game/world.js';
 import { createTransportController } from './game/transport_controller.js';
@@ -884,39 +884,61 @@ if (typeof window !== 'undefined' && window.document) {
           ctx.restore();
         }
 
-        // Roads: concrete/curb support, asphalt carriageway, then lane markings.
+        // Building parcels first. Roads are painted over the parcel edges so
+        // architecture reads as city blocks without ever covering the carriageway.
+        for (const raw of WORLD.buildings) {
+          const x=raw[0],y=raw[1],w=raw[2],h=raw[3],pad=12;
+          ctx.fillStyle='#292824';
+          ctx.strokeStyle='rgba(154,160,168,.22)';
+          ctx.lineWidth=2;
+          ctx.beginPath();
+          ctx.roundRect(x-pad,y-pad,w+pad*2,h+pad*2,10);
+          ctx.fill();
+          ctx.stroke();
+        }
+
+        // Roads use the same geometry contract as collision/navigation:
+        // sidewalk support -> curb corridor -> actual carriageway -> markings.
         for (const road of CITY_ROADS) {
-          const halfWidth = collisionHalfWidth(road);
+          if (road.gradeSeparated) continue;
+          const supportHalf = supportHalfWidth(road);
+          const collisionHalf = collisionHalfWidth(road);
+          const carriageHalf = carriagewayHalfWidth(road);
           const segments = roadSegments(road);
           for (const seg of segments) {
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
 
-            ctx.strokeStyle = road.gradeSeparated ? '#515862' : PALETTE.curb;
-            ctx.lineWidth = halfWidth * 2 + 20;
+            ctx.strokeStyle = PALETTE.sidewalk;
+            ctx.lineWidth = supportHalf * 2;
             ctx.beginPath();
             ctx.moveTo(seg.a.x, seg.a.y);
             ctx.lineTo(seg.b.x, seg.b.y);
             ctx.stroke();
 
-            ctx.strokeStyle = road.gradeSeparated ? PALETTE.bridgeAsphalt : PALETTE.asphaltWet;
-            ctx.lineWidth = halfWidth * 2;
+            ctx.strokeStyle = PALETTE.curb;
+            ctx.lineWidth = collisionHalf * 2;
             ctx.beginPath();
             ctx.moveTo(seg.a.x, seg.a.y);
             ctx.lineTo(seg.b.x, seg.b.y);
             ctx.stroke();
 
-            if (!road.gradeSeparated) {
-              ctx.save();
-              ctx.setLineDash([18, 18]);
-              ctx.strokeStyle = road.class === 'ARTERIAL' ? PALETTE.roadMarkingYellow : PALETTE.roadMarkingWhite;
-              ctx.lineWidth = 2.2;
-              ctx.beginPath();
-              ctx.moveTo(seg.a.x, seg.a.y);
-              ctx.lineTo(seg.b.x, seg.b.y);
-              ctx.stroke();
-              ctx.restore();
-            }
+            ctx.strokeStyle = PALETTE.asphaltWet;
+            ctx.lineWidth = carriageHalf * 2;
+            ctx.beginPath();
+            ctx.moveTo(seg.a.x, seg.a.y);
+            ctx.lineTo(seg.b.x, seg.b.y);
+            ctx.stroke();
+
+            ctx.save();
+            ctx.setLineDash([18, 18]);
+            ctx.strokeStyle = road.class === 'ARTERIAL' ? PALETTE.roadMarkingYellow : PALETTE.roadMarkingWhite;
+            ctx.lineWidth = 2.2;
+            ctx.beginPath();
+            ctx.moveTo(seg.a.x, seg.a.y);
+            ctx.lineTo(seg.b.x, seg.b.y);
+            ctx.stroke();
+            ctx.restore();
           }
         }
 
