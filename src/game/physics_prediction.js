@@ -45,7 +45,7 @@ export function predictVehicle(state,seconds,input={},physics=state.physics,opti
       const h=Math.min(physicsDt,frame-frameElapsed);
       physicsStep(current,h,useActuator?actuator:input,physics);
       elapsed+=h;frameElapsed+=h;stepIndex++;
-      if(blocked&&blocked(current.x,current.y)){collision=true;collisionT=elapsed;break;}
+      if(blocked&&blocked(current.x,current.y,current.a)){collision=true;collisionT=elapsed;break;}
       if(stepIndex%sampleEvery===0)points.push({x:current.x,y:current.y,z:current.z,a:current.a,vx:current.vx,vy:current.vy,vz:current.vz});
     }
     if(collision)break;
