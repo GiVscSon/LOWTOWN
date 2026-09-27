@@ -3,7 +3,7 @@ import { predictVehicle } from './physics_prediction.js';
 import { resolveTransportPhysics } from './transport_profiles.js';
 import { collisionSafety } from './vehicle_safety.js';
 
-export function createAIDriver({ nodes = [], blocked = () => false, getTraffic = () => [] }) {
+export function createAIDriver({ nodes = [], blocked = () => false, blockedVehicle = blocked, getTraffic = () => [] }) {
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const wrap = a => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
@@ -123,7 +123,7 @@ export function createAIDriver({ nodes = [], blocked = () => false, getTraffic =
   function sharedPredict(car, seconds, candidate) {
     const physics = car.physics || resolveTransportPhysics(car.vehicleId || 'sedan');
     return predictVehicle(car, seconds, { steer: candidate.steer, throttle: candidate.throttle, brake: candidate.brake, handbrake: !!candidate.handbrake }, physics, {
-      blocked, useActuatorDelay: true, actuatorResponse: { steer: 12, throttle: 8, brake: 16, climb: 8, descend: 8 }
+      blocked: blockedVehicle, useActuatorDelay: true, actuatorResponse: { steer: 12, throttle: 8, brake: 16, climb: 8, descend: 8 }
     });
   }
 
@@ -137,7 +137,7 @@ export function createAIDriver({ nodes = [], blocked = () => false, getTraffic =
     return { risk, minTtc };
   }
 
-  const trajectoryLab = createTrajectoryLab({ simulate: (car, seconds, steer, throttle, brake = 0) => sharedPredict(car, seconds, { steer, throttle, brake }), trafficRisk, blocked });
+  const trajectoryLab = createTrajectoryLab({ simulate: (car, seconds, steer, throttle, brake = 0) => sharedPredict(car, seconds, { steer, throttle, brake }), trafficRisk, blocked: blockedVehicle });
 
   function candidateScore(car, candidate, seg, hazards) {
     const p = sharedPredict(car, candidate.horizon, candidate), tr = trafficRisk(p, hazards);
@@ -186,9 +186,11 @@ export function createAIDriver({ nodes = [], blocked = () => false, getTraffic =
       candidates.push(candidateScore(car, { id: `${offset}:${throttle}`, steer, throttle, brake, horizon: speed > 260 ? .9 : 1.2, overtake: tactical === 'OVERTAKE' && laneBias !== 0 && offset * laneBias > 0 }, seg, hazards));
     }
     candidates.sort((a, b) => b.score - a.score);
-    const best = candidates.find(c => c.safe && c.ttc > 1.05) || candidates.find(c => c.safe) || candidates[0];
+    const safeCandidates = candidates.filter(c => c.safe);
+    const best = safeCandidates.find(c => c.ttc > 1.05) || safeCandidates[0] || candidates[0];
+    const emergencyBrake = safeCandidates.length === 0;
     state.candidates = candidates.slice(0, 12).map((c, i) => ({ rank: i + 1, id: c.id, steer: +c.steer.toFixed(3), throttle: c.throttle, brake: +c.brake.toFixed(3), safe: c.safe, score: Math.round(c.score), ttc: Number.isFinite(c.ttc) ? +c.ttc.toFixed(2) : Infinity }));
-    state.chosenCandidate = Math.max(0, candidates.indexOf(best)); state.targetSpeed = desiredSpeed; state.mode = state.state = best.brake > .5 ? 'BRAKE' : tactical; state.decisions++;
+    state.chosenCandidate = Math.max(0, candidates.indexOf(best)); state.targetSpeed = desiredSpeed; state.mode = state.state = emergencyBrake || best.brake > .5 ? 'BRAKE' : tactical; state.decisions++;
     const horizons = [.35, .7, 1.05].map(t => candidateScore(car, { ...best, horizon: t }, seg, hazards));
     state.predictedTrajectory = horizons.flatMap(p => p.points || []);
     const last = horizons[horizons.length - 1] || best, tr = trafficRisk(last, hazards);
@@ -198,7 +200,7 @@ export function createAIDriver({ nodes = [], blocked = () => false, getTraffic =
     state.prediction = { safe: best.safe && tr.risk < 10, x: last.x, y: last.y, t: last.collisionT, ttc: tr.minTtc, risk: clamp((1 - Math.min(1, finite(last.minWall, 100) / 100)) + tr.risk / 40 + (best.safe ? 0 : 1), 0, 2), confidence: state.predictionConfidence };
     state.horizons = horizons.map((p, i) => ({ t: [.35, .7, 1.05][i], x: p.x, y: p.y, safe: p.safe, wall: p.minWall, confidence: state.predictionConfidence }));
     state.crossTrack = seg.cross || 0; state.curvature = seg.curvature || 0;
-    state.control = { throttle: best.throttle, brake: best.brake, steer: best.steer, handbrake: speed > 180 && Math.abs(best.steer) > .65 };
+    state.control = { throttle: emergencyBrake ? 0 : best.throttle, brake: emergencyBrake ? 1 : best.brake, steer: best.steer, handbrake: !emergencyBrake && speed > 180 && Math.abs(best.steer) > .65 };
     if (state.prediction.ttc < 1.2) state.nearMisses++;
     return state.control;
   }
@@ -269,6 +271,7 @@ export function createAIDriver({ nodes = [], blocked = () => false, getTraffic =
   function update(car, dt = 1 / 60) {
     if (!state.enabled) return null;
     const h = clamp(finite(dt, 1 / 60), 0, .1); state.routeTimer += h; state.progressTimer += h;
+    if (!state.missionLocked && state.route.length && state.node >= state.route.length - 1) state.goal = null;
     if (!state.route.length || state.node >= state.route.length - 1 || (!state.missionLocked && state.routeTimer > 3)) { if (!replan(car)) return state.control; }
     while (state.node + 1 < state.route.length && dist(car, state.route[state.node + 1]) < 55) { state.visited.add(state.route[state.node].id); state.node++; state.lap++; }
     const moved = Math.hypot(car.x - state.lastProgressX, car.y - state.lastProgressY); state.distance += moved;
