@@ -57,9 +57,27 @@ for(let i=0;i<180;i++){
   assert(run('policeCars.every(c=>onRoadSurface(c.x,c.y,roads,bridges,scenicRoads,roadEnds))'),'police left the road surface');
 }
 assert(seenPolice>0,'police must be able to spawn on the road network');
+const responseMatrix=[[0,0,0,0],[1,2,0,0],[2,3,0,0],[3,4,0,0],[4,4,1,0],[5,4,1,1]];
+for(const [level,patrols,tactical,guard] of responseMatrix){
+  run(`state.wanted=${level};state.wantedCooldown=0;state.tacticalCallDispatched=false;state.guardCallDispatched=false;policeCars.length=0;updatePoliceAI(1/60);`);
+  assert.equal(run(`wantedResponseProfile(${level}).patrolCount`),patrols,`wanted level ${level} patrol profile`);
+  assert.equal(run(`wantedResponseProfile(${level}).tacticalCount`),tactical,`wanted level ${level} tactical profile`);
+  assert.equal(run(`wantedResponseProfile(${level}).guardCount`),guard,`wanted level ${level} guard profile`);
+  assert.equal(run("policeCars.filter(c=>c.role==='patrol').length"),patrols,`wanted level ${level} patrol dispatch`);
+  assert.equal(run("policeCars.filter(c=>c.role==='tactical').length"),tactical,`wanted level ${level} tactical dispatch`);
+  assert.equal(run("policeCars.filter(c=>c.role==='nationalGuard').length"),guard,`wanted level ${level} guard dispatch`);
+  assert(run('policeCars.every(c=>policeFootprintOnRoad(c))'),`wanted level ${level} response vehicle footprint must stay on connected roads: ${run('JSON.stringify(policeCars.map(c=>({role:c.role,x:c.x,y:c.y,angle:c.angle,width:c.width,height:c.height,center:onRoadSurface(c.x,c.y,roads,bridges,scenicRoads,roadEnds),foot:policeFootprintOnRoad(c)})))')}`);
+}
+assert(run("policeCars.some(c=>c.role==='tactical'&&/police precinct/i.test(c.responseBase)&&c.route.length>0)"),'SWAT must route from the police precinct');
+assert(run("policeCars.some(c=>c.role==='nationalGuard'&&/national guard armory/i.test(c.responseBase)&&c.route.length>0)"),'National Guard must route from the armory');
+run('state.wanted=3;state.wantedCooldown=0;state.tacticalCallDispatched=false;state.guardCallDispatched=false;policeCars.length=0;Object.assign(player,{x:1200,y:1200,angle:0,speed:0});policeCars.push({role:"patrol",x:1224,y:1200,angle:0,speed:0,maxSpeed:0,route:[{x:1300,y:1200}],routeTimer:2});player.speed=4;updatePoliceAI(1/60);');
+assert.equal(run('state.wanted'),4,'a deliberate moving collision with police should call tactical units');
+run('state.wantedCooldown=0;player.speed=4;updatePoliceAI(1/60);updatePoliceAI(1/60);');
+assert.equal(run('state.wanted'),5,'a second deliberate police collision should trigger the maximum wanted tier');
+assert.equal(run("policeCars.filter(c=>c.role==='nationalGuard').length"),1,`maximum wanted tier should dispatch an armoured National Guard vehicle; wanted=${run('state.wanted')} bases=${run("JSON.stringify(buildings.filter(b=>/national guard|armory/i.test(b.sign||'')).map(b=>({sign:b.sign,civicType:b.civicType,x:b.x,y:b.y,w:b.w,h:b.h})))")} units=${run("JSON.stringify(policeCars.map(c=>({role:c.role,responseBase:c.responseBase,x:c.x,y:c.y,route:c.route?.length})))")}`);
 // The descent must stop above a roof, not go through it to a floor-level hover.
 const pilot={x:0,y:0,angle:0,speed:0,width:48,height:24,hp:100};
 const flight=roaming.createFreeRoam(pilot,[],[{x:400,y:400,w:200,h:200,floors:6}],[],()=>true);
 flight.interact();const heli=flight.fleet.find(c=>c.type==='helicopter');Object.assign(pilot,{x:heli.x+20,y:heli.y});flight.interact();flight.toggleFlight();for(let i=0;i<220;i++)flight.step({},1/60);
 Object.assign(pilot,{x:500,y:500});flight.toggleFlight();for(let i=0;i<300;i++)flight.step({},1/60);assert(flight.altitude>=156,'descent crossed a building roof');
-console.log('PASS: real keyboard/touch handlers, screen-relative walking, enter/exit, sedan/van/truck/bike, bridge navigation, helicopter flight/landing and roof clearance');
+console.log('PASS: controls and transport regression plus five-tier patrol/SWAT/National Guard dispatch, road-bound units and pursuit escalation');
