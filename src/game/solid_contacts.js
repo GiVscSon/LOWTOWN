@@ -19,10 +19,11 @@ export function contact(a, b) {
 export function resolveContact(a, b, fixed = false) {
   const hit = contact(chassis(a), chassis(b));
   if (!hit) return false;
-  const share = fixed ? 1 : 0.5;
-  a.x += hit.x * (hit.depth + 0.02) * share;
-  a.y += hit.y * (hit.depth + 0.02) * share;
-  if (!fixed) { b.x -= hit.x * (hit.depth + 0.02) * share; b.y -= hit.y * (hit.depth + 0.02) * share; }
+  const invA=1/Math.max(250,Number(a.mass)||1500),invB=1/Math.max(250,Number(b.mass)||1500);
+  const shareA=fixed?1:invA/(invA+invB),shareB=fixed?0:invB/(invA+invB);
+  a.x += hit.x * (hit.depth + 0.02) * shareA;
+  a.y += hit.y * (hit.depth + 0.02) * shareA;
+  if (!fixed) { b.x -= hit.x * (hit.depth + 0.02) * shareB; b.y -= hit.y * (hit.depth + 0.02) * shareB; }
   for (const car of fixed ? [a] : [a, b]) {
     if (Number.isFinite(car.speed)) car.speed *= 0.35;
     if (Number.isFinite(car.vx)) car.vx *= 0.35;

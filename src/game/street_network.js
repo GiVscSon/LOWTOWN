@@ -34,6 +34,54 @@ export function roadPath(graph,start,finish){
   const path=[];for(let id=to;id!==null;id=parents.get(id))path.unshift({x:graph[id].x,y:graph[id].y});
   return path;
 }
+
+// Build continuous bus/emergency routes by joining shortest paths between
+// named stops. Stop points are snapped to the same connected road graph used
+// by police and other road vehicles.
+export function planStopRoute(graph,stops,{loop=false,id='route'}={}){
+  if(!Array.isArray(stops)||stops.length<2)return null;
+  const legCount=loop?stops.length:stops.length-1,points=[],stopIndices=[];
+  for(let leg=0;leg<legCount;leg++){
+    const asPoint=value=>Array.isArray(value)?{x:value[0],y:value[1]}:value;
+    const path=roadPath(graph,asPoint(stops[leg]),asPoint(stops[(leg+1)%stops.length]));
+    if(path.length<1)return null;
+    if(points.length&&Math.hypot(points.at(-1).x-path[0].x,points.at(-1).y-path[0].y)<1)path.shift();
+    points.push(...path);
+    stopIndices.push(points.length-1);
+  }
+  if(loop&&points.length>2&&Math.hypot(points.at(-1).x-points[0].x,points.at(-1).y-points[0].y)<1){
+    points.pop();stopIndices[stopIndices.length-1]=0;
+  }
+  return {id,points,stopIndices,stopPoints:stopIndices.map(i=>points[i]),loop,stopCount:stops.length};
+}
+
+// Smoothly turns a route-following vehicle while keeping its centre on the
+// graph path. Buses, service cars, and police can share this update primitive.
+export function advanceRouteActor(actor,route,dt,{speed=1.4,dwell=1.6,stopRadius=24}={}){
+  if(!route?.points?.length)return false;
+  const frame=Math.min(Math.max(Number(dt)||0,0),.05)*60;
+  if(!frame)return true;
+  const points=route.points,index=((actor.routeIndex||0)%points.length+points.length)%points.length;
+  actor.routeIndex=index;
+  if((actor.routeWait||0)>0){actor.routeWait=Math.max(0,actor.routeWait-dt);actor.speed=0;return true;}
+  const target=points[index],dx=target.x-actor.x,dy=target.y-actor.y,distance=Math.hypot(dx,dy);
+  if(distance<stopRadius){
+    if(route.stopIndices?.includes(index)&&actor.lastStopIndex!==index){actor.lastStopIndex=index;actor.routeWait=dwell;actor.speed=0;return true;}
+    actor.routeIndex=route.loop?(index+1)%points.length:Math.min(index+1,points.length-1);
+    actor.lastStopIndex=-1;
+    return true;
+  }
+  const desired=Math.atan2(dy,dx),error=Math.atan2(Math.sin(desired-(actor.angle||0)),Math.cos(desired-(actor.angle||0)));
+  const turn=Math.max(-.13*frame,Math.min(.13*frame,error));
+  actor.angle=(actor.angle||0)+turn;
+  const alignment=Math.max(.25,Math.cos(error));
+  const targetSpeed=speed*(distance<90?.58:1)*alignment;
+  actor.speed+=(targetSpeed-(actor.speed||0))*Math.min(1,.12*frame);
+  actor.x+=Math.cos(actor.angle)*actor.speed*frame;
+  actor.y+=Math.sin(actor.angle)*actor.speed*frame;
+  actor.axis=Math.abs(Math.cos(actor.angle))>Math.abs(Math.sin(actor.angle))?'x':'y';
+  return true;
+}
 export function roadTerminals(roads,bridges,solid){
   const ends=[];
   for(const road of roads){

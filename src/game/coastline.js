@@ -1,4 +1,23 @@
+export const BEACH_WIDTH = 108;
 const cache = new WeakMap();
+const CITY_SHAPES = {
+  core:      { sx: 1.025, sy: 1.055, wave: .045, phase: .2, lobes: 3, coves: [4] },
+  docks:     { sx: 1.085, sy: 1.025, wave: .035, phase: 1.1, lobes: 5, coves: [9, 14] },
+  lantern:   { sx: 1.025, sy: 1.105, wave: .060, phase: 2.2, lobes: 3, coves: [4, 18] },
+  oldmill:   { sx: 1.055, sy: 1.035, wave: .070, phase: 3.3, lobes: 4, coves: [13] },
+  redhook:   { sx: 1.095, sy: 1.065, wave: .040, phase: 4.4, lobes: 6, coves: [4, 9] },
+  blackwood: { sx: 1.025, sy: 1.105, wave: .075, phase: 5.5, lobes: 4, coves: [13, 18] },
+  marrow:    { sx: 1.095, sy: 1.025, wave: .060, phase: 6.6, lobes: 3, coves: [4] },
+  southport: { sx: 1.065, sy: 1.035, wave: .040, phase: 7.7, lobes: 6, coves: [9, 13] },
+  velvet:    { sx: 1.035, sy: 1.095, wave: .075, phase: 8.8, lobes: 4, coves: [4, 18] },
+  eastgate:  { sx: 1.085, sy: 1.035, wave: .050, phase: 9.9, lobes: 5, coves: [13] },
+  cinder:    { sx: 1.035, sy: 1.095, wave: .075, phase: 11, lobes: 3, coves: [4, 9] },
+  aerodrome: { sx: 1.105, sy: 1.025, wave: .040, phase: 12, lobes: 4, coves: [13, 18] },
+  saints:    { sx: 1.025, sy: 1.105, wave: .065, phase: 13, lobes: 5, coves: [4] },
+  refinery:  { sx: 1.115, sy: 1.025, wave: .035, phase: 14, lobes: 6, coves: [9, 14] },
+  campus:    { sx: 1.035, sy: 1.055, wave: .080, phase: 15, lobes: 3, coves: [4, 18] },
+  marina:    { sx: 1.085, sy: 1.095, wave: .060, phase: 16, lobes: 4, coves: [9, 13] }
+};
 export function coastPoints(island) {
   if(cache.has(island))return cache.get(island);
   const { x, y, w, h } = island;
@@ -12,6 +31,8 @@ export function coastPoints(island) {
     const points=Array.from({length:72},(_,i)=>{const a=i*Math.PI/36,r=1+.13*Math.sin(a*3+seed%9)+.07*Math.cos(a*5+seed%5);return [x+w/2+Math.cos(a)*w*.46*r,y+h/2+Math.sin(a)*h*.44*r];});
     cache.set(island,points);return points;
   }
+  const shape=CITY_SHAPES[island.id]||{sx:1.04,sy:1.04,wave:.055,phase:seed%17,lobes:4,coves:[]};
+  const protectedLandfalls=new Set([1,2,3,5,6,7,8,10,11,12,15,16,17]);
   const anchors = [[75+jitter(0,80),0],[w*.20+jitter(1,100),-38-jitter(2,55)],[w*.43,-28-Math.abs(jitter(4,25))],[w*.67+jitter(5,80),-48-jitter(6,55)],[w-95+jitter(7,55),0],[w+35+jitter(8,35),105+jitter(9,75)],
     [w+Math.abs(jitter(10,45)),h*.29+jitter(11,90)],[w+35+Math.abs(jitter(12,35)),h*.52+jitter(13,100)],[w+Math.abs(jitter(14,38)),h*.78+jitter(15,85)],[w-70+jitter(16,70),h],[w*.73+jitter(17,70),h+32+Math.abs(jitter(18,45))],[w*.49,h+24+Math.abs(jitter(20,25))],
     [w*.23+jitter(21,100),h+42+Math.abs(jitter(22,48))],[72+jitter(23,55),h],[-28-Math.abs(jitter(24,35)),h-105+jitter(25,70)],[-42-Math.abs(jitter(26,32)),h*.72+jitter(27,90)],[-Math.abs(jitter(28,32)),h*.48+jitter(29,80)],[-35-Math.abs(jitter(30,30)),h*.24+jitter(31,70)],[0,78+jitter(32,50)]]
@@ -22,12 +43,22 @@ export function coastPoints(island) {
       if(i===2)py-=12;
       if(i===3)py-=35+Math.abs(jitter(41,120));
       if(i===6)px-=45;
-      if(i===8)px=w-12;
+      // Preserve dry eastern landings on the two bridges that cross the bay.
+      // Other island templates keep their established open-water contour.
+      if(i===7)px=(island.id==='core'||island.id==='blackwood')?w+20:w-50;
+      // Keep a shallow indentation beside the established east-side piers.
+      if(i===8)px=w-50;
       if(i===10)py-=65;
       if(i===12)py+=40+Math.abs(jitter(42,100));
       if(i===15)px+=75;
       if(i===17)px-=25+Math.abs(jitter(43,60));
-      return [x+px,y+py];
+      const angle=Math.atan2(py-h/2,px-w/2);
+      const wave=shape.wave*(Math.sin(angle*shape.lobes+shape.phase)+.38*Math.sin(angle*5-shape.phase));
+      const cove=shape.coves.includes(i)?-.075:0;
+      // Keep bridge approaches and the outer street envelope on dry land; the
+      // profile changes only the undeveloped coast beyond those protected arcs.
+      const radial=protectedLandfalls.has(i)?Math.max(1.015,1+wave):Math.max(.94,1+wave+cove);
+      return [x+w/2+(px-w/2)*shape.sx*radial,y+h/2+(py-h/2)*shape.sy*radial];
     });
   // Closed Catmull-Rom shoreline: the same dense curve drives rendering and collision.
   const points=[];
@@ -50,6 +81,23 @@ export function pointInCoast(x,y,island) {
     if((ay>y)!==(by>y) && x<(bx-ax)*(y-ay)/(by-ay)+ax) inside=!inside;
   }
   return inside;
+}
+function distanceToCoastSquared(x,y,points) {
+  let best=Infinity;
+  for(let i=0;i<points.length;i++){
+    const a=points[i],b=points[(i+1)%points.length],dx=b[0]-a[0],dy=b[1]-a[1];
+    const t=Math.max(0,Math.min(1,((x-a[0])*dx+(y-a[1])*dy)/(dx*dx+dy*dy||1)));
+    const px=a[0]+dx*t,py=a[1]+dy*t,d2=(x-px)**2+(y-py)**2;
+    if(d2<best)best=d2;
+  }
+  return best;
+}
+export function pointInBeach(x,y,island,width=island.natural?42:BEACH_WIDTH) {
+  if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(width)||width<=0)return false;
+  const pad=width+180;
+  if(x<island.x-pad||x>island.x+island.w+pad||y<island.y-pad||y>island.y+island.h+pad)return false;
+  if(pointInCoast(x,y,island))return false;
+  return distanceToCoastSquared(x,y,coastPoints(island))<=width*width;
 }
 export function coastPath(ctx,island,scale=1,offsetX=0,offsetY=0) {
   ctx.beginPath(); coastPoints(island).forEach(([x,y],i)=>i?ctx.lineTo(x*scale+offsetX,y*scale+offsetY):ctx.moveTo(x*scale+offsetX,y*scale+offsetY)); ctx.closePath();

@@ -2,10 +2,13 @@ import { drawArchitecture, drawRoundedJunction, drawStreetTree, drawStreetFurnit
 import { velocityForHeading, projectIso, routeInput } from './game/test_drive_core.js';
 import { createDriveLab } from './game/test_drive_lab.js';
 import { resolveContact, resolveScenery } from './game/solid_contacts.js';
-import { coastPath, coastPoints, pointInCoast } from './game/coastline.js';
+import { coastPath, coastPoints, pointInCoast, pointInBeach, BEACH_WIDTH } from './game/coastline.js';
 import { createFreeRoam, drawTransport, PLANE_RUNWAYS } from './game/free_roam.js';
+import { visibleOceanChunks } from './game/ocean_chunks.js';
+import { classifySurface, surfaceMovement } from './game/surface_physics.js';
+import { createCityIncidentDirector, updateCrowdReactions } from './game/city_incidents.js';
 import { advanceTrafficCar, resolveTrafficPair } from './game/traffic_turns.js';
-import { createRoadGraph, roadPath, roadTerminals, onRoadSurface, createWalkingRoutes, assignWalkingRoutes, nextWalkingGoal, drawRoadTerminals } from './game/street_network.js';
+import { createRoadGraph, roadPath, roadTerminals, onRoadSurface, createWalkingRoutes, assignWalkingRoutes, nextWalkingGoal, planStopRoute, advanceRouteActor, drawRoadTerminals } from './game/street_network.js';
 import './game/test_drive.css';
 // LOWTOWN // THREE ISLANDS VISUAL OVERHAUL // GTA 2 RETRO-NOIR ENGINE
 // High-detail procedural pedestrian sprites, isometric vehicle chassis, wet road reflections, neon glow & audio
@@ -229,6 +232,7 @@ const islets=[
   {id:'salt-marsh',x:7650,y:8700,w:420,h:150},
   {id:'long-key',x:9680,y:4700,w:270,h:660}
 ].map(i=>({...i,natural:true}));
+const allIslands=[...islands,...islets];
 const piers=[{x:2470,y:1760,w:45,h:400},{x:4820,y:1760,w:45,h:400},{x:2470,y:7480,w:45,h:430},{x:4820,y:7480,w:45,h:430}];
 
 const shorelineDetails=[...islands,...islets].flatMap((island,islandIndex)=>{
@@ -244,6 +248,14 @@ const shorelineDetails=[...islands,...islets].flatMap((island,islandIndex)=>{
         variety<.16?'rock':variety<.36?'brush':variety<.5?'timber':'tideline',
       seed:stableVisualHash(islandIndex,i,37),natural:!!island.natural};
   });
+});
+const beachDetails=[...islands,...islets].flatMap((island,islandIndex)=>{
+  const points=coastPoints(island),stride=Math.max(1,Math.floor(points.length/(island.natural?18:34)));
+  return points.filter((_,i)=>i%stride===0).map(([x,y],i)=>{
+    const dx=x-(island.x+island.w/2),dy=y-(island.y+island.h/2),length=Math.hypot(dx,dy)||1;
+    const seed=stableVisualHash(islandIndex,i,71),distance=(island.natural?8:12)+seed*(island.natural?32:88);
+    return {x:x+dx/length*distance,y:y+dy/length*distance,seed,natural:!!island.natural,island};
+  }).filter(detail=>pointInBeach(detail.x,detail.y,island,island.natural?42:BEACH_WIDTH));
 });
 
 const expansionDistricts = [
@@ -293,7 +305,11 @@ const breakableProps = [];
 const bridgeRails = [];
 const trafficCars = [];
 const policeCars = [];
+const incidentPoliceCars = [];
+const transitRoutes=[];
 const pedestrians = [];
+let cityIncidentDirector = null;
+let incidentNoticeId = 0;
 const skidmarks = [];
 const waterSplashes = [];
 const streetLights = [];
@@ -340,6 +356,8 @@ function initTopology() {
   bridgeRails.length = 0;
   trafficCars.length = 0;
   policeCars.length = 0;
+  incidentPoliceCars.length = 0;
+  transitRoutes.length = 0;
   pedestrians.length = 0;
   streetLights.length = 0;
   trees.length = 0;
@@ -850,17 +868,44 @@ function initTopology() {
     !onRoadSurface(x,y,roads,bridges,[],roadEnds)&&!parkedCars.some(c=>pedestrianCarBlocked(x,y,c)));
   assignWalkingRoutes(pedestrians,walkingRoutes);
   roadGraph=createRoadGraph(roads,bridges);
+  cityIncidentDirector=createCityIncidentDirector({nodes:roadGraph});
+  incidentNoticeId=0;
+  const busLines=[
+    {id:'north-shore',stops:[[1200,1200],[2500,1200],[3850,1200],[4850,1200],[6200,1200],[7000,1200],[8500,1200],[8500,4200],[7000,4200],[6200,4200],[4850,4200],[3850,4200],[2500,4200],[1200,4200]]},
+    {id:'south-link',stops:[[1200,7200],[2500,7200],[3850,7200],[4850,7200],[6200,7200],[7000,7200],[8500,7200],[8500,10200],[7000,10200],[6200,10200],[4850,10200],[3850,10200],[2500,10200],[1200,10200]]}
+  ];
+  for(const line of busLines){
+    const route=planStopRoute(roadGraph,line.stops,{loop:true,id:line.id});
+    if(route?.points.length>8)transitRoutes.push(route);
+  }
+  transitRoutes.forEach((route,lineIndex)=>{
+    for(let busIndex=0;busIndex<2;busIndex++){
+      const points=route.points,total=points.length,origin=Math.floor(total*(busIndex?0.58:0.16));
+      let start=-1;
+      for(let offset=0;offset<total;offset++){
+        const index=(origin+offset)%total,p=points[index];
+        if(!trafficCars.some(c=>Math.hypot(c.x-p.x,c.y-p.y)<190)&&
+          !parkedCars.some(c=>Math.hypot(c.x-p.x,c.y-p.y)<130)){start=index;break;}
+      }
+      if(start<0)continue;
+      const point=points[start],next=points[(start+1)%total];
+      trafficCars.push({x:point.x,y:point.y,angle:Math.atan2(next.y-point.y,next.x-point.x),speed:0,cruiseSpeed:1.12,
+        color:lineIndex?'#b28a52':'#5b8f8a',type:'bus',width:82,height:30,mass:8200,axis:'x',isTraffic:true,
+        trafficId:`bus-${lineIndex}-${busIndex}`,routeManaged:true,route,routeIndex:(start+1)%total,lastStopIndex:-1,routeWait:0});
+    }
+  });
 }
 
 function isPositionOnIslandLand(x, y) {
-  for (let isl of [...islands,...islets]) {
+  for (let isl of allIslands) {
     if (pointInCoast(x, y, isl)) return true;
   }
   return false;
 }
 
 function isPositionOnSolidGround(x, y) {
-  if(isPositionOnIslandLand(x,y)||piers.some(p=>x>=p.x&&x<=p.x+p.w&&y>=p.y&&y<=p.y+p.h))return true;
+  if(isPositionOnIslandLand(x,y)||allIslands.some(isl=>pointInBeach(x,y,isl,isl.natural?42:BEACH_WIDTH))||
+    piers.some(p=>x>=p.x&&x<=p.x+p.w&&y>=p.y&&y<=p.y+p.h))return true;
   for (let br of bridges) {
     if (x >= br.x - 10 && x <= br.x + br.w + 10 && y >= br.y - 12 && y <= br.y + br.h + 12) return true;
   }
@@ -869,6 +914,27 @@ function isPositionOnSolidGround(x, y) {
 
 function isPositionOnWaterObstacle(x,y){
   return isPositionOnIslandLand(x,y)||piers.some(p=>x>=p.x&&x<=p.x+p.w&&y>=p.y&&y<=p.y+p.h);
+}
+
+function surfaceAt(x,y){
+  return classifySurface(x,y,{roads,bridges,scenicRoads,piers,parks:parkZones,
+    landAt:isPositionOnIslandLand,beachAt:(px,py)=>allIslands.some(isl=>pointInBeach(px,py,isl,isl.natural?42:BEACH_WIDTH))});
+}
+
+function drawTransitStops(){
+  const placed=new Set();
+  for(const route of transitRoutes)route.stopIndices.forEach((nodeIndex,index)=>{
+    const point=route.points[nodeIndex],key=`${Math.round(point.x)}:${Math.round(point.y)}`;
+    if(placed.has(key)||Math.abs(point.x-player.x)>2200||Math.abs(point.y-player.y)>2200)return;
+    placed.add(key);
+    const next=route.points[(nodeIndex+1)%route.points.length],previous=route.points[(nodeIndex-1+route.points.length)%route.points.length];
+    const dx=next.x-previous.x,dy=next.y-previous.y,length=Math.hypot(dx,dy)||1,side=index%2?1:-1;
+    const x=point.x-dy/length*72*side,y=point.y+dx/length*72*side;
+    ctx.strokeStyle='#343a39';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x,y+15);ctx.lineTo(x,y-12);ctx.stroke();
+    ctx.fillStyle='#d5a54e';ctx.fillRect(x-7,y-14,14,12);ctx.strokeStyle='#20201b';ctx.lineWidth=1;ctx.strokeRect(x-7,y-14,14,12);
+    ctx.fillStyle='#171a1b';ctx.font='bold 7px monospace';ctx.textAlign='center';ctx.fillText('BUS',x,y-6);
+    ctx.fillStyle='rgba(22,27,27,.7)';ctx.fillRect(x-12,y+5,24,3);
+  });
 }
 
 function pedestrianCarBlocked(x,y,c){
@@ -913,7 +979,7 @@ function movePedestrian(p,dx,dy){
 
 function updatePedestrians(dt){
   const frame=Math.min(dt,.05)*60;
-  const cars=[...trafficCars,...policeCars,...(roam?.mode!=='foot'&&!(roam?.altitude>12)?[player]:[])];
+  const cars=[...trafficCars,...policeCars,...incidentPoliceCars,...(roam?.mode!=='foot'&&!(roam?.altitude>12)?[player]:[])];
   pedestrians.forEach((p,index)=>{
     if(p.homeY===undefined){p.homeY=p.y;p.homeX=p.x;p.pause=index%7*.18;p.trip=0;}
     p.movedDistance=0;
@@ -926,10 +992,16 @@ function updatePedestrians(dt){
       const distance=Math.hypot(p.x-threat.x,p.y-threat.y)||1;
       p.fleeX=(p.x-threat.x)/distance;p.fleeY=(p.y-threat.y)/distance;
     }
+    if(threat)p.reaction='fleeing';
     p.fleeTimer=threat ? .8 : Math.max(0,(p.fleeTimer||0)-dt);
     let dx=0,dy=0;
-    if(p.fleeTimer>0){
-      dx=(p.fleeX||0)*1.3*frame;dy=(p.fleeY||0)*1.3*frame;
+    if(p.fleeTimer>0||(p.eventFleeTimer||0)>0){
+      p.reaction='fleeing';
+      const eventPanic=(p.eventFleeTimer||0)>0&&!threat;
+      const fleeX=eventPanic?(p.eventFleeX||0):(p.fleeX||0);
+      const fleeY=eventPanic?(p.eventFleeY||0):(p.fleeY||0);
+      const pace=eventPanic?1.9:1.3;
+      dx=fleeX*pace*frame;dy=fleeY*pace*frame;
     }else if(!p.pause){
       if(!p.goal||Math.hypot(p.goal.x-p.x,p.goal.y-p.y)<9){
         if(p.route){p.goal=nextWalkingGoal(p);}
@@ -943,13 +1015,15 @@ function updatePedestrians(dt){
         }
       }else{
         const distance=Math.hypot(p.goal.x-p.x,p.goal.y-p.y);
-        const speed=(.42+index%5*.045)*frame;
+        const curiosity=p.reaction==='curious'?.48:1;
+        const speed=(.42+index%5*.045)*frame*curiosity;
         dx=(p.goal.x-p.x)/distance*speed;dy=(p.goal.y-p.y)/distance*speed;
         const neighbor=pedestrians.find(o=>o!==p&&Math.hypot(o.x-p.x,o.y-p.y)<15);
         if(neighbor){const d=Math.hypot(p.x-neighbor.x,p.y-neighbor.y)||1;dx+=(p.x-neighbor.x)/d*.3*frame;dy+=(p.y-neighbor.y)/d*.3*frame;}
       }
     }
     if((dx||dy)&&!movePedestrian(p,dx,dy)){p.pause=.5;}
+    if(p.reaction==='curious'&&p.lookAt)p.heading=Math.atan2(p.lookAt.y-p.y,p.lookAt.x-p.x);
     p.gait=Math.min(1,p.movedDistance/Math.max(.01,frame*.42));
     if(p.gait===0)p.walkPhase=0;
     if(roam?.mode!=='foot'&&Math.abs(player.speed)>2&&pedestrianCarBlocked(p.x,p.y,player)&&!p.hitCooldown){
@@ -958,6 +1032,59 @@ function updatePedestrians(dt){
     }
     p.hitCooldown=Math.max(0,(p.hitCooldown||0)-dt);
   });
+}
+
+function dispatchIncidentPolice(incident){
+  if(!incident||incident.policeDispatched||!roadGraph.length)return false;
+  const target=roadGraph.reduce((best,node)=>Math.hypot(node.x-incident.x,node.y-incident.y)<Math.hypot(best.x-incident.x,best.y-incident.y)?node:best,roadGraph[0]);
+  const candidates=roadGraph.map(node=>({node,distance:Math.hypot(node.x-target.x,node.y-target.y)}))
+    .filter(entry=>entry.distance>340&&entry.distance<1150)
+    .sort((a,b)=>a.distance-b.distance);
+  if(!candidates.length)return false;
+  const start=candidates[Math.floor(Math.random()*Math.min(6,candidates.length))].node;
+  const route=roadPath(roadGraph,start,target);
+  if(route.length<2)return false;
+  incidentPoliceCars.push({
+    x:start.x,y:start.y,angle:Math.atan2(route[1].y-route[0].y,route[1].x-route[0].x),
+    speed:0,maxSpeed:5.6,route,routeTimer:1,responseTarget:{x:target.x,y:target.y},
+    responseIncidentId:incident.id,strobePhase:0,arrived:false,arrivalTimer:0
+  });
+  incident.policeDispatched=true;
+  return true;
+}
+
+function updateIncidentPolice(dt){
+  const frame=Math.min(Math.max(dt,0),.05)*60;
+  for(let i=incidentPoliceCars.length-1;i>=0;i--){
+    const unit=incidentPoliceCars[i];
+    unit.strobePhase=(unit.strobePhase||0)+dt*12;
+    if(unit.arrived){
+      unit.arrivalTimer-=dt;
+      if(unit.arrivalTimer<=0)incidentPoliceCars.splice(i,1);
+      continue;
+    }
+    unit.routeTimer=(unit.routeTimer||0)-dt;
+    if(unit.routeTimer<=0||!unit.route?.length){
+      unit.route=roadPath(roadGraph,unit,unit.responseTarget);
+      unit.routeTimer=1.2;
+    }
+    while(unit.route.length>1&&Math.hypot(unit.route[0].x-unit.x,unit.route[0].y-unit.y)<25)unit.route.shift();
+    const target=unit.route[0]||unit.responseTarget;
+    const distance=Math.hypot(target.x-unit.x,target.y-unit.y);
+    if(distance<34){unit.arrived=true;unit.arrivalTimer=8;unit.speed=0;continue;}
+    const wanted=Math.atan2(target.y-unit.y,target.x-unit.x);
+    const diff=Math.atan2(Math.sin(wanted-unit.angle),Math.cos(wanted-unit.angle));
+    unit.angle+=Math.sign(diff)*Math.min(Math.abs(diff),.105*frame);
+    const desired=Math.abs(diff)>.4?1.8:unit.maxSpeed;
+    unit.speed+=(desired-unit.speed)*Math.min(1,.12*frame);
+    const oldX=unit.x,oldY=unit.y;
+    unit.x+=Math.cos(unit.angle)*unit.speed*frame;
+    unit.y+=Math.sin(unit.angle)*unit.speed*frame;
+    const cs=Math.cos(unit.angle),sn=Math.sin(unit.angle);
+    const supported=[[24,12],[24,-12],[-24,12],[-24,-12]].every(([x,y])=>
+      onRoadSurface(unit.x+x*cs-y*sn,unit.y+x*sn+y*cs,roads,bridges,scenicRoads,roadEnds));
+    if(!supported){unit.x=oldX;unit.y=oldY;unit.speed=0;unit.routeTimer=0;}
+  }
 }
 
 function nearestSafeSpawn(x,y){
@@ -1025,8 +1152,10 @@ function updatePhysics(dt) {
     }
   }
 
-  let maxSpeed = roam?.profile?.max || 8.8;
-  let accel = roam?.profile?.accel || 0.17;
+  const surface=surfaceAt(player.x,player.y),surfaceResponse=surfaceMovement(surface,roam?.profile);
+  player.surface=surface;
+  let maxSpeed = (roam?.profile?.max || 8.8)*surfaceResponse.maxSpeed;
+  let accel = (roam?.profile?.accel || 0.17)*surfaceResponse.acceleration;
 
   if (CARPARTS.find(p => p.id === 'turbo')?.found) maxSpeed *= 1.2;
   if (CARPARTS.find(p => p.id === 'cams')?.found) accel += 0.04;
@@ -1050,14 +1179,14 @@ function updatePhysics(dt) {
     if (player.speed > 0.18) player.speed = Math.max(0, player.speed - accel * 2.55);
     else player.speed = Math.max(-maxSpeed * 0.38, player.speed - accel * 0.82);
   } else {
-    player.speed *= 0.965;
+    player.speed *= surfaceResponse.coast;
     if (Math.abs(player.speed) < 0.025) player.speed = 0;
   }
 
-  let lateralGrip = 0.18;
+  let lateralGrip = surfaceResponse.slipRetention;
   if (state.keys.handbrake) {
     player.speed *= 0.96;
-    lateralGrip = 0.76;
+    lateralGrip = Math.min(0.82,surfaceResponse.slipRetention*1.8);
   }
 
   if (Math.abs(player.speed) > 2) {
@@ -1067,7 +1196,7 @@ function updatePhysics(dt) {
 
   if (Math.abs(player.speed) > 0.12) {
     const dir = player.speed >= 0 ? 1 : -1;
-    const steeringAuthority = Math.min(1, 0.28 + Math.abs(player.speed) / 3.2);
+    const steeringAuthority = Math.min(1, 0.28 + Math.abs(player.speed) / 3.2)*surfaceResponse.steering;
     const turnSpeed = (state.keys.handbrake ? 0.063 : (roam?.profile?.steer||0.044)) * steeringAuthority;
     if (state.keys.left) player.angle -= turnSpeed * dir;
     if (state.keys.right) player.angle += turnSpeed * dir;
@@ -1181,6 +1310,10 @@ function updatePhysics(dt) {
     });
     c.collisionHold=Math.max(0,(c.collisionHold||0)-dt);
     const obstacle = occupied || approachingRed || c.collisionHold>0;
+    if(c.routeManaged){
+      advanceRouteActor(c,c.route,dt,{speed:obstacle?0:c.cruiseSpeed,dwell:2.1,stopRadius:26});
+      return;
+    }
     c.speed += ((obstacle ? 0 : c.cruiseSpeed) - c.speed) * Math.min(1, dt * (obstacle ? 9 : 3.5));
     const frame = Math.min(dt, .05) * 60;
     advanceTrafficCar(c,frame,trafficCars);
@@ -1197,10 +1330,24 @@ function updatePhysics(dt) {
     }
   });
 
+  const incident=cityIncidentDirector?.update(dt,{player,people:pedestrians})||null;
+  updateCrowdReactions(pedestrians,incident,dt);
+  if(incident&&incidentNoticeId!==incident.id&&Math.hypot(player.x-incident.x,player.y-incident.y)<1100){
+    incidentNoticeId=incident.id;
+    showToast(`⚠️ ${incident.title}: прохожие реагируют на происшествие`);
+  }
+  if(incident?.reported){
+    const dispatched=dispatchIncidentPolice(incident);
+    if(dispatched&&!incident.reportNoticeShown&&Math.hypot(player.x-incident.x,player.y-incident.y)<1400){
+      incident.reportNoticeShown=true;
+      showToast('📞 Свидетель сообщил о происшествии · патруль направлен');
+    }
+  }
+  updateIncidentPolice(dt);
   updatePedestrians(dt);
 
   if (!roam?.special) updatePoliceAI(dt);
-  const vehicles = [...(!roam?.special ? [player] : []), ...trafficCars, ...policeCars];
+  const vehicles = [...(!roam?.special ? [player] : []), ...trafficCars, ...policeCars, ...incidentPoliceCars];
   // Repeated projection handles simultaneous wall/car contacts at intersections.
   for (let pass = 0; pass < 3; pass++) {
     for (let i = 0; i < vehicles.length; i++) {
@@ -1591,26 +1738,50 @@ function renderWorld() {
 
   // Layered harbour water: depth colour, broad current bands, small wavelets
   // and broken light reflections continue beyond the playable archipelago.
-  const waterRange=4300, now=performance.now();
+  const waterRange=Math.max(4300,Math.ceil(Math.max(w,h)/cameraZoom*2)), now=performance.now();
   const sea=ctx.createLinearGradient(player.x-waterRange,player.y-waterRange,player.x+waterRange,player.y+waterRange);
   sea.addColorStop(0,'#07151d');sea.addColorStop(.42,'#0b222b');sea.addColorStop(.72,'#0b2a31');sea.addColorStop(1,'#061820');
   ctx.fillStyle=sea;ctx.fillRect(player.x-waterRange,player.y-waterRange,waterRange*2,waterRange*2);
-  const waveX=Math.floor((player.x-1800)/65)*65,waveY=Math.floor((player.y-1800)/65)*65;
   ctx.lineWidth=1;
-  for(let x=waveX;x<player.x+1800;x+=65)for(let y=waveY;y<player.y+1800;y+=65){
-    const seed=stableVisualHash(x,y,7),phase=now*.00065+seed*12;
-    const px=x+seed*45+Math.sin(phase)*4,py=y+stableVisualHash(x,y,11)*43;
-    ctx.strokeStyle=seed>.75?'rgba(142,184,176,.17)':'rgba(64,116,128,.18)';
-    ctx.beginPath();ctx.moveTo(px,py);ctx.quadraticCurveTo(px+9,py-2-Math.sin(phase)*2,px+18+seed*16,py+1);ctx.stroke();
-    if(seed>.8){ctx.strokeStyle='rgba(181,198,182,.11)';ctx.beginPath();ctx.moveTo(px+5,py+6);ctx.lineTo(px+17,py+7);ctx.stroke();}
+  const oceanViewRadius=Math.max(2200,Math.ceil(Math.max(w,h)/cameraZoom*1.3));
+  for(const chunk of visibleOceanChunks(player.x,player.y,oceanViewRadius)){
+    for(const [i,wave] of chunk.waves.entries()){
+      const phase=now*.00065+wave.phase;
+      const px=chunk.x+wave.x+Math.sin(phase)*4,py=chunk.y+wave.y;
+      ctx.strokeStyle=wave.bright?'rgba(142,184,176,.18)':'rgba(64,116,128,.15)';
+      ctx.beginPath();ctx.moveTo(px,py);ctx.quadraticCurveTo(px+wave.length*.45,py-2-Math.sin(phase)*2,px+wave.length,py+1);ctx.stroke();
+      if(i%4===0){ctx.strokeStyle='rgba(181,198,182,.09)';ctx.beginPath();ctx.moveTo(px+4,py+5);ctx.lineTo(px+wave.length*.7,py+6);ctx.stroke();}
+    }
+    if(chunk.glint){
+      const px=chunk.x+360+(chunk.seed%410),py=chunk.y+260+((chunk.seed>>>9)%520);
+      ctx.fillStyle='rgba(172,204,197,.2)';ctx.beginPath();ctx.ellipse(px,py,11,2.4,.08,0,Math.PI*2);ctx.fill();
+    }
   }
-  // 1. Island Bases with Dark Shoreline
-  [...islands,...islets].forEach(isl => {
-    coastPath(ctx, isl);ctx.strokeStyle='rgba(34,91,94,.68)';ctx.lineWidth=55;ctx.stroke();
-    ctx.strokeStyle='#647365';ctx.lineWidth=20;ctx.stroke();
+  // 1. A broad, layered shore blends deep water into shallows and sand.
+  // The same coastline remains the land/navmesh boundary, so roads and bridges
+  // keep their authored connections while the beach is walkable ground.
+  allIslands.forEach(isl => {
+    const coastalScale=isl.natural ? 0.48 : 1;
+    coastPath(ctx, isl);ctx.strokeStyle='rgba(9,31,38,.94)';ctx.lineWidth=420*coastalScale;ctx.stroke();
+    ctx.strokeStyle='rgba(20,56,61,.96)';ctx.lineWidth=330*coastalScale;ctx.stroke();
+    ctx.strokeStyle='rgba(64,104,96,.98)';ctx.lineWidth=255*coastalScale;ctx.stroke();
+    ctx.strokeStyle='rgba(174,151,103,.98)';ctx.lineWidth=188*coastalScale;ctx.stroke();
     ctx.fillStyle = '#202721';ctx.fill();
     ctx.strokeStyle = '#686556';ctx.lineWidth = 7;ctx.stroke();
+    ctx.setLineDash([38*coastalScale,29*coastalScale]);
+    ctx.strokeStyle='rgba(213,222,197,.68)';ctx.lineWidth=3.5*coastalScale;ctx.stroke();ctx.setLineDash([]);
   });
+  for(const detail of beachDetails){
+    if(Math.abs(detail.x-player.x)>3200||Math.abs(detail.y-player.y)>3200)continue;
+    if(!pointInBeach(detail.x,detail.y,detail.island,detail.natural?42:BEACH_WIDTH))continue;
+    const radius=1.2+detail.seed*2.2;
+    ctx.fillStyle=detail.seed>.5?'rgba(231,213,164,.32)':'rgba(73,68,51,.24)';
+    ctx.beginPath();ctx.ellipse(detail.x,detail.y,radius*1.8,radius*.62,detail.seed*Math.PI,0,Math.PI*2);ctx.fill();
+    if(detail.seed>.86){
+      ctx.strokeStyle='rgba(91,79,53,.35)';ctx.lineWidth=1.1;
+      ctx.beginPath();ctx.moveTo(detail.x-4,detail.y+3);ctx.lineTo(detail.x+4,detail.y-2);ctx.stroke();
+    }
+  }
   // Harbour piers, landing pads and a small airstrip occupy open waterfront land.
   for (const x of [2470,4820]) {
     ctx.fillStyle='#686357';ctx.fillRect(x,1760,45,400);
@@ -1695,6 +1866,7 @@ function renderWorld() {
   });
 
   drawRoadTerminals(ctx,roadEnds);
+  drawTransitStops();
 
   // Continuous intersections: no kerbs or lane stripes across crossing roads.
   for (const horizontal of roads.filter(r => r.dir === 'h')) {
@@ -1842,6 +2014,11 @@ function drawScreenPedestrian(ped,sx,sy,index,zoom=1){
   const shirt=ped.shirt||'#62503f',pants=ped.pants||'#22262a',skin=ped.skin||'#c99f77';
   ctx.save();ctx.translate(sx,sy);ctx.scale(size,size);
   ctx.fillStyle='rgba(0,0,0,.45)';ctx.beginPath();ctx.ellipse(2,1,6,2.7,-.15,0,Math.PI*2);ctx.fill();
+  if(ped.stance==='down'){
+    ctx.save();ctx.rotate(-.16);ctx.fillStyle=pants;ctx.fillRect(-7,-4,10,3.5);
+    ctx.fillStyle=shirt;ctx.fillRect(-1,-5.3,7,4.6);ctx.fillStyle=skin;
+    ctx.beginPath();ctx.ellipse(7,-3.2,2.3,2.1,0,0,Math.PI*2);ctx.fill();ctx.restore();ctx.restore();return;
+  }
   const limb=(points,color,width)=>{ctx.strokeStyle=color;ctx.lineWidth=width;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.stroke();};
   for(const side of [-1,1]){
     const stride=swing*side*3.5,footX=side*hip+fx*stride,footY=fy*stride*.5;
@@ -1849,6 +2026,12 @@ function drawScreenPedestrian(ped,sx,sy,index,zoom=1){
     limb([[footX,footY],[footX+fx*1.7,footY+fy*.7]],'#101315',2.3);
   }
   const arm=side=>{
+    if(ped.stance==='handsUp'||ped.stance==='fighting'){
+      const raised=ped.stance==='handsUp'||side===(fx>0?1:-1);
+      const elbowY=raised?-27:-24,handY=raised?-31:-23;
+      limb([[side*shoulder,-21],[side*(shoulder+1.2),elbowY],[side*(shoulder+2),handY]],shirt,2.3);
+      ctx.fillStyle=skin;ctx.beginPath();ctx.arc(side*(shoulder+2),handY,1.35,0,Math.PI*2);ctx.fill();return;
+    }
     const stride=-swing*side*2.8;
     limb([[side*shoulder,-21],[side*(shoulder+1)+fx*stride*.45,-16],[side*(shoulder+.8)+fx*stride,-11+fy*stride*.4]],shirt,2.3);
     ctx.fillStyle=skin;ctx.beginPath();ctx.ellipse(side*(shoulder+.8)+fx*stride,-10.5+fy*stride*.4,1.1,1.5,0,0,Math.PI*2);ctx.fill();
@@ -1871,6 +2054,33 @@ function drawScreenPedestrian(ped,sx,sy,index,zoom=1){
   if(index%6===0){ctx.fillStyle='#25282b';ctx.fillRect(-3.1,-30,6.2,1.8);ctx.fillRect(-2.3,-31.7,4.6,2);}
   if(index%5===0){limb([[shoulder,-20],[shoulder+1,-12]],'#201c19',.8);ctx.fillStyle='#513d2e';ctx.fillRect(shoulder,-13,3,5);ctx.strokeStyle='#907453';ctx.lineWidth=.5;ctx.strokeRect(shoulder,-13,3,5);}
   if(ped.player){ctx.strokeStyle='#e8b84a';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(0,2,8,4,0,0,Math.PI*2);ctx.stroke();}
+  if(ped.reaction==='fleeing'||ped.reaction==='curious'){
+    ctx.fillStyle=ped.reaction==='fleeing'?'#ef6655':'#f0c46c';
+    ctx.font='bold 8px monospace';ctx.textAlign='center';
+    ctx.fillText(ped.reaction==='fleeing'?'!':'?',0,-35);
+  }
+  ctx.restore();
+}
+
+function drawCityIncidentMarker(incident){
+  const pulse=1+Math.sin(performance.now()/180)*.13;
+  ctx.save();ctx.translate(incident.x,incident.y);
+  ctx.transform(1/Math.sqrt(3),-1/Math.sqrt(3),1,1,0,0);
+  if(incident.kind==='fire'){
+    ctx.fillStyle='rgba(239,92,40,.2)';ctx.beginPath();ctx.ellipse(0,-17,33,24,0,0,Math.PI*2);ctx.fill();
+    for(let i=0;i<5;i++){
+      const drift=Math.sin(performance.now()/210+i*1.7)*5,rise=(performance.now()/70+i*13)%32;
+      ctx.fillStyle=i%2?'rgba(226,76,37,.82)':'rgba(245,174,62,.76)';
+      ctx.beginPath();ctx.ellipse((i-2)*9+drift,-18-rise,5+(i%2)*2,9+(i%3),drift*.025,0,Math.PI*2);ctx.fill();
+    }
+    ctx.fillStyle='rgba(31,35,34,.3)';
+    for(let i=0;i<4;i++){const drift=Math.sin(performance.now()/480+i)*8;const rise=(performance.now()/160+i*16)%50;ctx.beginPath();ctx.arc(-12+i*8+drift,-34-rise,5+i*1.2,0,Math.PI*2);ctx.fill();}
+  }
+  ctx.globalAlpha=.78;ctx.fillStyle='rgba(10,13,15,.82)';ctx.strokeStyle='#e8b84a';ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(0,-8,13*pulse,0,Math.PI*2);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#f4ede0';ctx.font='bold 12px monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(incident.mark,0,-8);
+  ctx.fillStyle='#f0c46c';ctx.font='bold 8px monospace';ctx.fillText(incident.title,0,-27);
   ctx.restore();
 }
 
@@ -1913,13 +2123,19 @@ function drawStreetActors(w,h,center,zoom){
   streetProps.forEach(p=>actors.push({depth:p.x+p.y+p.height/2,draw:()=>drawStreetFurniture(ctx,p)}));
   billboards.forEach(board=>actors.push({depth:board.x+board.y,draw:()=>drawBillboard(board)}));
   streetLights.forEach((lamp,index)=>actors.push({depth:lamp.x+lamp.y,draw:()=>drawStreetLamp(lamp,index)}));
+  const activeIncident=cityIncidentDirector?.current();
+  if(activeIncident&&Math.abs(activeIncident.x-player.x)<1500&&Math.abs(activeIncident.y-player.y)<1500){
+    actors.push({depth:activeIncident.x+activeIncident.y+2,draw:()=>drawCityIncidentMarker(activeIncident)});
+  }
   const addVehicle=(vehicle,draw)=>actors.push({depth:vehicle.x+vehicle.y,draw});
   trafficCars.forEach(c=>addVehicle(c,()=>drawDetailedCar(ctx,c.x,c.y,c.angle,c.color,c.width||46,c.height||22,false,c.type)));
   policeCars.forEach(c=>addVehicle(c,()=>drawDetailedCar(ctx,c.x,c.y,c.angle,'#0f172a',48,24,true,'police')));
+  incidentPoliceCars.forEach(c=>addVehicle(c,()=>drawDetailedCar(ctx,c.x,c.y,c.angle,'#0f172a',48,24,true,'police')));
+  for(const wreck of activeIncident?.wrecks||[])addVehicle(wreck,()=>drawDetailedCar(ctx,wreck.x,wreck.y,wreck.angle,wreck.color,wreck.width,wreck.height,false,wreck.type));
   for(const vehicle of roam?.fleet||[])if(vehicle.kind!=='water')
     addVehicle(vehicle,()=>drawTransport(ctx,vehicle,performance.now()/1000));
 
-  const people=pedestrians.slice();
+  const people=[...pedestrians,...(activeIncident?.actors||[])];
   if(roam?.mode==='foot')people.push({x:player.x,y:player.y,heading:player.angle,gait:player.gait||0,walkPhase:player.walkPhase||0,shirt:'#735235',pants:'#22272b',skin:'#d5b594',hair:'#1a1512',player:true});
   people.forEach((ped,index)=>{
     const ground=projectIso(ped.x,ped.y);
@@ -1958,7 +2174,7 @@ function drawDetailedCar(ctx, x, y, ang, color, w, h, isPolice = false, model = 
   ctx.translate(x, y);
   ctx.rotate(ang);
   const kind=isPolice?'police':model;
-  const elevation=(kind==='van'?8.5:kind==='truck'?7.5:kind==='coupe'||kind==='sports'?5.2:6.5), cs=Math.cos(ang), sn=Math.sin(ang);
+  const elevation=(kind==='bus'?9:kind==='van'?8.5:kind==='truck'?7.5:kind==='coupe'||kind==='sports'?5.2:6.5), cs=Math.cos(ang), sn=Math.sin(ang);
   // Inverse-rotated world vertical; after the camera transform this stays an
   // upright screen-space extrusion at every vehicle heading.
   const zx=-elevation*(cs+sn), zy=elevation*(sn-cs);
@@ -1967,6 +2183,7 @@ function drawDetailedCar(ctx, x, y, ang, color, w, h, isPolice = false, model = 
     coupe:[[-w*.5,-h*.34],[-w*.34,-h*.48],[w*.38,-h*.46],[w*.5,-h*.25],[w*.5,h*.25],[w*.38,h*.46],[-w*.34,h*.48],[-w*.5,h*.34]],
     sports:[[-w*.5,-h*.31],[-w*.31,-h*.47],[w*.4,-h*.43],[w*.5,-h*.22],[w*.5,h*.22],[w*.4,h*.43],[-w*.31,h*.47],[-w*.5,h*.31]],
     wagon:[[-w*.5,-h*.43],[w*.36,-h*.5],[w*.5,-h*.3],[w*.5,h*.3],[w*.36,h*.5],[-w*.5,h*.43]],
+    bus:[[-w*.5,-h*.48],[w*.38,-h*.48],[w*.5,-h*.34],[w*.5,h*.34],[w*.38,h*.48],[-w*.5,h*.48]],
     van:[[-w*.5,-h*.46],[w*.34,-h*.48],[w*.5,-h*.31],[w*.5,h*.31],[w*.34,h*.48],[-w*.5,h*.46]],
     truck:[[-w*.5,-h*.48],[w*.36,-h*.48],[w*.5,-h*.31],[w*.5,h*.31],[w*.36,h*.48],[-w*.5,h*.48]]
   };
@@ -2016,11 +2233,12 @@ function drawDetailedCar(ctx, x, y, ang, color, w, h, isPolice = false, model = 
     coupe:[[-w*.29,-h*.31],[w*.03,-h*.31],[w*.18,-h*.16],[w*.18,h*.16],[w*.03,h*.31],[-w*.29,h*.31],[-w*.36,h*.17],[-w*.36,-h*.17]],
     sports:[[-w*.31,-h*.29],[-w*.02,-h*.29],[w*.15,-h*.14],[w*.15,h*.14],[-w*.02,h*.29],[-w*.31,h*.29],[-w*.38,h*.15],[-w*.38,-h*.15]],
     wagon:[[-w*.34,-h*.36],[w*.14,-h*.35],[w*.26,-h*.19],[w*.26,h*.19],[w*.14,h*.35],[-w*.34,h*.36],[-w*.4,h*.21],[-w*.4,-h*.21]],
+    bus:[[-w*.44,-h*.39],[w*.32,-h*.39],[w*.42,-h*.23],[w*.42,h*.23],[w*.32,h*.39],[-w*.44,h*.39]],
     van:[[-w*.4,-h*.38],[w*.18,-h*.37],[w*.34,-h*.22],[w*.34,h*.22],[w*.18,h*.37],[-w*.4,h*.38]],
     truck:[[w*.03,-h*.36],[w*.27,-h*.35],[w*.39,-h*.2],[w*.39,h*.2],[w*.27,h*.35],[w*.03,h*.36],[-w*.02,h*.2],[-w*.02,-h*.2]]
   };
   const cabinBase=cabins[kind]||[[-w*.2,-h*.36],[w*.14,-h*.35],[w*.27,-h*.19],[w*.27,h*.19],[w*.14,h*.35],[-w*.2,h*.36],[-w*.29,h*.2],[-w*.29,-h*.2]];
-  const cabinHeight=kind==='van'?2.35:kind==='truck'?2.1:kind==='coupe'||kind==='sports'?1.55:1.82;
+  const cabinHeight=kind==='bus'?2.5:kind==='van'?2.35:kind==='truck'?2.1:kind==='coupe'||kind==='sports'?1.55:1.82;
   const cabinLow=raised(cabinBase,1.08), cabinTop=raised(cabinBase,cabinHeight);
   for(let i=0;i<cabinBase.length;i++){
     const a=cabinLow[i],b=cabinLow[(i+1)%cabinLow.length],c=cabinTop[(i+1)%cabinTop.length],d=cabinTop[i];
@@ -2030,7 +2248,16 @@ function drawDetailedCar(ctx, x, y, ang, color, w, h, isPolice = false, model = 
   poly(cabinTop,isPolice?'#f0f0eb':kind==='van'?'#899094':'rgba(70,79,84,.94)','#090d10',1);
 
   // Truck cargo and sport bonnet make the classes readable at a glance.
-  if(kind==='truck'){
+  if(kind==='bus'){
+    for(const side of [-1,1])for(let window=0;window<5;window++){
+      const px=-w*.34+window*w*.14,py=side*h*.34;
+      const glass=[[px,py],[px+w*.09,py],[px+w*.09,py+side*h*.055],[px,py+side*h*.055]];
+      poly(raised(glass,2.35),'#29444b','#111b20',.7);
+    }
+    ctx.strokeStyle='#1c2325';ctx.lineWidth=2;
+    for(const side of [-1,1]){ctx.beginPath();ctx.moveTo(-w*.07+zx*1.1,side*h*.48+zy*1.1);ctx.lineTo(-w*.07+zx*1.1,side*h*.37+zy*1.1);ctx.stroke();}
+    poly(raised([[w*.39,-h*.17],[w*.49,-h*.15],[w*.49,h*.15],[w*.39,h*.17]],1.25),'#c7b270','#16191a',.8);
+  }else if(kind==='truck'){
     const cargo=[[-w*.46,-h*.4],[-w*.08,-h*.4],[-w*.08,h*.4],[-w*.46,h*.4]];
     const box=volume(cargo,1.05,2.45,'#6f6558','#514940');
     ctx.strokeStyle='rgba(218,206,181,.25)';ctx.beginPath();ctx.moveTo(box.upper[0][0]+3,box.upper[0][1]+3);ctx.lineTo(box.upper[1][0]-3,box.upper[1][1]+3);ctx.stroke();
