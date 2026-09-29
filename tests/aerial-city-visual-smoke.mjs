@@ -88,7 +88,9 @@ try {
     if (message.type() === 'error') errors.push(`console: ${message.text()}`);
   });
   await page.addInitScript(() => {
-    localStorage.setItem('lowtown_integrity_save', JSON.stringify({ cash: 750, x: 1040, y: 2070 }));
+    // Spawn just north of the airport helicopter so the first safe exit leaves
+    // it closer than the sedan we just exited.
+    localStorage.setItem('lowtown_integrity_save', JSON.stringify({ cash: 750, x: 1040, y: 2010 }));
     window.__lowtownCameraZooms = [];
     let capturedFrameScale = false;
     const originalScale = CanvasRenderingContext2D.prototype.scale;
