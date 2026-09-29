@@ -99,7 +99,8 @@
     .part-card.found { border-color: var(--accent-amber); background: rgba(229, 157, 53, 0.1); }
     .part-title { font-size: 9px; font-weight: 800; color: #fff; }
     .part-bonus { font-size: 7.5px; color: var(--text-muted); }
-    #fullMapCanvas { width: 100%; height: 300px; border-radius: 10px; background: #06090e; border: 1px solid var(--glass-border); display: block; }
+    #mapModal .modal-card { max-width: min(1000px, 94vw); }
+    #fullMapCanvas { width: min(100%, calc(68vh * 4 / 3)); height: auto; aspect-ratio: 4 / 3; border-radius: 10px; background: #06090e; border: 1px solid var(--glass-border); display: block; }
     /* Reference pass: chunky noir HUD framing a dense isometric street scene. */
     #gameCanvas { image-rendering: pixelated; filter: saturate(.9) contrast(1.16) brightness(.86); }
     .radar-wrapper { width: 164px; height: 164px; border: 8px solid #080a0d; box-shadow: 0 0 0 3px #32363a, 0 12px 34px rgba(0,0,0,.85); }
@@ -195,7 +196,7 @@
         <div class="modal-title">КАРТА LOWTOWN — 16 РАЙОНОВ</div>
         <button class="modal-close" id="btnCloseMap">&times;</button>
       </div>
-      <canvas id="fullMapCanvas" width="400" height="300"></canvas>
+      <canvas id="fullMapCanvas" width="960" height="720"></canvas>
     </div>
   </div>
   <div class="modal-overlay" id="garageModal">

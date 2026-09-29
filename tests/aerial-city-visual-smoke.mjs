@@ -68,7 +68,10 @@ async function release(...keys) {
 
 async function flyStraight(name, milliseconds) {
   await hold('w');
-  await page.waitForTimeout(milliseconds);
+  const midpoint = Math.floor(milliseconds / 2);
+  await page.waitForTimeout(midpoint);
+  await screenshot(`${name}-mid`);
+  await page.waitForTimeout(milliseconds - midpoint);
   await release('w');
   await screenshot(name);
 }
@@ -120,7 +123,7 @@ try {
   const mapCanvas = page.locator('#fullMapCanvas');
   await mapCanvas.waitFor({ state: 'visible', timeout: 5000 });
   const mapSize = await mapCanvas.evaluate(element => ({ width: element.width, height: element.height }));
-  assert(mapSize.width >= 320 && mapSize.height >= 240, `full-city map is not initialized: ${JSON.stringify(mapSize)}`);
+  assert(mapSize.width >= 800 && mapSize.height >= 600, `full-city map is not a readable overview: ${JSON.stringify(mapSize)}`);
   const mapPath = `${artifactDir}/full-city-map.png`;
   await page.screenshot({ path: mapPath });
   shots.push({ name: 'full-city-map', path: mapPath, mapCanvas: mapSize });
@@ -142,7 +145,7 @@ try {
   const airHeight = await page.locator('#hudGear').textContent();
   assert(Number.parseInt(airHeight, 10) >= 180, `helicopter did not reach useful aerial height: ${airHeight}`);
   const aerialZoom = await page.evaluate(() => window.__lowtownCameraZooms.at(-1)?.x);
-  assert(aerialZoom < groundZoom * .94, `helicopter altitude did not zoom the city camera out: ${groundZoom} -> ${aerialZoom}`);
+  assert(aerialZoom < groundZoom * .55, `helicopter altitude did not zoom the city camera out enough: ${groundZoom} -> ${aerialZoom}`);
   await screenshot('aerial-takeoff');
 
   await flyStraight('aerial-east', 16000);
