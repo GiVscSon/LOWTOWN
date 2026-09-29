@@ -25,6 +25,7 @@ assert(started.actors.length >= 1, 'incidents should place people in the scene')
 
 const forced = director.start('fire', { x: 0, y: 0 }, { duration: 4 });
 assert.equal(forced.actors[0].role, 'evacuee');
+assert(forced.actors.some(actor=>actor.role==='injured'&&actor.stance==='down'),'fire scenes should include a patient for ambulance response');
 const first = updateCrowdReactions(people, forced, 0.1);
 assert.equal(people[0].reaction, 'fleeing', 'people in the danger zone should flee');
 assert(people[0].eventFleeX > 0, 'flee direction should lead away from the incident');

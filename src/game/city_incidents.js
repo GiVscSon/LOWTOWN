@@ -19,7 +19,7 @@ function createSceneActors(kind,x,y){
   if(kind==='carTheft')return [person('suspect',-18,-8,'#34383d','fighting','fleeing'),person('owner',34,13,'#98774d','handsUp','curious')];
   if(kind==='killing')return [person('suspect',-26,-8,'#3e3030','fighting','fleeing'),person('victim',15,6,'#5a6266','down','calm')];
   if(kind==='crash')return [person('injured',-6,8,'#9b5b4e','down','calm'),person('witness',45,24,'#526a57','handsUp','curious')];
-  if(kind==='fire')return [person('evacuee',52,28,'#9a6741','handsUp','fleeing')];
+  if(kind==='fire')return [person('evacuee',52,28,'#9a6741','handsUp','fleeing'),person('injured',-34,18,'#815a4d','down','calm')];
   return [];
 }
 
