@@ -9,3 +9,4 @@ LOWTOWN_ACCESS_TEST.txt
 node_modules/
 dist/
 coverage/
+artifacts/

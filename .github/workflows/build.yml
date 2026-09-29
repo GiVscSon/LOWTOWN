@@ -28,12 +28,16 @@ jobs:
           npm run test:pages-smoke
       - name: Run aerial city visual sweep
         run: npm run test:aerial-visual
+      - name: Test living city and complete emergency response routes
+        run: npm run test:living-city
       - name: Upload aerial city screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: lowtown-aerial-visuals
-          path: artifacts/aerial-city/
+          path: |
+            artifacts/aerial-city/
+            artifacts/living-city/
           if-no-files-found: ignore
           retention-days: 14
       - name: Test player drive acceptance

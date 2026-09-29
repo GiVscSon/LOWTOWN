@@ -223,6 +223,28 @@ const islands = [
   ,{ id: 'marina', name: 'Kingsport Marina', x: 7350, y: 9200, w: 2200, h: 2200 }
 ];
 
+// District identity changes architecture and vegetation inside the established
+// street envelope. Civic parcels and bridge positions remain authoritative.
+const districtProfiles={
+  core:{types:['tenement','office','deco','shop'],land:'#292821',roof:'#39362d',trees:10,population:12},
+  docks:{types:['warehouse','warehouse','shop','office'],land:'#292c2a',roof:'#394241',trees:6,population:8},
+  lantern:{types:['townhouse','deco','shop','townhouse'],land:'#29372a',roof:'#4c4235',trees:24,population:8},
+  oldmill:{types:['warehouse','tenement','warehouse','shop'],land:'#302c25',roof:'#494136',trees:8,population:8},
+  redhook:{types:['shop','tenement','shop','deco'],land:'#332d25',roof:'#4b3d32',trees:10,population:12},
+  blackwood:{types:['townhouse','townhouse','shop','deco'],land:'#1f3327',roof:'#354837',trees:28,population:8},
+  marrow:{types:['tenement','shop','warehouse','townhouse'],land:'#2b3028',roof:'#414639',trees:14,population:8},
+  southport:{types:['warehouse','warehouse','office','shop'],land:'#30312c',roof:'#46483e',trees:6,population:8},
+  velvet:{types:['deco','deco','shop','office'],land:'#302c2c',roof:'#4b3c3b',trees:16,population:10},
+  eastgate:{types:['tenement','office','shop','deco'],land:'#2e3029',roof:'#41453d',trees:12,population:10},
+  cinder:{types:['shop','townhouse','tenement','shop'],land:'#29342a',roof:'#3d493c',trees:22,population:10},
+  aerodrome:{types:['warehouse','warehouse','office','shop'],land:'#2b3030',roof:'#3e4849',trees:6,population:8},
+  saints:{types:['deco','townhouse','tenement','shop'],land:'#30342e',roof:'#4b4c40',trees:20,population:10},
+  refinery:{types:['warehouse','warehouse','office','warehouse'],land:'#332e26',roof:'#4a4135',trees:6,population:8},
+  campus:{types:['office','deco','townhouse','shop'],land:'#26372c',roof:'#3e4b40',trees:26,population:10},
+  marina:{types:['townhouse','shop','deco','warehouse'],land:'#29332d',roof:'#424b40',trees:18,population:10}
+};
+function districtAt(x,y){return islands.find(i=>x>=i.x&&x<=i.x+i.w&&y>=i.y&&y<=i.y+i.h);}
+
 const islets=[
   {id:'reed-bank',x:600,y:2770,w:290,h:165},
   {id:'gull-rock',x:3320,y:2790,w:300,h:150},
@@ -307,6 +329,7 @@ const trafficCars = [];
 const policeCars = [];
 const incidentPoliceCars = [];
 const incidentResponseVehicles = [];
+const serviceBases = [];
 const transitRoutes=[];
 const pedestrians = [];
 let cityIncidentDirector = null;
@@ -365,7 +388,7 @@ function civicTypeForSign(sign='') {
 }
 
 function buildStuntZones() {
-  const roadList=roads.filter(r=>!r.bridgeApproach);
+  const roadList=roads.filter(r=>!r.bridgeApproach&&!r.serviceAccess);
   const candidates=[];
   for(const road of roadList){
     const horizontal=road.dir==='h',length=horizontal?road.w:road.h;
@@ -468,6 +491,7 @@ function initTopology() {
   policeCars.length = 0;
   incidentPoliceCars.length = 0;
   incidentResponseVehicles.length = 0;
+  serviceBases.length = 0;
   transitRoutes.length = 0;
   pedestrians.length = 0;
   streetLights.length = 0;
@@ -682,7 +706,7 @@ function initTopology() {
       const floors=civicType==='hospital'?5:civicType==='civic'?3:civicType==='airfield'?2:2;
       const archetype=['guardBase','airAmbulanceBase','marineRescueBase'].includes(civicType)?'civic':civicType;
       buildings.push(
-        {...block,x:block.x+insetX,y:block.y+insetY,w:block.w*.62,h:block.h*.66,floors,archetype,civicType,cornerRadius:14},
+        {...block,x:block.x+insetX,y:block.y+insetY,w:block.w*.62,h:block.h*.66,floors,archetype,civicType,cornerRadius:14,serviceParcel:{x:block.x,y:block.y,w:block.w,h:block.h}},
         {...block,x:block.x+block.w*.68,y:block.y+block.h*.08,w:block.w*.24,h:block.h*.27,floors:1,archetype:'warehouse',sign:'SERVICE BAY',neon:'#b88b53'},
         {...block,x:block.x+block.w*.68,y:block.y+block.h*.41,w:block.w*.24,h:block.h*.27,floors:1,archetype:'warehouse',sign:'STORES & GARAGE',neon:'#8b7c62'},
         {...block,x:block.x+block.w*.1,y:block.y+block.h*.75,w:block.w*.5,h:block.h*.15,floors:1,archetype:'pavilion',sign:'VISITOR ANNEX',neon:'#9aa0a8'}
@@ -717,7 +741,8 @@ function initTopology() {
       trees.push({x:block.x+block.w*.5,y:block.y-28,size:23});
       return;
     }
-    const districtTypes=['tenement','shop','warehouse','deco','townhouse','office'];
+    const district=districtAt(block.x+block.w/2,block.y+block.h/2);
+    const districtTypes=districtProfiles[district?.id]?.types||['tenement','shop','warehouse','deco','townhouse','office'];
     const secondarySigns=['APARTMENTS','REPAIR SHOP','GROCERY','WAREHOUSE','LAUNDROMAT','DINER','PAWN & LOAN','OLD BOOKS'];
     const floorRanges={tenement:[4,6],shop:[2,3],warehouse:[1,2],deco:[3,5],townhouse:[2,4],office:[5,7]};
     for (let row = 0; row < 2; row++) for (let col = 0; col < 2; col++) {
@@ -735,6 +760,9 @@ function initTopology() {
   // Vary actual footprints inside existing parcels. Collision bodies shrink
   // with the facades, leaving genuine forecourts and accessible side alleys.
   buildings.forEach((b,i)=>{
+    const district=districtAt(b.x+b.w/2,b.y+b.h/2);
+    b.districtId=district?.id;
+    if(!b.civicType)b.roof=districtProfiles[district?.id]?.roof||b.roof;
     if(b.archetype==='pavilion')return;
     const sx=[.82,1,.91,.74,1,.88][i%6],sy=[1,.84,.93,1,.79][i%5];
     const dw=b.w*(1-sx),dh=b.h*(1-sy);b.x+=dw*.5;b.y+=dh*.5;b.w-=dw;b.h-=dh;
@@ -1004,17 +1032,31 @@ function initTopology() {
   }
   billboards.forEach((b,i)=>b.color=['#d39b4e','#bd754d','#b6a880'][i%3]);
   roadEnds.push(...roadTerminals(roads,bridges,isPositionOnIslandLand));
-  for(const island of [...islands,...islets])for(let n=0;n<(island.natural?7:10);n++){
+  for(const island of [...islands,...islets])for(let n=0;n<(island.natural?7:districtProfiles[island.id].trees);n++){
     const x=island.natural?island.x+island.w*(.25+(n%3)*.22):island.x+island.w-150-(n%3)*28;
-    const y=island.natural?island.y+island.h*(.25+Math.floor(n/3)*.21):island.y+360+n*160;
+    const y=island.natural?island.y+island.h*(.25+Math.floor(n/3)*.21):island.y+240+Math.floor(n/3)*180;
     if(!isPositionOnIslandLand(x,y)||buildings.some(b=>x>b.x-35&&x<b.x+b.w+35&&y>b.y-35&&y<b.y+b.h+35))continue;
     if([[0,0],[38,0],[-38,0],[0,38],[0,-38]].some(([dx,dy])=>onRoadSurface(x+dx,y+dy,roads,bridges,scenicRoads,roadEnds)))continue;
     trees.push({x,y,size:17+n%4*3,shore:true});
   }
+  buildServiceAccess();
   walkingRoutes=createWalkingRoutes(roads,parkZones,(x,y)=>!isPedestrianSceneryBlocked(x,y)&&
     !onRoadSurface(x,y,roads,bridges,[],roadEnds)&&!parkedCars.some(c=>pedestrianCarBlocked(x,y,c)));
+  for(const route of walkingRoutes){const point=route.points[Math.floor(route.points.length/2)];route.districtId=districtAt(point.x,point.y)?.id;}
+  for(const p of pedestrians){
+    const district=districtAt(p.x,p.y)||islands.reduce((best,i)=>Math.hypot(p.x-i.x-i.w/2,p.y-i.y-i.h/2)<Math.hypot(p.x-best.x-best.w/2,p.y-best.y-best.h/2)?i:best,islands[0]);
+    p.districtId=district.id;
+  }
+  for(const district of islands){
+    const count=pedestrians.filter(p=>p.districtId===district.id).length;
+    for(let n=count;n<districtProfiles[district.id].population;n++){
+      const style=pedStyles[(pedestrians.length+n)%pedStyles.length];
+      pedestrians.push({...style,districtId:district.id,x:district.x+district.w/2,y:district.y+1000,
+        visualScale:.85+(n%4)*.035,walkPhase:0,fleeTimer:0});
+    }
+  }
   assignWalkingRoutes(pedestrians,walkingRoutes);
-  roadGraph=createRoadGraph(roads,bridges);
+  roadGraph=createRoadGraph(roads,bridges,serviceBases.map(base=>base.origin));
   cityIncidentDirector=createCityIncidentDirector({nodes:roadGraph});
   incidentNoticeId=0;
   const busLines=[
@@ -1102,6 +1144,7 @@ function isPedestrianBlocked(x,y){
   return parkedCars.some(c=>pedestrianCarBlocked(x,y,c)) ||
     (roam?.fleet||[]).some(c=>c.kind!=='water'&&pedestrianCarBlocked(x,y,c)) ||
     trafficCars.some(c=>pedestrianCarBlocked(x,y,c)) || policeCars.some(c=>pedestrianCarBlocked(x,y,c)) ||
+    incidentPoliceCars.some(c=>pedestrianCarBlocked(x,y,c)) || incidentResponseVehicles.some(c=>pedestrianCarBlocked(x,y,c)) ||
     (roam?.mode!=='foot'&&!(roam?.altitude>12)&&pedestrianCarBlocked(x,y,player));
 }
 
@@ -1113,7 +1156,10 @@ function movePedestrian(p,dx,dy){
     if(distance<.001)continue;
     const steps=Math.ceil(distance/2);
     let clear=true;
-    for(let i=1;i<=steps;i++)if(isPedestrianBlocked(p.x+mx*i/steps,p.y+my*i/steps)){clear=false;break;}
+    for(let i=1;i<=steps;i++){
+      const x=p.x+mx*i/steps,y=p.y+my*i/steps;
+      if(isPedestrianBlocked(x,y)||(p.route&&onRoadSurface(x,y,roads,bridges,[],roadEnds))){clear=false;break;}
+    }
     if(!clear)continue;
     p.x+=mx;p.y+=my;
     p.heading=Math.atan2(my,mx);
@@ -1126,11 +1172,16 @@ function movePedestrian(p,dx,dy){
 
 function updatePedestrians(dt){
   const frame=Math.min(dt,.05)*60;
-  const cars=[...trafficCars,...policeCars,...incidentPoliceCars,...(roam?.mode!=='foot'&&!(roam?.altitude>12)?[player]:[])];
+  const cars=[...trafficCars,...policeCars,...incidentPoliceCars,...incidentResponseVehicles,...(roam?.mode!=='foot'&&!(roam?.altitude>12)?[player]:[])];
   pedestrians.forEach((p,index)=>{
     if(p.homeY===undefined){p.homeY=p.y;p.homeX=p.x;p.pause=index%7*.18;p.trip=0;}
     p.movedDistance=0;
     p.pause=Math.max(0,p.pause-dt);
+    if(p.reaction==='calm'&&!p.pause){
+      p.activityTimer=(p.activityTimer??(5+index%11))-dt;
+      if(p.activityTimer<=0){p.pause=1.4+(index%4)*.35;p.activity=index%3===0?'checkingPhone':p.route?.kind==='park'?'resting':'looking';p.activityTimer=9+index%13;}
+      else p.activity=null;
+    }else if(p.reaction!=='calm')p.activity=null;
     // React to the approach of traffic, rather than shoving a person on contact.
     const threat=cars.find(c=>Math.abs(c.speed||0)>1.5&&Math.hypot(c.x-p.x,c.y-p.y)<90&&
       Math.abs(-(p.x-c.x)*Math.sin(c.angle)+(p.y-c.y)*Math.cos(c.angle))<(c.height||24)/2+15&&
@@ -1169,11 +1220,17 @@ function updatePedestrians(dt){
         if(neighbor){const d=Math.hypot(p.x-neighbor.x,p.y-neighbor.y)||1;dx+=(p.x-neighbor.x)/d*.3*frame;dy+=(p.y-neighbor.y)/d*.3*frame;}
       }
     }
-    if((dx||dy)&&!movePedestrian(p,dx,dy)){p.pause=.5;}
+    if((dx||dy)&&!movePedestrian(p,dx,dy)){
+      p.pause=.5;p.blockedTimer=(p.blockedTimer||0)+.5;
+      if(p.route&&p.blockedTimer>1.5){
+        const nearest=p.route.points.reduce((best,point,i)=>Math.hypot(point.x-p.x,point.y-p.y)<Math.hypot(p.route.points[best].x-p.x,p.route.points[best].y-p.y)?i:best,0);
+        p.routeIndex=nearest;p.goal=p.route.points[nearest];p.blockedTimer=0;
+      }
+    }else if(p.movedDistance>0)p.blockedTimer=0;
     if(p.reaction==='curious'&&p.lookAt)p.heading=Math.atan2(p.lookAt.y-p.y,p.lookAt.x-p.x);
     p.gait=Math.min(1,p.movedDistance/Math.max(.01,frame*.42));
     if(p.gait===0)p.walkPhase=0;
-    if(roam?.mode!=='foot'&&Math.abs(player.speed)>2&&pedestrianCarBlocked(p.x,p.y,player)&&!p.hitCooldown){
+    if(roam?.mode!=='foot'&&!(roam?.altitude>12)&&Math.abs(player.speed)>2&&pedestrianCarBlocked(p.x,p.y,player)&&!p.hitCooldown){
       if(state.wanted<3)raiseWantedFromCrime(3,1.25);
       showToast('🚨 НАЕЗД НА ПЕШЕХОДА!');p.hitCooldown=2;
     }
@@ -1181,30 +1238,75 @@ function updatePedestrians(dt){
   });
 }
 
+function buildServiceAccess(){
+  for(const building of buildings){
+    const kind=/police\s+(precinct|station)/i.test(building.sign||'')?'police':building.civicType;
+    if(!['police','hospital','firestation','guardBase'].includes(kind)||!building.serviceParcel)continue;
+    const parcel=building.serviceParcel;
+    let choice;
+    for(const ratio of [.84,.88,.80]){
+      const origin={x:parcel.x+parcel.w*.82,y:parcel.y+parcel.h*ratio};
+      const candidates=roads.filter(r=>!r.serviceAccess&&!r.bridgeApproach&&r.dir==='v'&&origin.y>=r.y+48&&origin.y<=r.y+r.h-48)
+        .map(r=>({x:r.x+r.w/2,y:origin.y})).filter(p=>p.x>origin.x&&p.x-origin.x<650)
+        .sort((a,b)=>a.x-b.x);
+      for(const entry of candidates){
+        const driveway={x:origin.x-48,y:origin.y-48,w:entry.x-origin.x+96,h:96,dir:'h',serviceAccess:true,name:building.sign};
+        let clear=true;
+        for(let x=driveway.x;x<=driveway.x+driveway.w&&clear;x+=8)for(const y of [driveway.y,origin.y,driveway.y+96]){
+          if(isPedestrianSceneryBlocked(x,y)){clear=false;break;}
+        }
+        if(!clear||parkedCars.some(c=>c.x>=driveway.x-35&&c.x<=driveway.x+driveway.w+35&&Math.abs(c.y-origin.y)<65))continue;
+        choice={building,kind,origin,entry,driveway};break;
+      }
+      if(choice)break;
+    }
+    if(choice){serviceBases.push(choice);roads.push(choice.driveway);}
+  }
+}
+
+function advanceServiceRoute(unit,dt){
+  const frame=Math.min(Math.max(Number(dt)||0,0),.05)*60;
+  if(!frame||!unit.route?.length)return;
+  while(unit.route.length>1&&Math.hypot(unit.route[0].x-unit.x,unit.route[0].y-unit.y)<12)unit.route.shift();
+  const target=unit.route[0],distance=Math.hypot(target.x-unit.x,target.y-unit.y);
+  const wanted=Math.atan2(target.y-unit.y,target.x-unit.x);
+  const diff=Math.atan2(Math.sin(wanted-unit.angle),Math.cos(wanted-unit.angle));
+  const old={x:unit.x,y:unit.y,angle:unit.angle};
+  unit.angle+=Math.sign(diff)*Math.min(Math.abs(diff),.105*frame);
+  const desired=Math.abs(diff)>.55?0:unit.maxSpeed*Math.min(1,distance/50);
+  unit.speed+=(desired-unit.speed)*(1-Math.pow(1-(unit.model==='fireEngine'?.075:.12),frame));
+  const step=Math.min(distance,Math.max(0,unit.speed)*frame);
+  unit.x+=Math.cos(unit.angle)*step;unit.y+=Math.sin(unit.angle)*step;
+  if(!policeFootprintOnRoad(unit)){
+    unit.x=old.x;unit.y=old.y;unit.speed=0;
+    if(!policeFootprintOnRoad(unit))unit.angle=old.angle;
+  }
+}
+
 function dispatchIncidentPolice(incident){
   if(!incident||incident.policeDispatched||!roadGraph.length)return false;
   const target=roadGraph.reduce((best,node)=>Math.hypot(node.x-incident.x,node.y-incident.y)<Math.hypot(best.x-incident.x,best.y-incident.y)?node:best,roadGraph[0]);
-  const candidates=roadGraph.map(node=>({node,distance:Math.hypot(node.x-target.x,node.y-target.y)}))
-    .filter(entry=>entry.distance>340&&entry.distance<1150)
-    .filter(entry=>!roadEnds.some(end=>Math.hypot(end.x-entry.node.x,end.y-entry.node.y)<end.radius+42))
+  const candidates=serviceBases.filter(base=>base.kind==='police').map(base=>({base,node:base.origin,distance:Math.hypot(base.origin.x-target.x,base.origin.y-target.y)}))
     .sort((a,b)=>a.distance-b.distance);
   if(!candidates.length)return false;
-  const supportedCandidates=candidates.flatMap(({node})=>{
+  const supportedCandidates=candidates.flatMap(({node,base})=>{
     const route=roadPath(roadGraph,node,target);
     if(route.length<2)return [];
     const angle=Math.atan2(route[1].y-route[0].y,route[1].x-route[0].x),cs=Math.cos(angle),sn=Math.sin(angle);
     const supported=[[24,12],[24,-12],[-24,12],[-24,-12]].every(([x,y])=>
       onRoadSurface(node.x+x*cs-y*sn,node.y+x*sn+y*cs,roads,bridges,scenicRoads,roadEnds));
-    return supported?[{node,route}]:[];
+    return supported?[{node,route,base}]:[];
   });
   if(!supportedCandidates.length)return false;
-  const {node:start,route}=supportedCandidates[Math.floor(Math.random()*Math.min(6,supportedCandidates.length))];
+  const {node:start,route,base}=supportedCandidates[0];
   incidentPoliceCars.push({
     x:start.x,y:start.y,angle:Math.atan2(route[1].y-route[0].y,route[1].x-route[0].x),
-    speed:0,maxSpeed:5.6,route,routeTimer:1,responseTarget:{x:target.x,y:target.y},
+    speed:0,maxSpeed:5.6,width:48,height:24,model:'police',route:route.slice(1),routeTimer:1,responseTarget:{x:target.x,y:target.y},
+    baseTarget:{...base.origin},responseBase:base.building.sign,status:'enroute',
     responseIncidentId:incident.id,strobePhase:0,arrived:false,arrivalTimer:0
   });
   incident.policeDispatched=true;
+  incident.timer=Math.max(incident.timer,responseRouteLength(route)/(5.6*60)*1.65+12);
   return true;
 }
 
@@ -1215,31 +1317,16 @@ function updateIncidentPolice(dt){
     unit.strobePhase=(unit.strobePhase||0)+dt*12;
     if(unit.arrived){
       unit.arrivalTimer-=dt;
-      if(unit.arrivalTimer<=0)incidentPoliceCars.splice(i,1);
+      if(unit.arrivalTimer<=0){unit.arrived=false;beginIncidentResponseReturn(unit);}
       continue;
     }
-    unit.routeTimer=(unit.routeTimer||0)-dt;
-    if(unit.routeTimer<=0||!unit.route?.length){
-      unit.route=roadPath(roadGraph,unit,unit.responseTarget);
-      unit.routeTimer=1.2;
-    }
-    while(unit.route.length>1&&Math.hypot(unit.route[0].x-unit.x,unit.route[0].y-unit.y)<34)unit.route.shift();
-    const target=unit.route[0]||unit.responseTarget;
-    const distance=Math.hypot(target.x-unit.x,target.y-unit.y);
     const responseDistance=Math.hypot(unit.responseTarget.x-unit.x,unit.responseTarget.y-unit.y);
-    if(responseDistance<34){unit.arrived=true;unit.arrivalTimer=8;unit.speed=0;continue;}
-    const wanted=Math.atan2(target.y-unit.y,target.x-unit.x);
-    const diff=Math.atan2(Math.sin(wanted-unit.angle),Math.cos(wanted-unit.angle));
-    unit.angle+=Math.sign(diff)*Math.min(Math.abs(diff),.105*frame);
-    const desired=Math.abs(diff)>.4?1.8:unit.maxSpeed;
-    unit.speed+=(desired-unit.speed)*Math.min(1,.12*frame);
-    const oldX=unit.x,oldY=unit.y;
-    unit.x+=Math.cos(unit.angle)*unit.speed*frame;
-    unit.y+=Math.sin(unit.angle)*unit.speed*frame;
-    const cs=Math.cos(unit.angle),sn=Math.sin(unit.angle);
-    const supported=[[24,12],[24,-12],[-24,12],[-24,-12]].every(([x,y])=>
-      onRoadSurface(unit.x+x*cs-y*sn,unit.y+x*sn+y*cs,roads,bridges,scenicRoads,roadEnds));
-    if(!supported){unit.x=oldX;unit.y=oldY;unit.speed=0;unit.routeTimer=0;}
+    if(responseDistance<18){
+      if(unit.status==='returning'){unit.returnedToBase=true;incidentPoliceCars.splice(i,1);continue;}
+      unit.arrived=true;unit.status='onscene';unit.arrivalTimer=8;unit.speed=0;continue;
+    }
+    if(!unit.route?.length)unit.route=roadPath(roadGraph,unit,unit.responseTarget);
+    advanceServiceRoute(unit,dt);
   }
 }
 
@@ -1263,8 +1350,8 @@ function dispatchIncidentResponse(incident){
   const dispatchedServices=[];
   for(const serviceType of services){
     const civicType=serviceType==='fireEngine'?'firestation':'hospital';
-    const bases=buildings.filter(building=>building.civicType===civicType)
-      .map(building=>({x:building.x+building.w*.5,y:building.y+building.h*.5,building}))
+    const bases=serviceBases.filter(base=>base.kind===civicType)
+      .map(base=>({...base.origin,building:base.building}))
       .sort((a,b)=>Math.hypot(a.x-incident.x,a.y-incident.y)-Math.hypot(b.x-incident.x,b.y-incident.y));
     const candidates=[];
     for(const base of bases.slice(0,5)){
@@ -1283,10 +1370,13 @@ function dispatchIncidentResponse(incident){
       speed:0,maxSpeed:fireEngine?4.35:5.9,width:fireEngine?72:54,height:fireEngine?34:27,
       mass:fireEngine?8400:3300,model:serviceType,color:fireEngine?'#bd3e30':'#dedbd1',
       route:choice.route.slice(1),routeTimer:0,responseTarget:{x:target.x,y:target.y},
-      baseTarget:{x:choice.start.x,y:choice.start.y},responseIncidentId:incident.id,
+      baseTarget:{x:choice.start.x,y:choice.start.y},responseBase:choice.base.building.sign,responseIncidentId:incident.id,
       status:'enroute',sceneTimer:fireEngine?4.8:4.1,strobePhase:Math.random()*Math.PI*2
     });
     dispatchedServices.push(serviceType);
+    // A scene must remain present long enough for responders to reach it.
+    const arrivalSeconds=choice.distance/((fireEngine?4.35:5.9)*60)*1.65+14;
+    incident.timer=Math.max(incident.timer,arrivalSeconds);
   }
   if(dispatchedServices.length){incident.responseDispatched=true;incident.respondingServices=dispatchedServices;}
   return dispatchedServices.length;
@@ -1332,28 +1422,15 @@ function updateIncidentResponse(dt){
     if(unit.removeAfterScene){incidentResponseVehicles.splice(i,1);continue;}
     if(!unit.route?.length)unit.route=roadPath(roadGraph,unit,unit.responseTarget).slice(1);
     if(!unit.route.length){incidentResponseVehicles.splice(i,1);continue;}
-    while(unit.route.length>1&&Math.hypot(unit.route[0].x-unit.x,unit.route[0].y-unit.y)<30)unit.route.shift();
-    const target=unit.route[0]||unit.responseTarget;
-    const distance=Math.hypot(target.x-unit.x,target.y-unit.y);
     const responseDistance=Math.hypot(unit.responseTarget.x-unit.x,unit.responseTarget.y-unit.y);
-    if(responseDistance<32){
+    if(responseDistance<18){
       if(unit.status==='returning'){unit.returnedToBase=true;incidentResponseVehicles.splice(i,1);continue;}
       unit.status='onscene';unit.sceneTimer=unit.model==='fireEngine'?4.8:4.1;unit.speed=0;
       if(incident&&unit.model==='fireEngine')incident.fireResponse='onScene';
       if(incident&&unit.model==='ambulance')incident.medicalResponse='onScene';
       continue;
     }
-    const desiredAngle=Math.atan2(target.y-unit.y,target.x-unit.x);
-    const diff=Math.atan2(Math.sin(desiredAngle-unit.angle),Math.cos(desiredAngle-unit.angle));
-    unit.angle+=Math.sign(diff)*Math.min(Math.abs(diff),.105*frame);
-    const desired=Math.abs(diff)>.42?unit.maxSpeed*.48:unit.maxSpeed;
-    unit.speed+=(desired-unit.speed)*Math.min(1,(unit.model==='fireEngine'?.075:.12)*frame);
-    const oldX=unit.x,oldY=unit.y;
-    unit.x+=Math.cos(unit.angle)*unit.speed*frame;
-    unit.y+=Math.sin(unit.angle)*unit.speed*frame;
-    if(!onRoadSurface(unit.x,unit.y,roads,bridges,scenicRoads,roadEnds)){
-      unit.x=oldX;unit.y=oldY;unit.speed=0;unit.routeTimer=0;
-    }
+    advanceServiceRoute(unit,dt);
   }
 }
 
@@ -1568,9 +1645,15 @@ function updatePhysics(dt) {
     const cross = axis === 'x' ? 'y' : 'x';
     const direction = Math.sign(c.cruiseSpeed);
     const forwardGap = Math.max(72, (c.width || 46) + 34);
-    const occupied = [...((roam?.altitude||0)<12?[player]:[]), ...trafficCars, ...parkedCars,...(roam?.fleet||[]).filter(v=>v.kind!=='water')].some(other => other !== c &&
-      Math.abs(other[cross] - c[cross]) < ((c.height||24)+(other.height||24))/2+12 &&
-      (other[axis] - c[axis]) * direction > 0 && (other[axis] - c[axis]) * direction < forwardGap);
+    const cs=Math.cos(c.angle),sn=Math.sin(c.angle);
+    const ahead=(other,gap,margin)=>{
+      const dx=other.x-c.x,dy=other.y-c.y,along=dx*cs+dy*sn;
+      return along>0&&along<gap&&Math.abs(-dx*sn+dy*cs)<margin;
+    };
+    const occupied = [...(roam?.mode!=='foot'&&(roam?.altitude||0)<12?[player]:[]), ...trafficCars, ...parkedCars,
+      ...policeCars,...incidentPoliceCars,...incidentResponseVehicles,...(roam?.fleet||[]).filter(v=>v.kind!=='water')]
+      .some(other=>other!==c&&ahead(other,forwardGap,((c.height||24)+(other.height||24))/2+12))||
+      [...pedestrians,...(roam?.mode==='foot'?[player]:[])].some(person=>ahead(person,70,(c.height||24)/2+7));
     // Alternating six-second phases give the visible junctions coherent flow.
     const phase = Math.floor(performance.now() / 6000) % 2;
     const redForAxis = (axis === 'x' ? 0 : 1) !== phase;
@@ -1583,7 +1666,9 @@ function updatePhysics(dt) {
     c.collisionHold=Math.max(0,(c.collisionHold||0)-dt);
     const obstacle = occupied || approachingRed || c.collisionHold>0;
     if(c.routeManaged){
-      advanceRouteActor(c,c.route,dt,{speed:obstacle?0:c.cruiseSpeed,dwell:2.1,stopRadius:26});
+      const pose={x:c.x,y:c.y,angle:c.angle};
+      advanceRouteActor(c,c.route,dt,{speed:obstacle?0:c.cruiseSpeed,dwell:2.1,stopRadius:12});
+      if(!policeFootprintOnRoad(c)){Object.assign(c,pose);c.speed=0;}
       return;
     }
     c.speed += ((obstacle ? 0 : c.cruiseSpeed) - c.speed) * Math.min(1, dt * (obstacle ? 9 : 3.5));
@@ -1629,6 +1714,8 @@ function updatePhysics(dt) {
   const stuntVehicles=[...trafficCars,...policeCars,...incidentPoliceCars,...incidentResponseVehicles];
   stuntVehicles.forEach(vehicle=>updateStuntVehicle(vehicle,dt));
   const vehicles = [...(!roam?.special&&stuntHeightFor(player)<16 ? [player] : []), ...trafficCars, ...policeCars, ...incidentPoliceCars,...incidentResponseVehicles];
+  const responsePoses=new Map([...policeCars,...incidentPoliceCars,...incidentResponseVehicles].filter(policeFootprintOnRoad)
+    .map(unit=>[unit,{x:unit.x,y:unit.y,angle:unit.angle}]));
   // Repeated projection handles simultaneous wall/car contacts at intersections.
   for (let pass = 0; pass < 3; pass++) {
     for (let i = 0; i < vehicles.length; i++) {
@@ -1645,6 +1732,7 @@ function updatePhysics(dt) {
       if(stuntHeightFor(vehicles[i])<16)resolveScenery(vehicles[i], buildings, trees, solidProps);
     }
   }
+  for(const [unit,pose] of responsePoses)if(!policeFootprintOnRoad(unit)){Object.assign(unit,pose);unit.speed=0;}
   roam?.contacts();
 
   if(player.hp<=0)respawnPlayer('тяжёлая авария');
@@ -2047,6 +2135,8 @@ function policeFootprintOnRoad(unit) {
 }
 
 function updatePoliceAI(dt) {
+  const frame=Math.min(Math.max(Number(dt)||0,0),.05)*60;
+  if(!frame)return;
   state.wantedCooldown=Math.max(0,(state.wantedCooldown||0)-Math.max(0,dt));
   const evadeCard = document.getElementById('evadeStatusCard');
   const wantedPill = document.getElementById('wantedBadge');
@@ -2064,7 +2154,7 @@ function updatePoliceAI(dt) {
   let anyCopSees = false;
   for (let i = policeCars.length - 1; i >= 0; i--) {
     const cop = policeCars[i];
-    cop.strobePhase += 0.3;
+    cop.strobePhase += .3*frame;
     cop.contactCooldown=Math.max(0,(cop.contactCooldown||0)-Math.max(0,dt));
     if (!isPositionOnSolidGround(cop.x, cop.y)) {
       policeCars.splice(i, 1);
@@ -2084,13 +2174,14 @@ function updatePoliceAI(dt) {
     let diff = targetAng - cop.angle;
     while (diff < -Math.PI) diff += Math.PI * 2;
     while (diff > Math.PI) diff -= Math.PI * 2;
-    cop.angle += Math.sign(diff)*Math.min(Math.abs(diff),cop.turnRate||.085);
+    const oldAngle=cop.angle;
+    cop.angle += Math.sign(diff)*Math.min(Math.abs(diff),(cop.turnRate||.085)*frame);
     const maxSpeed=cop.maxSpeed||4.3;
     const desired=Math.abs(diff)>.45?maxSpeed*.4:maxSpeed;
-    cop.speed+=(desired-cop.speed)*(cop.acceleration||.08);
+    cop.speed+=(desired-cop.speed)*(1-Math.pow(1-(cop.acceleration||.08),frame));
     const ox=cop.x,oy=cop.y;
-    cop.x+=Math.cos(cop.angle)*cop.speed;cop.y+=Math.sin(cop.angle)*cop.speed;
-    if(!policeFootprintOnRoad(cop)){cop.x=ox;cop.y=oy;cop.speed=0;cop.routeTimer=0;}
+    cop.x+=Math.cos(cop.angle)*cop.speed*frame;cop.y+=Math.sin(cop.angle)*cop.speed*frame;
+    if(!policeFootprintOnRoad(cop)){cop.x=ox;cop.y=oy;cop.speed=0;cop.routeTimer=0;if(!policeFootprintOnRoad(cop))cop.angle=oldAngle;}
 
     const distance=Math.hypot(player.x-cop.x,player.y-cop.y);
     if(distance<450){
@@ -2197,7 +2288,7 @@ function renderWorld() {
     ctx.strokeStyle='rgba(20,56,61,.96)';ctx.lineWidth=330*coastalScale;ctx.stroke();
     ctx.strokeStyle='rgba(64,104,96,.98)';ctx.lineWidth=255*coastalScale;ctx.stroke();
     ctx.strokeStyle='rgba(174,151,103,.98)';ctx.lineWidth=188*coastalScale;ctx.stroke();
-    ctx.fillStyle = '#202721';ctx.fill();
+    ctx.fillStyle = districtProfiles[isl.id]?.land||'#202721';ctx.fill();
     ctx.strokeStyle = '#686556';ctx.lineWidth = 7;ctx.stroke();
     ctx.setLineDash([38*coastalScale,29*coastalScale]);
     ctx.strokeStyle='rgba(213,222,197,.68)';ctx.lineWidth=3.5*coastalScale;ctx.stroke();ctx.setLineDash([]);
@@ -2228,7 +2319,7 @@ function renderWorld() {
     ctx.fillStyle='#373b3b';ctx.fillRect(runway.x,runway.y,runway.w,runway.h);
     ctx.strokeStyle='#c8c5ae';ctx.lineWidth=3;ctx.setLineDash([30,25]);ctx.beginPath();ctx.moveTo(runway.x+20,runway.y+runway.h/2);ctx.lineTo(runway.x+runway.w-20,runway.y+runway.h/2);ctx.stroke();ctx.setLineDash([]);
   }
-  for(const [x,y] of [[1040,2070],[6550,2070],[6550,8070]]){ctx.strokeStyle='#d3c58e';ctx.lineWidth=4;ctx.beginPath();ctx.arc(x,y,55,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#d3c58e';ctx.font='bold 42px sans-serif';ctx.textAlign='center';ctx.fillText('H',x,y+15);}
+  for(const [x,y] of [[1040,2070],[6550,2070],[6500,8080],[8188.4,7629.2]]){ctx.strokeStyle='#d3c58e';ctx.lineWidth=4;ctx.beginPath();ctx.arc(x,y,55,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#d3c58e';ctx.font='bold 42px sans-serif';ctx.textAlign='center';ctx.fillText('H',x,y+15);}
 
   // Watercraft are below bridge decks in the scene graph. They remain visible
   // in open water and are naturally occluded while passing underneath.
@@ -2461,6 +2552,10 @@ function drawScreenPedestrian(ped,sx,sy,index,zoom=1){
     ctx.fillStyle='rgba(206,180,125,.65)';ctx.fillRect(-shoulder-2,-18,1,5);
   }
   const arm=side=>{
+    if(ped.activity==='checkingPhone'&&side===(fx>0?1:-1)){
+      limb([[side*shoulder,-21],[side*(shoulder+1),-16],[side*2,-20]],shirt,2.3);
+      ctx.fillStyle=skin;ctx.fillRect(side*2-1,-21,2,2);ctx.fillStyle='#161b1d';ctx.fillRect(side*2-1,-23,2.4,3);return;
+    }
     if(ped.stance==='handsUp'||ped.stance==='fighting'){
       const raised=ped.stance==='handsUp'||side===(fx>0?1:-1);
       const elbowY=raised?-27:-24,handY=raised?-31:-23;
@@ -2872,7 +2967,7 @@ function renderFullMap() {
   fullMapCtx.fillRect(0, 0, mw, mh);
 
   [...islands,...islets].forEach(isl => {
-    fullMapCtx.fillStyle = '#1e2430';
+    fullMapCtx.fillStyle = districtProfiles[isl.id]?.land||'#1e2430';
     coastPath(fullMapCtx,isl,scale,mapX,mapY);fullMapCtx.fill();
     fullMapCtx.strokeStyle = '#334155';
     fullMapCtx.stroke();
@@ -2888,6 +2983,18 @@ function renderFullMap() {
   roads.forEach(r => {
     fullMapCtx.fillRect(mapX + r.x * scale, mapY + r.y * scale, r.w * scale, r.h * scale);
   });
+
+  fullMapCtx.textAlign='center';fullMapCtx.font='bold 9px sans-serif';
+  for(const island of islands){
+    const x=mapX+(island.x+island.w/2)*scale,y=mapY+(island.y+island.h*.93)*scale;
+    fullMapCtx.fillStyle='rgba(6,9,14,.82)';fullMapCtx.fillRect(x-66,y-10,132,15);
+    fullMapCtx.fillStyle='#d3c6a7';fullMapCtx.fillText(island.name.toUpperCase(),x,y);
+  }
+  for(const base of serviceBases){
+    const x=mapX+base.origin.x*scale,y=mapY+base.origin.y*scale;
+    fullMapCtx.fillStyle=base.kind==='hospital'?'#d7ded2':base.kind==='firestation'?'#ce6950':base.kind==='police'?'#88aabb':'#a2aa7b';
+    fullMapCtx.fillRect(x-3,y-3,6,6);fullMapCtx.strokeStyle='#11171b';fullMapCtx.lineWidth=1;fullMapCtx.strokeRect(x-3,y-3,6,6);
+  }
 
   CARPARTS.forEach(p => {
     if (!p.found) {
@@ -3139,7 +3246,8 @@ function toggleGarage() {
 
 function boot() {
   initTopology();
-  roam = createFreeRoam(player, parkedCars, buildings, trees, isPositionOnSolidGround, showToast, solidProps, isPositionOnWaterObstacle);
+  roam = createFreeRoam(player, parkedCars, buildings, trees, isPositionOnSolidGround, showToast, solidProps, isPositionOnWaterObstacle,
+    ()=>[...trafficCars,...policeCars,...incidentPoliceCars,...incidentResponseVehicles]);
   const roamControls = document.createElement('div');
   roamControls.className = 'roam-controls';
   const enterButton = document.createElement('button');enterButton.id='btnRoamEnter';enterButton.textContent = 'Выйти / сесть · E';enterButton.addEventListener('click',()=>roam.interact());
@@ -3148,6 +3256,28 @@ function boot() {
   loadProgress();
   setupInputListeners();
   driveLab = createDriveLab({ player, state, canvas, roads, buildings, trafficCars, policeCars, routeInput, roam });
+  // Deterministic survey positions are available only on a local QA preview.
+  // The published game never exposes this control surface.
+  if(['127.0.0.1','localhost'].includes(window.location?.hostname)&&window.location.search.includes('cityQA=1')){
+    window.__lowtownCityQA={
+      districts:()=>islands.map(i=>({id:i.id,name:i.name,x:i.x,y:i.y,w:i.w,h:i.h})),
+      viewDistrict(id){
+        const island=islands.find(i=>i.id===id);
+        if(!island||roam.profile.kind!=='air'||roam.altitude<180)throw new Error('Survey requires an airborne aircraft');
+        Object.assign(player,{x:island.x+island.w/2,y:island.y+island.h/2,speed:0,vx:0,vy:0});
+        Object.keys(state.keys).forEach(key=>state.keys[key]=false);
+        state.wanted=0;renderWorld();return {id,altitude:roam.altitude,mode:roam.mode};
+      },
+      snapshot:()=>({
+        districts:islands.map(i=>({id:i.id,people:pedestrians.filter(p=>p.districtId===i.id).length,
+          buildings:buildings.filter(b=>b.districtId===i.id).length,profile:districtProfiles[i.id]})),
+        serviceBases:serviceBases.map(b=>({sign:b.building.sign,kind:b.kind,origin:b.origin,entry:b.entry})),
+        people:pedestrians.length,traffic:trafficCars.length,
+        badPeople:pedestrians.filter(p=>isPedestrianSceneryBlocked(p.x,p.y)).length,
+        trafficOffRoad:trafficCars.filter(c=>!onRoadSurface(c.x,c.y,roads,bridges,scenicRoads,roadEnds)).length
+      })
+    };
+  }
   state.lastFrameTime = performance.now();
   requestAnimationFrame(gameLoop);
 }

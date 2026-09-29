@@ -33,6 +33,7 @@
     "test:live-city": "node tests/live-traffic-regression.mjs",
     "test:city-render": "node tests/free-roam-render-smoke.mjs",
     "test:aerial-visual": "node tests/aerial-city-visual-smoke.mjs",
+    "test:living-city": "node tests/living-city-regression.mjs",
     "test:surface": "node tests/surface-physics-smoke.mjs",
     "test:mobility-routes": "node tests/mobility-routes-smoke.mjs",
     "test:city-incidents": "node tests/city-incidents-smoke.mjs",
