@@ -1,3 +1,4 @@
+import * as streetNetwork from '../src/game/street_network.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
@@ -6,11 +7,12 @@ import * as contacts from '../src/game/solid_contacts.js';
 import * as coast from '../src/game/coastline.js';
 import * as roamModule from '../src/game/free_roam.js';
 import * as architecture from '../src/game/architecture.js';
+import * as trafficTurns from '../src/game/traffic_turns.js';
 let depth=0,draws=0;
 const noop=()=>{};
 const context=new Proxy({save(){depth++;},restore(){depth--;assert(depth>=0);},createRadialGradient(){return {addColorStop:noop};},createLinearGradient(){return {addColorStop:noop};}}, {get(target,key){return key in target?target[key]:(...args)=>{for(const arg of args)if(typeof arg==='number')assert(Number.isFinite(arg),`Non-finite ${key}`);draws++;};},set(target,key,value){target[key]=value;return true;}});
 const element=()=>({width:900,height:700,style:{},classList:{add:noop,remove:noop},appendChild:noop,append:noop,addEventListener:noop,getContext:()=>context,remove:noop});
-const sandbox={console,Math,performance:{now:()=>100},document:{readyState:'loading',getElementById:element,createElement:element,querySelectorAll:()=>[],addEventListener:noop},window:{innerWidth:1100,innerHeight:800,addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,...core,...contacts,...coast,...roamModule,...architecture};
+const sandbox={...streetNetwork,console,Math,performance:{now:()=>100},document:{readyState:'loading',getElementById:element,createElement:element,querySelectorAll:()=>[],addEventListener:noop},window:{innerWidth:1100,innerHeight:800,addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,...core,...contacts,...coast,...roamModule,...architecture,...trafficTurns};
 vm.createContext(sandbox);
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
 vm.runInContext(source+`\ninitTopology();roam=createFreeRoam(player,parkedCars,buildings,trees,isPositionOnSolidGround);

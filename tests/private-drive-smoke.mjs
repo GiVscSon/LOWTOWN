@@ -1,8 +1,9 @@
+import * as streetNetwork from '../src/game/street_network.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { resolveContact, resolveScenery } from '../src/game/solid_contacts.js';
-import { pointInCoast } from '../src/game/coastline.js';
+import { coastPoints, pointInCoast } from '../src/game/coastline.js';
 import { velocityForHeading, projectIso, routeInput } from '../src/game/test_drive_core.js';
 
 for(let angle=-Math.PI;angle<Math.PI;angle+=0.1){
@@ -17,9 +18,9 @@ assert.equal(routeInput({x:0,y:0,angle:0,speed:1},{x:0,y:-100}).left,true);
 // Run the CURRENT game physics, not the legacy disconnected modules.
 const noop=()=>{};
 const element={style:{},classList:{add:noop,remove:noop},appendChild:noop,addEventListener:noop,getContext:()=>({}),remove:noop};
-const sandbox={console,Math,performance:{now:()=>0},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,velocityForHeading,projectIso,routeInput};
+const sandbox={...streetNetwork,console,Math,performance:{now:()=>0},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,velocityForHeading,projectIso,routeInput};
 vm.createContext(sandbox);
-Object.assign(sandbox, { resolveContact, resolveScenery, pointInCoast });
+Object.assign(sandbox, { resolveContact, resolveScenery, coastPoints, pointInCoast });
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
 vm.runInContext(source+`\ninitTopology(); trafficCars.length=0; pedestrians.length=0;
 Object.assign(player,{x:1265,y:1200,angle:0,speed:0,vx:0,vy:0});
@@ -37,11 +38,13 @@ while(point<points.length&&ticks<6000){
  if(buildings.some(b=>player.x>b.x-15&&player.x<b.x+b.w+15&&player.y>b.y-15&&player.y<b.y+b.h+15))hits++;
  ticks++;
 }
-this.result={segments:point,seconds:ticks/60,maxSlip,hits,drowned:state.isDrowning,world:{islands:islands.length,bridges:bridges.length,roads:roads.length,buildings:buildings.length,traffic:trafficCars.length,pedestrians:pedestrians.length,verticalRails:bridgeRails.filter(r=>r.axis==='x').length,streetLights:streetLights.length,trees:trees.length,parkedCars:parkedCars.length,cranes:cranes.length,billboards:billboards.length}};`,sandbox);
+Object.assign(player,{x:4000,y:6000,hp:0});state.cash=500;respawnPlayer('test');
+this.result={segments:point,seconds:ticks/60,maxSlip,hits,drowned:state.isDrowning,respawned:player.hp===100&&isPositionOnSolidGround(player.x,player.y)&&state.cash===400,world:{islands:islands.length,bridges:bridges.length,roads:roads.length,buildings:buildings.length,traffic:trafficCars.length,pedestrians:pedestrians.length,verticalRails:bridgeRails.filter(r=>r.axis==='x').length,streetLights:streetLights.length,trees:trees.length,parkedCars:parkedCars.length,cranes:cranes.length,billboards:billboards.length}};`,sandbox);
 console.log(JSON.stringify(sandbox.result,null,2));
 assert.equal(sandbox.result.segments,8,'Expanded route must complete');
 assert.ok(sandbox.result.maxSlip<18,'No excessive lateral slide');
 assert.equal(sandbox.result.hits,0);
 assert.equal(sandbox.result.drowned,false);
-assert.equal(JSON.stringify(sandbox.result.world),JSON.stringify({islands:16,bridges:20,roads:93,buildings:232,traffic:0,pedestrians:0,verticalRails:20,streetLights:116,trees:278,parkedCars:24,cranes:8,billboards:18}));
+assert.equal(sandbox.result.respawned,true,'death did not restore the player at a safe spawn');
+assert.equal(JSON.stringify(sandbox.result.world),JSON.stringify({islands:16,bridges:24,roads:141,buildings:232,traffic:0,pedestrians:0,verticalRails:24,streetLights:116,trees:462,parkedCars:24,cranes:8,billboards:18}));
 console.log('PASS: heading, projection, steering and sixteen-district world route through actual game physics');
