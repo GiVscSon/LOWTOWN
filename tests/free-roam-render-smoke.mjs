@@ -50,7 +50,7 @@ this.incidentAudit.servicesRoadBound=incidentUnits.every(c=>c.route.length>0&&c.
 this.incidentAudit.fireSuppressed=smokeIncident.fireSuppressed;
 this.incidentAudit.medicalTreated=smokeIncident.medicalTreated;
 this.incidentAudit.treatedPatients=smokeIncident.actors.filter(p=>p.medicalTreated).length;
-this.incidentAudit.serviceUnitsReturned=incidentResponseVehicles.length===0;
+this.incidentAudit.serviceUnitsReturned=incidentResponseVehicles.length===0&&incidentUnits.every(c=>c.returnedToBase);
 assert.equal(depth,0,'Balanced canvas state in car, pedestrian and aircraft rendering');
 assert(draws>800);assert.equal(modeResult.mode,'helicopter');
 assert(Number.isFinite(modeResult.x));assert(modeResult.altitude>100);

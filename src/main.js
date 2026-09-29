@@ -1247,10 +1247,12 @@ function responseRouteLength(route){
 }
 
 function dispatchIncidentResponse(incident){
-  if(!incident||incident.responseDispatched||!roadGraph.length)return 0;
-  const target=nearestRoadNode(incident);
+  if(!incident||incident.responseDispatched||incident.responseDispatchAttempted||!roadGraph.length)return 0;
   const services=incident.kind==='fire'?['fireEngine','ambulance']:
     ['crash','fight','killing'].includes(incident.kind)?['ambulance']:[];
+  incident.responseDispatchAttempted=true;
+  if(!services.length)return 0;
+  const target=nearestRoadNode(incident);
   const dispatchedServices=[];
   for(const serviceType of services){
     const civicType=serviceType==='fireEngine'?'firestation':'hospital';
@@ -1301,7 +1303,7 @@ function beginIncidentResponseReturn(unit){
   unit.responseTarget={...unit.baseTarget};
   unit.route=roadPath(roadGraph,unit,unit.responseTarget).slice(1);
   unit.routeTimer=0;
-  if(unit.route.length<2)unit.removeAfterScene=true;
+  if(!unit.route.length){unit.returnedToBase=true;unit.removeAfterScene=true;}
 }
 
 function updateIncidentResponse(dt){
@@ -1328,7 +1330,7 @@ function updateIncidentResponse(dt){
     const distance=Math.hypot(target.x-unit.x,target.y-unit.y);
     const responseDistance=Math.hypot(unit.responseTarget.x-unit.x,unit.responseTarget.y-unit.y);
     if(responseDistance<32){
-      if(unit.status==='returning'){incidentResponseVehicles.splice(i,1);continue;}
+      if(unit.status==='returning'){unit.returnedToBase=true;incidentResponseVehicles.splice(i,1);continue;}
       unit.status='onscene';unit.sceneTimer=unit.model==='fireEngine'?4.8:4.1;unit.speed=0;
       if(incident&&unit.model==='fireEngine')incident.fireResponse='onScene';
       if(incident&&unit.model==='ambulance')incident.medicalResponse='onScene';
