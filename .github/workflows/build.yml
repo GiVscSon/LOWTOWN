@@ -20,6 +20,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - name: Install Chromium for Pages smoke test
+        run: npx playwright install --with-deps chromium
+      - name: Run production Pages smoke test
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/lowtown-preview.log 2>&1 &
+          npm run test:pages-smoke
       - name: Test player drive acceptance
         run: node tests/player-drive-smoke.mjs
       - name: Test standalone character physics
