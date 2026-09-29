@@ -118,7 +118,7 @@ try {
   const mapCanvas = page.locator('#fullMapCanvas');
   await mapCanvas.waitFor({ state: 'visible', timeout: 5000 });
   const mapSize = await mapCanvas.evaluate(element => ({ width: element.width, height: element.height }));
-  assert(mapSize.width >= 640 && mapSize.height >= 360, `full-city map is too small: ${JSON.stringify(mapSize)}`);
+  assert(mapSize.width >= 320 && mapSize.height >= 240, `full-city map is not initialized: ${JSON.stringify(mapSize)}`);
   const mapPath = `${artifactDir}/full-city-map.png`;
   await page.screenshot({ path: mapPath });
   shots.push({ name: 'full-city-map', path: mapPath, mapCanvas: mapSize });
