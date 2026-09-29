@@ -28,13 +28,13 @@ const smokeIncident=cityIncidentDirector.start('fire',{x:pedestrians[3].x,y:pede
 smokeIncident.reported=true;
 updatePhysics(1/60);renderWorld();
 const responseStartDistance=incidentPoliceCars.length?Math.hypot(incidentPoliceCars[0].x-incidentPoliceCars[0].responseTarget.x,incidentPoliceCars[0].y-incidentPoliceCars[0].responseTarget.y):Infinity;
-for(let i=0;i<90;i++)updateIncidentPolice(1/60);
+for(let i=0;i<240;i++)updateIncidentPolice(1/60);
 const responseEndDistance=incidentPoliceCars.length?Math.hypot(incidentPoliceCars[0].x-incidentPoliceCars[0].responseTarget.x,incidentPoliceCars[0].y-incidentPoliceCars[0].responseTarget.y):Infinity;
 renderWorld();
 this.modeResult={mode:roam.mode,x:player.x,y:player.y,altitude:roam.altitude};
 this.mapLabels=mapLabels.slice();this.vehicleNames=roam.fleet.map(v=>v.name);
 this.routeAudit={walkingRoutes:walkingRoutes.length,transitRoutes:transitRoutes.map(r=>({id:r.id,points:r.points.length,stops:r.stopCount,roadBound:r.points.every(p=>onRoadSurface(p.x,p.y,roads,bridges,scenicRoads,roadEnds))})),buses:trafficCars.filter(c=>c.routeManaged).length};
-this.incidentAudit={active:!!cityIncidentDirector.current(),reactions:pedestrians.filter(p=>p.reaction==='fleeing'||p.reaction==='curious').length,responders:incidentPoliceCars.length,roadBound:incidentPoliceCars.every(c=>c.route.length>0&&c.route.every(p=>onRoadSurface(p.x,p.y,roads,bridges,scenicRoads,roadEnds))),responseStartDistance,responseEndDistance,visible:mapLabels.includes('ПОЖАР')};
+this.incidentAudit={active:!!cityIncidentDirector.current(),reactions:pedestrians.filter(p=>p.reaction==='fleeing'||p.reaction==='curious').length,responders:incidentPoliceCars.length,roadBound:incidentPoliceCars.every(c=>c.route.length>0&&c.route.every(p=>onRoadSurface(p.x,p.y,roads,bridges,scenicRoads,roadEnds))),responseStartDistance,responseEndDistance,responseCar:incidentPoliceCars.map(c=>({x:c.x,y:c.y,target:c.responseTarget,speed:c.speed,routeTimer:c.routeTimer,routeLength:c.route?.length,arrived:c.arrived})),arrivalAccurate:incidentPoliceCars.every(c=>!c.arrived||Math.hypot(c.x-c.responseTarget.x,c.y-c.responseTarget.y)<35),visible:mapLabels.includes('ПОЖАР')};
 assert.equal(depth,0,'Balanced canvas state in car, pedestrian and aircraft rendering');
 assert(draws>800);assert.equal(modeResult.mode,'helicopter');
 assert(Number.isFinite(modeResult.x));assert(modeResult.altitude>100);
@@ -45,7 +45,8 @@ assert(routeAudit.transitRoutes.length>=2&&routeAudit.transitRoutes.every(r=>r.p
 assert(routeAudit.buses>=4,'public transit should run on the planned routes');
 assert(incidentAudit.active&&incidentAudit.reactions>0,'city events should trigger pedestrian reactions');
 assert(incidentAudit.responders===1&&incidentAudit.roadBound,'reported events should dispatch police over the road graph');
-assert(incidentAudit.responseEndDistance<incidentAudit.responseStartDistance,'dispatched patrol should progress toward the incident');
+assert(incidentAudit.responseEndDistance<incidentAudit.responseStartDistance,'dispatched patrol should progress toward the incident: '+JSON.stringify(incidentAudit));
+assert(incidentAudit.arrivalAccurate,'a patrol must not count an intermediate road node as arrival');
 assert(incidentAudit.visible,'incident should have a visible in-world marker');
 
 // Change the test trail on every run, but keep one run reproducible if it fails.
