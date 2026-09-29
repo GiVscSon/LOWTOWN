@@ -1,45 +1,57 @@
 import { chromium } from 'playwright';
 
-const URL = process.env.LOWTOWN_PAGES_URL || 'http://127.0.0.1:4173/LOWTOWN/';
-const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage();
+const URL = process.env.LOWTOWN_PAGES_URL || 'http://127.0.0.1:4173/';
+const EXPECTED_TITLE = 'LOWTOWN — приватный тест-драйв';
 const errors = [];
+const browser = await chromium.launch({ headless: true });
 
-page.on('pageerror', error => errors.push(`pageerror: ${error.message}`));
-page.on('console', message => {
-  if (message.type() === 'error') errors.push(`console: ${message.text()}`);
-});
+try {
+  const page = await browser.newPage({ viewport: { width: 1365, height: 768 } });
+  page.on('pageerror', error => errors.push(`pageerror: ${error.message}`));
+  page.on('console', message => {
+    if (message.type() === 'error') errors.push(`console: ${message.text()}`);
+  });
 
-let response = null;
-for (let attempt = 1; attempt <= 30; attempt += 1) {
-  try {
-    response = await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 15000 });
-    if (response?.ok()) break;
-  } catch {}
-  await new Promise(resolve => setTimeout(resolve, 2000));
-}
+  let response;
+  let lastError;
+  for (let attempt = 1; attempt <= 15; attempt += 1) {
+    try {
+      response = await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 3000 });
+      if (response?.ok()) break;
+    } catch (error) {
+      lastError = error;
+    }
+    await page.waitForTimeout(500);
+  }
+  if (!response?.ok()) {
+    const reason = response?.status() ?? lastError?.message ?? 'no response';
+    throw new Error(`LOWTOWN Pages could not be opened at ${URL}: ${reason}`);
+  }
 
-if (!response?.ok()) {
+  const title = await page.title();
+  if (title !== EXPECTED_TITLE) {
+    throw new Error(`Unexpected LOWTOWN title: ${JSON.stringify(title)}`);
+  }
+
+  const canvas = page.locator('#gameCanvas');
+  await canvas.waitFor({ state: 'visible', timeout: 10000 });
+  const canvasSize = await canvas.evaluate(element => ({ width: element.width, height: element.height }));
+  if (canvasSize.width < 320 || canvasSize.height < 240) {
+    throw new Error(`LOWTOWN canvas was not initialized: ${canvasSize.width}x${canvasSize.height}`);
+  }
+
+  const district = await page.locator('#hudDistrict').innerText();
+  if (!district.trim()) throw new Error('LOWTOWN district HUD did not initialize');
+
+  await page.locator('#btnOpenMap').click();
+  await page.locator('#mapModal').waitFor({ state: 'visible', timeout: 5000 });
+  const legend = await page.locator('.map-legend').innerText();
+  if (!legend.includes('ВПП')) throw new Error('LOWTOWN map legend is missing runway markings');
+  await page.locator('#btnCloseMap').click();
+  await page.locator('#mapModal').waitFor({ state: 'hidden', timeout: 5000 });
+
+  if (errors.length) throw new Error(`LOWTOWN browser errors:\n${errors.join('\n')}`);
+  console.log(`LOWTOWN PAGES SMOKE: PASS ${URL} HTTP ${response.status()} CANVAS OK MAP OK JS OK`);
+} finally {
   await browser.close();
-  throw new Error(`LOWTOWN Pages is not reachable: ${response?.status() ?? 'no response'}`);
 }
-
-await page.waitForTimeout(2000);
-const title = await page.title();
-const appCount = await page.locator('#app').count();
-
-if (title !== 'LOWTOWN // NIGHT SHIFT') {
-  await browser.close();
-  throw new Error(`Unexpected LOWTOWN title: ${JSON.stringify(title)}`);
-}
-if (appCount !== 1) {
-  await browser.close();
-  throw new Error(`LOWTOWN root #app missing or duplicated: ${appCount}`);
-}
-if (errors.length) {
-  await browser.close();
-  throw new Error(`LOWTOWN browser errors:\n${errors.join('\n')}`);
-}
-
-console.log(`LOWTOWN PAGES SMOKE: PASS ${URL} HTTP ${response.status()} TITLE OK APP OK JS OK`);
-await browser.close();
