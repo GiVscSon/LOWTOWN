@@ -100,6 +100,14 @@
     .part-title { font-size: 9px; font-weight: 800; color: #fff; }
     .part-bonus { font-size: 7.5px; color: var(--text-muted); }
     #fullMapCanvas { width: 100%; height: 300px; border-radius: 10px; background: #06090e; border: 1px solid var(--glass-border); display: block; }
+    .map-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 12px; color: var(--text-muted); font: 700 9px var(--font-mono); }
+    .map-legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .map-key { display: inline-block; width: 7px; height: 7px; border: 1px solid #080a0d; background: #bd9954; }
+    .map-key.player { width: 8px; height: 8px; border-radius: 50%; background: #f4f1e9; box-shadow: 0 0 0 1px #68d7f2; }
+    .map-key.water { background: #61b9ce; transform: rotate(45deg); }
+    .map-key.air { background: #ddd7be; clip-path: polygon(50% 0, 100% 100%, 0 100%); border: 0; }
+    .map-key.part { background: #e59d35; border-radius: 50%; }
+    .map-key.runway { width: 15px; height: 3px; border: 0; background: #e0d0a0; }
     /* Reference pass: chunky noir HUD framing a dense isometric street scene. */
     #gameCanvas { image-rendering: pixelated; filter: saturate(.9) contrast(1.16) brightness(.86); }
     .radar-wrapper { width: 164px; height: 164px; border: 8px solid #080a0d; box-shadow: 0 0 0 3px #32363a, 0 12px 34px rgba(0,0,0,.85); }
@@ -196,6 +204,14 @@
         <button class="modal-close" id="btnCloseMap">&times;</button>
       </div>
       <canvas id="fullMapCanvas" width="400" height="300"></canvas>
+      <div class="map-legend" aria-label="Условные обозначения карты">
+        <span><i class="map-key player" aria-hidden="true"></i>ИГРОК</span>
+        <span><i class="map-key" aria-hidden="true"></i>ЗЕМЛЯ</span>
+        <span><i class="map-key water" aria-hidden="true"></i>ВОДА</span>
+        <span><i class="map-key air" aria-hidden="true"></i>ВОЗДУХ</span>
+        <span><i class="map-key part" aria-hidden="true"></i>ДЕТАЛИ</span>
+        <span><i class="map-key runway" aria-hidden="true"></i>ВПП</span>
+      </div>
     </div>
   </div>
   <div class="modal-overlay" id="garageModal">

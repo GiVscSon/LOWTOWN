@@ -1584,7 +1584,7 @@ function renderWorld() {
   const center = projectIso(player.x + leadX-flightAltitude, player.y + leadY-flightAltitude);
   ctx.translate(w / 2, h / 2);
   const baseZoom = w > 900 ? 1.32 : 1.0;
-  const cameraZoom = baseZoom*(1-.24*Math.min(1,flightAltitude/220));
+  const cameraZoom = baseZoom*(1-.12*Math.min(1,flightAltitude/220));
   ctx.scale(cameraZoom, cameraZoom);
   ctx.translate(-center.x, -center.y);
   ctx.transform(Math.sqrt(3) / 2, 0.5, -Math.sqrt(3) / 2, 0.5, 0, 0);
@@ -2166,12 +2166,32 @@ function renderFullMap() {
   for (const vehicle of roam?.fleet || []) {
     fullMapCtx.fillStyle=vehicle.kind==='water'?'#61b9ce':vehicle.kind==='air'?'#ddd7be':'#bd9954';
     const x=mapX+vehicle.x*scale,y=mapY+vehicle.y*scale;
-    fullMapCtx.fillRect(x-3,y-3,6,6);fullMapCtx.font='12px sans-serif';fullMapCtx.fillText(vehicle.name,x+6,y-6);
+    fullMapCtx.strokeStyle='#080b0e';fullMapCtx.lineWidth=1.25;fullMapCtx.beginPath();
+    if(vehicle.kind==='air'){
+      fullMapCtx.moveTo(x,y-4.5);fullMapCtx.lineTo(x+4,y+3.5);fullMapCtx.lineTo(x-4,y+3.5);fullMapCtx.closePath();
+    }else if(vehicle.kind==='water'){
+      fullMapCtx.moveTo(x,y-4);fullMapCtx.lineTo(x+4,y);fullMapCtx.lineTo(x,y+4);fullMapCtx.lineTo(x-4,y);fullMapCtx.closePath();
+    }else fullMapCtx.arc(x,y,3.2,0,Math.PI*2);
+    fullMapCtx.fill();fullMapCtx.stroke();
   }
-  fullMapCtx.fillStyle = '#fff';
+  for(const runway of PLANE_RUNWAYS){
+    const x=mapX+runway.x*scale,y=mapY+runway.y*scale;
+    const w=runway.w*scale,h=Math.max(4,runway.h*scale);
+    fullMapCtx.fillStyle='#414443';fullMapCtx.fillRect(x,y,w,h);
+    fullMapCtx.strokeStyle='#e0d0a0';fullMapCtx.lineWidth=1.2;fullMapCtx.strokeRect(x,y,w,h);
+    fullMapCtx.strokeStyle='#f2ead0';fullMapCtx.lineWidth=1;fullMapCtx.setLineDash([3,2]);
+    fullMapCtx.beginPath();fullMapCtx.moveTo(x+2,y+h/2);fullMapCtx.lineTo(x+w-2,y+h/2);fullMapCtx.stroke();fullMapCtx.setLineDash([]);
+    const labelY=y-7;
+    fullMapCtx.fillStyle='rgba(7,10,13,.94)';fullMapCtx.fillRect(x+w/2-10,labelY-5.5,20,11);
+    fullMapCtx.strokeStyle='#e0d0a0';fullMapCtx.lineWidth=1;fullMapCtx.strokeRect(x+w/2-10,labelY-5.5,20,11);
+    fullMapCtx.fillStyle='#f2dfaa';fullMapCtx.font='bold 7px monospace';fullMapCtx.textAlign='center';fullMapCtx.textBaseline='middle';fullMapCtx.fillText('ВПП',x+w/2,labelY);
+  }
+  fullMapCtx.fillStyle = '#f4f1e9';fullMapCtx.strokeStyle='#182329';fullMapCtx.lineWidth=2;
   fullMapCtx.beginPath();
-  fullMapCtx.arc(mapX + player.x * scale, mapY + player.y * scale, 5, 0, Math.PI * 2);
-  fullMapCtx.fill();
+  const playerX=mapX+player.x*scale,playerY=mapY+player.y*scale;
+  fullMapCtx.arc(playerX,playerY,4,0,Math.PI*2);fullMapCtx.fill();fullMapCtx.stroke();
+  fullMapCtx.strokeStyle='#68d7f2';fullMapCtx.lineWidth=1.5;fullMapCtx.beginPath();
+  fullMapCtx.moveTo(playerX,playerY);fullMapCtx.lineTo(playerX+Math.cos(player.angle)*8,playerY+Math.sin(player.angle)*8);fullMapCtx.stroke();
 }
 
 function autoSaveProgress() {

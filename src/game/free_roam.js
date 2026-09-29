@@ -181,13 +181,18 @@ export function drawTransport(ctx,car,time=0,altitude=0) {
     }
   } else if(car.kind==='air') {
     if(car.type==='plane'){
-      const plane=[[43,0],[12,-6],[2,-39],[-8,-39],[-7,-7],[-34,-17],[-43,-13],[-22,0],[-43,13],[-34,17],[-7,7],[-8,39],[2,39],[12,6]];
-      extrude(plane,car.color||'#c5c8c5','#4b5251',1.15);
-      poly([[34+zx*1.25,-3+zy*1.25],[8+zx*1.25,-3+zy*1.25],[8+zx*1.25,3+zy*1.25],[34+zx*1.25,3+zy*1.25]],'#274552',true);
-      ctx.fillStyle='#d4523a';ctx.fillRect(-8+zx,-39+zy,7,4);ctx.fillRect(-8+zx,35+zy,7,4);
-      ctx.strokeStyle='rgba(199,205,193,.6)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(42+zx,-9+zy);ctx.lineTo(42+zx,9+zy);ctx.stroke();
-      ctx.strokeStyle='#171e20';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-6+zx,-31+zy);ctx.lineTo(-6+zx,31+zy);ctx.stroke();
-      ctx.fillStyle='#dba752';ctx.fillRect(-36+zx,-1+zy,12,2);
+      ctx.save();ctx.scale(1.12,1.12);
+      const plane=[[48,0],[18,-5],[5,-13],[2,-38],[-9,-41],[-9,-13],[-35,-22],[-48,-17],[-28,0],[-48,17],[-35,22],[-9,13],[-9,41],[2,38],[5,13],[18,5]];
+      extrude(plane,car.color||'#c5c8c5','#414a4a',2.05);
+      const fuselage=[[47,0],[31,-3.8],[5,-5.3],[-24,-4.5],[-39,-2.5],[-44,0],[-39,2.5],[-24,4.5],[5,5.3],[31,3.8]];
+      extrude(fuselage,'#e1e1d8','#424a49',3.1);
+      poly([[30+zx*1.65,-3+zy*1.65],[18+zx*1.65,-3.6+zy*1.65],[10+zx*1.65,-2.3+zy*1.65],[10+zx*1.65,2.3+zy*1.65],[18+zx*1.65,3.6+zy*1.65],[30+zx*1.65,3+zy*1.65]],'#315360',true);
+      ctx.fillStyle='#d4523a';ctx.fillRect(-8+zx,-41+zy,7,4);ctx.fillRect(-8+zx,37+zy,7,4);
+      ctx.strokeStyle='rgba(199,205,193,.72)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(2+zx,-37+zy);ctx.lineTo(2+zx,-18+zy);ctx.moveTo(2+zx,18+zy);ctx.lineTo(2+zx,37+zy);ctx.stroke();
+      ctx.strokeStyle='#171e20';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-8+zx,-33+zy);ctx.lineTo(-8+zx,33+zy);ctx.stroke();
+      ctx.fillStyle='#dba752';ctx.fillRect(-37+zx,-1+zy,12,2);
+      ctx.save();ctx.translate(48+zx,zy);ctx.rotate(time*(altitude>0?34:7));ctx.strokeStyle='rgba(224,228,219,.82)';ctx.lineWidth=2.6;ctx.beginPath();ctx.moveTo(0,-10);ctx.lineTo(0,10);ctx.stroke();ctx.restore();
+      ctx.restore();
     }else{
       extrude([[27,0],[12,-13],[-10,-14],[-24,-6],[-46,-4],[-51,0],[-46,4],[-24,6],[-10,14],[12,13]],car.color||'#7d8868','#303833',1.2);
       poly([[21+zx*1.45,-8+zy*1.45],[8+zx*1.45,-10+zy*1.45],[8+zx*1.45,10+zy*1.45],[21+zx*1.45,8+zy*1.45]],'rgba(75,119,132,.8)',true);
