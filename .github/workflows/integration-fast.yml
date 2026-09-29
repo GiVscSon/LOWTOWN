@@ -38,6 +38,10 @@ jobs:
         run: node tests/runtime-vehicle-collisions-smoke.mjs
       - name: Gameplay loop
         run: node tests/gameplay-loop-smoke.mjs
+      - name: Complete gameplay job chain
+        run: node tests/gameplay-job-chain-smoke.mjs
+      - name: AI road-boundary prediction
+        run: node tests/autopilot-road-safety-smoke.mjs
       - name: World connectivity
         run: node tests/world-connectivity-diagnostic.mjs
       - name: World stress

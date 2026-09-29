@@ -22,7 +22,7 @@ export function createTrajectoryLab({ simulate, trafficRisk, blocked = () => fal
     if (Number.isFinite(result.x) && Number.isFinite(result.y)) {
       const a = result.a || car.a || 0;
       for (const offset of [0, .3, -.3]) {
-        const hit = blocked(result.x + Math.cos(a + offset) * probe, result.y + Math.sin(a + offset) * probe);
+        const hit = blocked(result.x + Math.cos(a + offset) * probe, result.y + Math.sin(a + offset) * probe, a + offset);
         minWall = Math.min(minWall, hit ? probe : 999);
       }
     }

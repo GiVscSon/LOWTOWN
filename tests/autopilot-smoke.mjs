@@ -135,7 +135,7 @@ try {
   if (maxExplore < 300) throw new Error('Autopilot did not explore the world.');
   if (s.trafficCars < 18) throw new Error('Traffic system failed to spawn enough cars.');
   if (s.pedestrians < 20) throw new Error('Pedestrian system failed to spawn enough people.');
-  if (s.collisions > 10) throw new Error(`Too many building collisions: ${s.collisions}`);
+  if (s.collisions > 10) throw new Error(`Too many blocked-world contacts: ${s.collisions}`);
   if (s.stuck > 2) throw new Error(`Autopilot got stuck ${s.stuck} times.`);
   if (a.recoveries > 4) throw new Error(`Predictive AI recovered too often: ${a.recoveries}`);
   if (maxCrossTrack > 130) throw new Error(`AI left the road corridor: ${maxCrossTrack.toFixed(0)}.`);
@@ -146,7 +146,7 @@ try {
     maxSpeed: maxTelemetrySpeed, distance: maxDistance, explorationRadius: maxExplore,
     uniqueNodes: uniqueNodes.size, uniquePositionCells: uniquePositions.size,
     maxCrossTrack, maxRisk, minimumTtc: Number.isFinite(maxTtcRisk) ? maxTtcRisk : null,
-    buildingCollisions: s.collisions, trafficHits: s.trafficHits, stuck: s.stuck,
+    worldBoundaryContacts: s.collisions, trafficHits: s.trafficHits, stuck: s.stuck,
     replans: a.replans, recoveries: a.recoveries, safeStarts: a.safeStarts,
     decisions: a.decisions, overtakes: a.overtakes || 0, nearMisses: a.nearMisses || 0,
     collisionsAvoided: a.collisionsAvoided || 0, modes,

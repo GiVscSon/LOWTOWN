@@ -1,8 +1,7 @@
 name: Build LOWTOWN
 
 on:
-  push:
-    branches: [main]
+  workflow_call:
   pull_request:
     branches: [main]
   merge_group:
@@ -89,6 +88,10 @@ jobs:
         run: node tests/traffic-stability-smoke.mjs
       - name: Test gameplay loop
         run: node tests/gameplay-loop-smoke.mjs
+      - name: Test complete gameplay job chain
+        run: node tests/gameplay-job-chain-smoke.mjs
+      - name: Test AI road-boundary prediction
+        run: node tests/autopilot-road-safety-smoke.mjs
       - name: Diagnose world connectivity
         run: node tests/world-connectivity-diagnostic.mjs
       - name: Stress-test world routing

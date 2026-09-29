@@ -6,6 +6,7 @@ import { coastPath, pointInCoast } from './game/coastline.js';
 import { createFreeRoam, drawTransport } from './game/free_roam.js';
 import { isLand, ISLANDS, BRIDGES } from './game/islands.js';
 import { pointInBuilding } from './game/world_geometry.js';
+import { vehicleWorldBlocked } from './game/vehicle_collision.js';
 import { CITY_ROADS, roadById, destinationPoint } from './game/city_semantics.js';
 import { carriagewayHalfWidth, collisionHalfWidth, supportHalfWidth, roadSegments } from './game/road_geometry.js';
 import { buildRoadNetwork, roadSegments as authorityRoadSegments } from './game/road_authority.js';
@@ -559,6 +560,7 @@ function installTestHooks(roadNodes = [], roadLines = []) {
     integrationTest.ai = createAIDriver({
       nodes: roadNodes,
       blocked: (x, y) => pointInBuilding(x, y, 10),
+      blockedVehicle: (x, y, angle) => vehicleWorldBlocked(x, y, Number.isFinite(angle) ? angle : integrationTest.transport.state.a, roadLines),
       getTraffic: () => []
     });
     integrationTest.ai.start(integrationTest.transport.state);

@@ -38,7 +38,7 @@ export function createBlackBox({ capacity = 900, eventCapacity = 80 } = {}) {
   function analyze(){
     const s=state.summary,e=state.events,findings=[];
     const buildingHits=e.filter(x=>x.type==='BUILDING_COLLISION').length,trafficContacts=e.filter(x=>x.type==='TRAFFIC_CONTACT').length,nearMisses=e.filter(x=>x.type==='NEAR_MISS').length,recoveries=e.filter(x=>x.type==='RECOVERY').length;
-    if(buildingHits)findings.push({severity:buildingHits>3?'HIGH':'MEDIUM',code:'WALL_CONTACT',message:`AI touched buildings ${buildingHits} time(s). Inspect preceding trajectory and steering.`});
+    if(buildingHits)findings.push({severity:buildingHits>3?'HIGH':'MEDIUM',code:'WALL_CONTACT',message:`AI contacted blocked world geometry ${buildingHits} time(s). This includes road-boundary contacts; inspect the predicted path and steering.`});
     if(trafficContacts)findings.push({severity:trafficContacts>2?'HIGH':'MEDIUM',code:'TRAFFIC_CONTACT',message:`Traffic contact occurred ${trafficContacts} time(s). Compare prediction TTC with actual closing.`});
     if(nearMisses&&trafficContacts&&nearMisses<trafficContacts*2)findings.push({severity:'HIGH',code:'LATE_AVOIDANCE',message:'Near-miss margin is too small relative to traffic contacts. Increase anticipation horizon or braking margin.'});
     if(s.corridorRecoveries)findings.push({severity:s.corridorRecoveries>3?'HIGH':'MEDIUM',code:'CORRIDOR_RECOVERY_LOAD',message:`Corridor guardian engaged ${s.corridorRecoveries} time(s). Inspect route curvature and steering authority.`});
