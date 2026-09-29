@@ -115,6 +115,14 @@ export function drawArchitecture(ctx, b, index) {
       ctx.strokeStyle='#ddd9ca';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(cx-18,cy);ctx.lineTo(cx+18,cy);ctx.stroke();ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(cx,cy-12);ctx.lineTo(cx,cy+12);ctx.stroke();
     }else if(type==='depot'){
       ctx.fillStyle='#b69054';for(let bay=0;bay<3;bay++)ctx.fillRect(cx-16+bay*11,cy-8,7,16);
+    }else if(b.civicType==='airAmbulanceBase'){
+      ctx.fillStyle='#26343a';ctx.fillRect(cx-18,cy-11,36,22);ctx.strokeStyle='#d5ddd0';ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(cx-13,cy);ctx.lineTo(cx+13,cy);ctx.moveTo(cx,cy-8);ctx.lineTo(cx,cy+8);ctx.stroke();
+      ctx.fillStyle='#d5ddd0';ctx.font='bold 7px monospace';ctx.textAlign='center';ctx.fillText('H',cx,cy+3);
+    }else if(b.civicType==='marineRescueBase'){
+      ctx.strokeStyle='#ddd9ca';ctx.lineWidth=4;ctx.beginPath();ctx.arc(cx,cy,12,0,Math.PI*2);ctx.stroke();
+      ctx.strokeStyle='#bd4b3d';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(cx-10,cy-6);ctx.lineTo(cx+10,cy+6);ctx.moveTo(cx-10,cy+6);ctx.lineTo(cx+10,cy-6);ctx.stroke();
+      ctx.fillStyle='#d5ddd0';ctx.font='bold 6px monospace';ctx.textAlign='center';ctx.fillText('SAR',cx,cy+20);
     }else if(b.civicType==='guardBase'){
       ctx.fillStyle='#62694f';ctx.beginPath();ctx.moveTo(cx-17,cy-12);ctx.lineTo(cx+17,cy-12);ctx.lineTo(cx+14,cy+6);ctx.lineTo(cx,cy+15);ctx.lineTo(cx-14,cy+6);ctx.closePath();ctx.fill();
       ctx.strokeStyle='#c1a44e';ctx.lineWidth=2;ctx.stroke();

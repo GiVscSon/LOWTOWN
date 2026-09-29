@@ -39,7 +39,7 @@ this.report={
 
 assert.ok(sandbox.report.parks>=16,'city needs frequent open civic spaces');
 assert.ok(sandbox.report.parkObstacles>=70,'visible park furniture needs collision geometry');
-assert.equal(sandbox.report.physicalParkTrees,sandbox.report.parks*12,'every rendered park tree must be physical');
+assert.equal(sandbox.report.physicalParkTrees,sandbox.report.parks*16,'every rendered park tree must be physical');
 assert.ok(sandbox.report.archetypes.length>=6,'building silhouettes need multiple archetypes');
 assert.equal(sandbox.report.blockedBuildingCentre,true,'building must block pedestrians');
 assert.equal(sandbox.report.walkerBlocked,false,'pedestrian entered an obstacle');

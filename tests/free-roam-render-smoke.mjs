@@ -19,7 +19,32 @@ const sandbox={...streetNetwork,...ocean,...surfaces,...incidents,assert,console
 Object.defineProperties(sandbox,{depth:{get:()=>depth},draws:{get:()=>draws}});
 vm.createContext(sandbox);
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
-vm.runInContext(source+`\ninitTopology();roam=createFreeRoam(player,parkedCars,buildings,trees,isPositionOnSolidGround);
+vm.runInContext(source+`\ninitTopology();
+const expectedFacilityTypes={
+  'EASTGATE FIRE & RESCUE':'firestation','NORTHSIDE CLINIC':'hospital',
+  'CINDER FIRE STATION':'firestation','KINGSWAY AIRFIELD':'airfield','SKYFREIGHT 90':'airfield',
+  'AIR AMBULANCE BASE':'airAmbulanceBase','AIRPORT FIRE CREW':'firestation',
+  'ALL SAINTS HOSPITAL':'hospital','EMS DISPATCH':'hospital','FAMILY CLINIC':'hospital',
+  'NATIONAL GUARD ARMORY':'guardBase','FIRE SERVICE DEPOT':'firestation',
+  'KINGSPORT MARINA':'depot','MARITIME RESCUE':'marineRescueBase','COAST GUARD STATION':'marineRescueBase'
+};
+const serviceFacilities=buildings.filter(building=>Object.hasOwn(expectedFacilityTypes,building.sign));
+for(const [sign,type] of Object.entries(expectedFacilityTypes)){
+  const matches=serviceFacilities.filter(building=>building.sign===sign);
+  assert.equal(matches.length,1,'facility parcel should survive district styling: '+sign);
+  assert.equal(matches[0].civicType,type,'facility should retain its service classification: '+sign);
+  if(type==='airAmbulanceBase'||type==='marineRescueBase')assert.equal(matches[0].archetype,'civic','non-road response bases should use civic architecture: '+sign);
+}
+const roadServiceBases=serviceFacilities.filter(building=>building.civicType==='firestation'||building.civicType==='hospital');
+const facilityRouteAudit=roadServiceBases.map(building=>{
+  const center={x:building.x+building.w/2,y:building.y+building.h/2},start=nearestRoadNode(center);
+  return {sign:building.sign,nearestRoadDistance:Math.hypot(start.x-center.x,start.y-center.y),routes:safeSpawnPoints.map(target=>roadPath(roadGraph,start,target))};
+});
+const brokenFacilityRoutes=facilityRouteAudit.filter(base=>base.nearestRoadDistance>=600||base.routes.some(route=>route.length<1||!route.every(node=>onRoadSurface(node.x,node.y,roads,bridges,scenicRoads,roadEnds)))).map(base=>({sign:base.sign,nearestRoadDistance:base.nearestRoadDistance,routeLengths:base.routes.map(route=>route.length)}));
+assert.equal(brokenFacilityRoutes.length,0,'road response bases should connect across the whole road network: '+JSON.stringify(brokenFacilityRoutes));
+this.facilityRouteAudit=facilityRouteAudit.map(base=>({sign:base.sign,nearestRoadDistance:+base.nearestRoadDistance.toFixed(1),destinations:base.routes.length}));
+this.nonRoadFacilities=serviceFacilities.filter(building=>building.civicType==='airAmbulanceBase'||building.civicType==='marineRescueBase').map(building=>({sign:building.sign,type:building.civicType}));
+roam=createFreeRoam(player,parkedCars,buildings,trees,isPositionOnSolidGround);
 renderWorld();renderFullMap();roam.interact();renderWorld();
 Object.assign(player,{x:1040,y:2130});roam.interact();roam.toggleFlight();
 for(let i=0;i<100;i++)updatePhysics(1/60);renderWorld();renderFullMap();
@@ -113,5 +138,5 @@ assert(peopleOnLand,'pedestrian route update moved a person off the world surfac
 assert(travelSamples.length>=9,'random drive samples did not cover enough city regions; seed='+seed+' samples='+travelSamples.length);
 assert(new Set(travelSamples.map(p=>p.col)).size===4&&new Set(travelSamples.map(p=>p.row)).size===3,'random drive samples must reach the full city span; seed='+seed);
 this.randomTravelAudit={seed,samples:travelSamples.length,regions:travelSamples,people:pedestrians.length,peopleOnLand};
-console.log('PASS: actual rendering, event response, and randomized travel across the road network',JSON.stringify(this.randomTravelAudit));
+console.log('PASS: facility classification and routes, actual rendering, event response, and randomized travel across the road network',JSON.stringify({facilities:this.facilityRouteAudit,nonRoadFacilities:this.nonRoadFacilities,travel:this.randomTravelAudit}));
 `,sandbox);

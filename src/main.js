@@ -353,6 +353,8 @@ const safeSpawnPoints = [
 
 function civicTypeForSign(sign='') {
   const label=String(sign).toLowerCase();
+  if(/air ambulance/.test(label))return 'airAmbulanceBase';
+  if(/maritime rescue|coast guard/.test(label))return 'marineRescueBase';
   if(/hospital|clinic|medical|ems|ambulance/.test(label))return 'hospital';
   if(/fire|rescue/.test(label))return 'firestation';
   if(/airfield|airport|skyfreight/.test(label))return 'airfield';
@@ -669,10 +671,26 @@ function initTopology() {
 
   // Separate street-front properties with driveable service alleys.
   const blocks = buildings.splice(0);
+  let streetscapeIndex=0;
+  let parkStyleIndex=0;
   blocks.forEach((block, blockIndex) => {
     const gap = 76;
     const bw = (block.w - gap) / 2, bh = (block.h - gap) / 2;
-    if (blockIndex % 7 === 2) {
+    const civicType=civicTypeForSign(block.sign);
+    if(civicType){
+      const insetX=block.w*.03,insetY=block.h*.03;
+      const floors=civicType==='hospital'?5:civicType==='civic'?3:civicType==='airfield'?2:2;
+      const archetype=['guardBase','airAmbulanceBase','marineRescueBase'].includes(civicType)?'civic':civicType;
+      buildings.push(
+        {...block,x:block.x+insetX,y:block.y+insetY,w:block.w*.62,h:block.h*.66,floors,archetype,civicType,cornerRadius:14},
+        {...block,x:block.x+block.w*.68,y:block.y+block.h*.08,w:block.w*.24,h:block.h*.27,floors:1,archetype:'warehouse',sign:'SERVICE BAY',neon:'#b88b53'},
+        {...block,x:block.x+block.w*.68,y:block.y+block.h*.41,w:block.w*.24,h:block.h*.27,floors:1,archetype:'warehouse',sign:'STORES & GARAGE',neon:'#8b7c62'},
+        {...block,x:block.x+block.w*.1,y:block.y+block.h*.75,w:block.w*.5,h:block.h*.15,floors:1,archetype:'pavilion',sign:'VISITOR ANNEX',neon:'#9aa0a8'}
+      );
+      return;
+    }
+    const parcelIndex=streetscapeIndex++;
+    if (parcelIndex % 4 === 2) {
       // Asymmetric perimeter blocks leave a usable, open-ended inner court.
       // Every wing is also a collision body; the courtyard is genuinely empty.
       const wing=block.w*.22, depth=block.h*.21;
@@ -682,10 +700,10 @@ function initTopology() {
         {...block,y:block.y+depth+30,w:wing,h:block.h-depth-30,floors:3,archetype:'townhouse',sign:'COURT RESIDENCES'},
         {...block,x:block.x+block.w-wing,y:block.y+depth+52,w:wing,h:block.h-depth-110,floors:3,archetype:'deco',sign:'STUDIOS'}
       );
-      parkZones.push({x:block.x+wing+24,y:block.y+depth+34,w:block.w-wing*2-48,h:block.h-depth-64,type:(blockIndex+2)%8,courtyard:true});
+      parkZones.push({x:block.x+wing+24,y:block.y+depth+34,w:block.w-wing*2-48,h:block.h-depth-64,type:parkStyleIndex++%8,courtyard:true});
       return;
     }
-    if (blockIndex % 5 === 0 || blockIndex % 9 === 4) {
+    if (parcelIndex % 5 === 0 || parcelIndex % 9 === 4) {
       // Give every few districts breathing room: four low perimeter buildings
       // frame a real civic park instead of another full roof-to-roof block.
       const edgeH=Math.max(82,block.h*.22), edgeW=Math.max(92,block.w*.25);
@@ -695,21 +713,8 @@ function initTopology() {
         {...block,x:block.x,y:block.y+block.h-edgeH,w:block.w*.34,h:edgeH,floors:1,archetype:'pavilion',sign:'PARK HOUSE'},
         {...block,x:block.x+block.w-edgeW,y:block.y+block.h-edgeH,w:edgeW,h:edgeH,floors:1,archetype:'shop',sign:'NEWS & FLOWERS'}
       );
-      parkZones.push({x:block.x+28,y:block.y+edgeH+24,w:block.w-56,h:block.h-edgeH*2-48,type:blockIndex%8});
+      parkZones.push({x:block.x+28,y:block.y+edgeH+24,w:block.w-56,h:block.h-edgeH*2-48,type:parkStyleIndex++%8});
       trees.push({x:block.x+block.w*.5,y:block.y-28,size:23});
-      return;
-    }
-    const civicType=civicTypeForSign(block.sign);
-    if(civicType){
-      const insetX=block.w*.03,insetY=block.h*.03;
-      const floors=civicType==='hospital'?5:civicType==='civic'?3:civicType==='airfield'?2:2;
-      const archetype=civicType==='guardBase'?'civic':civicType;
-      buildings.push(
-        {...block,x:block.x+insetX,y:block.y+insetY,w:block.w*.62,h:block.h*.66,floors,archetype,civicType,cornerRadius:14},
-        {...block,x:block.x+block.w*.68,y:block.y+block.h*.08,w:block.w*.24,h:block.h*.27,floors:1,archetype:'warehouse',sign:'SERVICE BAY',neon:'#b88b53'},
-        {...block,x:block.x+block.w*.68,y:block.y+block.h*.41,w:block.w*.24,h:block.h*.27,floors:1,archetype:'warehouse',sign:'STORES & GARAGE',neon:'#8b7c62'},
-        {...block,x:block.x+block.w*.1,y:block.y+block.h*.75,w:block.w*.5,h:block.h*.15,floors:1,archetype:'pavilion',sign:'VISITOR ANNEX',neon:'#9aa0a8'}
-      );
       return;
     }
     const districtTypes=['tenement','shop','warehouse','deco','townhouse','office'];
@@ -746,8 +751,8 @@ function initTopology() {
   // contacts so visible trunks, water and street furniture cannot be crossed.
   parkZones.forEach((park,i)=>{
     park.trees=[];park.benches=[];park.feature={x:park.x+park.w*.53,y:park.y+park.h*.51,type:park.type};
-    for(let t=0;t<12;t++){
-      const edge=t%4,ratio=(Math.floor(t/4)+1)/4;
+    for(let t=0;t<16;t++){
+      const edge=t%4,ratio=(Math.floor(t/4)+1)/5;
       const x=edge===0?park.x+park.w*ratio:edge===1?park.x+park.w-18:edge===2?park.x+park.w*(1-ratio):park.x+18;
       const y=edge===0?park.y+18:edge===1?park.y+park.h*ratio:edge===2?park.y+park.h-18:park.y+park.h*(1-ratio);
       const tree={x,y,size:15+(t+i)%5,park:true};park.trees.push(tree);trees.push(tree);
@@ -2151,13 +2156,13 @@ function renderWorld() {
   ctx.save();
   const leadX = Math.cos(player.angle) * player.speed * 6;
   const leadY = Math.sin(player.angle) * player.speed * 6;
-  const flightAltitude=roam?.mode==='plane'?roam.altitude:0;
+  const flightAltitude=roam?.profile?.kind==='air'?roam.altitude:0;
   // Follow the aircraft itself, not its ground shadow, so the airframe stays
   // inside the viewport while the island below remains visible as an overview.
   const center = projectIso(player.x + leadX-flightAltitude, player.y + leadY-flightAltitude);
   ctx.translate(w / 2, h / 2);
   const baseZoom = w > 900 ? 1.32 : 1.0;
-  const cameraZoom = baseZoom*(1-.12*Math.min(1,flightAltitude/220));
+  const cameraZoom = baseZoom*(1-.5*Math.min(1,flightAltitude/220));
   ctx.scale(cameraZoom, cameraZoom);
   ctx.translate(-center.x, -center.y);
   ctx.transform(Math.sqrt(3) / 2, 0.5, -Math.sqrt(3) / 2, 0.5, 0, 0);
