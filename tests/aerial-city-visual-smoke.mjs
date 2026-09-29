@@ -129,7 +129,9 @@ try {
   await page.keyboard.press('e');
   await page.waitForFunction(() => document.querySelector('#toastMsg')?.textContent?.includes('Пешком'), null, { timeout: 5000 });
   await page.keyboard.press('e');
-  await page.waitForFunction(() => document.querySelector('#toastMsg')?.textContent?.includes('Вертолёт'), null, { timeout: 5000 });
+  await page.waitForTimeout(150);
+  const boardingToast = await page.locator('#toastMsg').textContent().catch(() => '');
+  assert(boardingToast.includes('Вертолёт'), `could not board the nearby helicopter: ${boardingToast || 'no boarding message'}`);
   await page.waitForFunction(() => /\d+ м/.test(document.querySelector('#hudGear')?.textContent || ''), null, { timeout: 5000 });
   await page.keyboard.press('q');
   await hold('w');
