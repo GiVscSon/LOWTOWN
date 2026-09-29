@@ -7,6 +7,14 @@ const browser = await chromium.launch({ headless: true });
 
 try {
   const page = await browser.newPage({ viewport: { width: 1365, height: 768 } });
+  await page.addInitScript(() => {
+    window.__lowtownMapLabels = [];
+    const originalFillText = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function (text, ...args) {
+      if (this.canvas?.id === 'fullMapCanvas') window.__lowtownMapLabels.push(String(text));
+      return originalFillText.call(this, text, ...args);
+    };
+  });
   page.on('pageerror', error => errors.push(`pageerror: ${error.message}`));
   page.on('console', message => {
     if (message.type() === 'error') errors.push(`console: ${message.text()}`);
@@ -45,8 +53,12 @@ try {
 
   await page.locator('#btnOpenMap').click();
   await page.locator('#mapModal').waitFor({ state: 'visible', timeout: 5000 });
-  const legend = await page.locator('.map-legend').innerText();
-  if (!legend.includes('ВПП')) throw new Error('LOWTOWN map legend is missing runway markings');
+  const mapCanvas = page.locator('#fullMapCanvas');
+  await mapCanvas.waitFor({ state: 'visible', timeout: 5000 });
+  const mapSize = await mapCanvas.evaluate(element => ({ width: element.width, height: element.height }));
+  if (mapSize.width < 320 || mapSize.height < 240) throw new Error(`LOWTOWN map canvas was not initialized: ${mapSize.width}x${mapSize.height}`);
+  const mapLabels = await page.evaluate(() => window.__lowtownMapLabels || []);
+  if (!mapLabels.includes('ВПП')) throw new Error('LOWTOWN map canvas did not draw runway labels');
   await page.locator('#btnCloseMap').click();
   await page.locator('#mapModal').waitFor({ state: 'hidden', timeout: 5000 });
 

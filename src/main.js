@@ -356,6 +356,7 @@ function civicTypeForSign(sign='') {
   if(/hospital|clinic|medical|ems|ambulance/.test(label))return 'hospital';
   if(/fire|rescue/.test(label))return 'firestation';
   if(/airfield|airport|skyfreight/.test(label))return 'airfield';
+  if(/national guard|armory/.test(label))return 'guardBase';
   if(/bus depot|terminal|marina|coast guard/.test(label))return 'depot';
   if(/police|city hall|civil defence|guard|college|library|school|community/.test(label))return 'civic';
   return null;
@@ -702,8 +703,9 @@ function initTopology() {
     if(civicType){
       const insetX=block.w*.03,insetY=block.h*.03;
       const floors=civicType==='hospital'?5:civicType==='civic'?3:civicType==='airfield'?2:2;
+      const archetype=civicType==='guardBase'?'civic':civicType;
       buildings.push(
-        {...block,x:block.x+insetX,y:block.y+insetY,w:block.w*.62,h:block.h*.66,floors,archetype:civicType,civicType,cornerRadius:14},
+        {...block,x:block.x+insetX,y:block.y+insetY,w:block.w*.62,h:block.h*.66,floors,archetype,civicType,cornerRadius:14},
         {...block,x:block.x+block.w*.68,y:block.y+block.h*.08,w:block.w*.24,h:block.h*.27,floors:1,archetype:'warehouse',sign:'SERVICE BAY',neon:'#b88b53'},
         {...block,x:block.x+block.w*.68,y:block.y+block.h*.41,w:block.w*.24,h:block.h*.27,floors:1,archetype:'warehouse',sign:'STORES & GARAGE',neon:'#8b7c62'},
         {...block,x:block.x+block.w*.1,y:block.y+block.h*.75,w:block.w*.5,h:block.h*.15,floors:1,archetype:'pavilion',sign:'VISITOR ANNEX',neon:'#9aa0a8'}
@@ -1167,7 +1169,7 @@ function updatePedestrians(dt){
     p.gait=Math.min(1,p.movedDistance/Math.max(.01,frame*.42));
     if(p.gait===0)p.walkPhase=0;
     if(roam?.mode!=='foot'&&Math.abs(player.speed)>2&&pedestrianCarBlocked(p.x,p.y,player)&&!p.hitCooldown){
-      if(state.wanted<3)setWanted(state.wanted+1);
+      if(state.wanted<3)raiseWantedFromCrime(3,1.25);
       showToast('🚨 НАЕЗД НА ПЕШЕХОДА!');p.hitCooldown=2;
     }
     p.hitCooldown=Math.max(0,(p.hitCooldown||0)-dt);
@@ -1360,7 +1362,7 @@ function respawnPlayer(reason='авария'){
   if(!roam)Object.assign(player,{x:spawn.x,y:spawn.y,angle:0,speed:0,vx:0,vy:0});
   player.hp=player.maxHp||100;
   state.isDrowning=false;state.drownProgress=0;state.deathFlash=1;state.invulnTimer=180;
-  state.wanted=0;state.evading=false;policeCars.length=0;state.cash=Math.max(0,state.cash-100);
+  state.wanted=0;state.wantedCooldown=0;state.evading=false;policeCars.length=0;state.tacticalCallDispatched=false;state.guardCallDispatched=false;state.cash=Math.max(0,state.cash-100);
   showToast(`☠️ ВЫ ПОГИБЛИ: ${reason.toUpperCase()} · ВОЗРОЖДЕНИЕ (-$100)`);
 }
 
@@ -1661,6 +1663,23 @@ function setWanted(lvl) {
   if (state.wanted > 0) showToast(`🚨 УРОВЕНЬ РОЗЫСКА: ★ x ${state.wanted}!`);
 }
 
+function wantedResponseProfile(level) {
+  const wanted=Math.max(0,Math.min(5,Math.floor(Number(level)||0)));
+  return {
+    wanted,
+    patrolCount:wanted?Math.min(4,wanted+1):0,
+    tacticalCount:wanted>=4?1:0,
+    guardCount:wanted>=5?1:0
+  };
+}
+
+function raiseWantedFromCrime(maxLevel=5,cooldown=2.5) {
+  if(state.wanted>=maxLevel||state.wantedCooldown>0)return false;
+  setWanted(Math.min(maxLevel,state.wanted+1));
+  state.wantedCooldown=cooldown;
+  return true;
+}
+
 function stableVisualHash(a, b, c = 0) {
   const value = Math.sin(a * 12.9898 + b * 78.233 + c * 37.719) * 43758.5453;
   return value - Math.floor(value);
@@ -1936,69 +1955,158 @@ function drawShoreLife() {
   dinghies.forEach(([x,y],i)=>{ctx.save();ctx.translate(x,y);ctx.rotate(i%2?.25:-.18);ctx.fillStyle='#27383d';ctx.beginPath();ctx.moveTo(25,0);ctx.lineTo(5,-10);ctx.lineTo(-24,-7);ctx.lineTo(-24,7);ctx.lineTo(5,10);ctx.closePath();ctx.fill();ctx.strokeStyle='#8e8877';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='#171d1f';ctx.fillRect(-10,-5,18,10);ctx.restore();});
 }
 
+function wantedPoliceBase(role) {
+  const match=role==='nationalGuard'?/national\s+guard|armory/i:/police\s+precinct|police\s+station/i;
+  return buildings.find(building=>match.test(building.sign||''))||null;
+}
+
+function spawnWantedPoliceUnit(role) {
+  if(!roadGraph.length)return false;
+  const definitions={
+    patrol:{model:'police',width:48,height:24,maxSpeed:4.3,turnRate:.085,acceleration:.08},
+    tactical:{model:'armoredPolice',width:62,height:32,maxSpeed:3.75,turnRate:.068,acceleration:.065},
+    nationalGuard:{model:'nationalGuard',width:72,height:38,maxSpeed:3.25,turnRate:.055,acceleration:.05}
+  };
+  const definition=definitions[role];
+  if(!definition)return false;
+  let start,route,responseBase='';
+  const candidateUnit=(node,path)=>{
+    const next=path[1]||path[0];
+    return {...definition,role,x:node.x,y:node.y,angle:Math.atan2(next.y-node.y,next.x-node.x)};
+  };
+  if(role==='patrol'){
+    for(let attempt=0;attempt<24;attempt++){
+      const angle=Math.random()*Math.PI*2,distance=600+Math.random()*200;
+      const target={x:player.x+Math.cos(angle)*distance,y:player.y+Math.sin(angle)*distance};
+      const node=nearestRoadNode(target);
+      if(!node||!isPositionOnSolidGround(node.x,node.y)||!onRoadSurface(node.x,node.y,roads,bridges,scenicRoads,roadEnds)||
+        isPedestrianBlocked(node.x,node.y)||Math.hypot(node.x-player.x,node.y-player.y)<=250)continue;
+      const path=roadPath(roadGraph,node,player);
+      if(!path.length||!policeFootprintOnRoad(candidateUnit(node,path)))continue;
+      start=node;route=path;break;
+    }
+  }else{
+    const base=wantedPoliceBase(role);
+    if(!base)return false;
+    responseBase=base.sign;
+    const basePoint={x:base.x+base.w*.5,y:base.y+base.h*.5};
+    const candidates=roadGraph.map(node=>({node,distance:Math.hypot(node.x-basePoint.x,node.y-basePoint.y)}))
+      .filter(entry=>entry.distance<520).sort((a,b)=>a.distance-b.distance);
+    for(const {node} of candidates){
+      const path=roadPath(roadGraph,node,player);
+      if(!path.length||!policeFootprintOnRoad(candidateUnit(node,path)))continue;
+      start=node;route=path;break;
+    }
+    if(!start)return false;
+  }
+  if(!start||!route?.length)return false;
+  const next=route[1]||route[0];
+  const unit={
+    ...definition,role,responseBase,x:start.x,y:start.y,
+    angle:Math.atan2(next.y-start.y,next.x-start.x),speed:0,route,routeTimer:0,
+    contactCooldown:0,strobePhase:Math.random()*Math.PI*2
+  };
+  if(!policeFootprintOnRoad(unit))return false;
+  policeCars.push(unit);
+  if(role==='tactical'&&!state.tacticalCallDispatched){
+    state.tacticalCallDispatched=true;
+    showToast('🚔 SWAT НАПРАВЛЕНА ОТ ГОРОДСКОГО УЧАСТКА');
+  }
+  if(role==='nationalGuard'&&!state.guardCallDispatched){
+    state.guardCallDispatched=true;
+    showToast('⚠️ НАЦИОНАЛЬНАЯ ГВАРДИЯ ВЫЕХАЛА ИЗ АРСЕНАЛА');
+  }
+  return true;
+}
+
+function reconcilePoliceRoster(profile) {
+  const desired=[['patrol',profile.patrolCount],['tactical',profile.tacticalCount],['nationalGuard',profile.guardCount]];
+  for(const [role,count] of desired){
+    let units=policeCars.filter(unit=>(unit.role||'patrol')===role).length;
+    for(let i=policeCars.length-1;i>=0&&units>count;i--){
+      if((policeCars[i].role||'patrol')===role){policeCars.splice(i,1);units--;}
+    }
+    for(let attempt=0;units<count&&attempt<count*2;attempt++){
+      if(spawnWantedPoliceUnit(role))units++;
+      else if(role!=='patrol')break;
+    }
+  }
+}
+
+function policeFootprintOnRoad(unit) {
+  const halfLength=(unit.width||48)*.5,halfWidth=(unit.height||24)*.5;
+  const cs=Math.cos(unit.angle),sn=Math.sin(unit.angle);
+  return onRoadSurface(unit.x,unit.y,roads,bridges,scenicRoads,roadEnds)&&
+    [[halfLength,halfWidth],[halfLength,-halfWidth],[-halfLength,halfWidth],[-halfLength,-halfWidth]].every(([x,y])=>
+    onRoadSurface(unit.x+x*cs-y*sn,unit.y+x*sn+y*cs,roads,bridges,scenicRoads,roadEnds));
+}
+
 function updatePoliceAI(dt) {
+  state.wantedCooldown=Math.max(0,(state.wantedCooldown||0)-Math.max(0,dt));
   const evadeCard = document.getElementById('evadeStatusCard');
   const wantedPill = document.getElementById('wantedBadge');
 
   if (state.wanted === 0) {
     policeCars.length = 0;
+    state.tacticalCallDispatched=false;state.guardCallDispatched=false;
     if (evadeCard) evadeCard.style.display = 'none';
     if (wantedPill) { wantedPill.classList.remove('active', 'evading'); }
     return;
   }
 
-  const targetCops = Math.min(4, state.wanted + 1);
-  for(let attempt=0;policeCars.length<targetCops&&attempt<24;attempt++){
-    const ang = Math.random() * Math.PI * 2;
-    const dist = 600 + Math.random() * 200;
-    const target={x:player.x+Math.cos(ang)*dist,y:player.y+Math.sin(ang)*dist};
-    const spawn=roadGraph.reduce((best,n)=>Math.hypot(n.x-target.x,n.y-target.y)<Math.hypot(best.x-target.x,best.y-target.y)?n:best,roadGraph[0]||target);
-    const sx=spawn.x,sy=spawn.y;
-    if(isPositionOnSolidGround(sx,sy)&&!isPedestrianBlocked(sx,sy)&&Math.hypot(sx-player.x,sy-player.y)>250){
-      policeCars.push({
-        x: sx, y: sy, angle: 0, speed: 0, maxSpeed: 7.2, strobePhase: 0
-      });
-    }
-  }
-
+  const response=wantedResponseProfile(state.wanted);
+  reconcilePoliceRoster(response);
   let anyCopSees = false;
   for (let i = policeCars.length - 1; i >= 0; i--) {
     const cop = policeCars[i];
     cop.strobePhase += 0.3;
+    cop.contactCooldown=Math.max(0,(cop.contactCooldown||0)-Math.max(0,dt));
     if (!isPositionOnSolidGround(cop.x, cop.y)) {
       policeCars.splice(i, 1);
       continue;
     }
-    const dist = Math.hypot(player.x - cop.x, player.y - cop.y);
-    if (dist < 450) anyCopSees = true;
+    const initialDistance = Math.hypot(player.x - cop.x, player.y - cop.y);
+    if (initialDistance < 450) {
+      anyCopSees = true;
+      if(cop.role&&cop.role!=='patrol')cop.hasMadeContact=true;
+    }
 
     cop.routeTimer=(cop.routeTimer||0)-dt;
     if(cop.routeTimer<=0||!cop.route?.length){cop.route=roadPath(roadGraph,cop,player);cop.routeTimer=2;}
-    while(cop.route.length>1&&Math.hypot(cop.route[0].x-cop.x,cop.route[0].y-cop.y)<28)cop.route.shift();
+    while(cop.route.length>1&&Math.hypot(cop.route[0].x-cop.x,cop.route[0].y-cop.y)<(cop.width||48)*.58)cop.route.shift();
     const target=cop.route[0]||cop;
     const targetAng=Math.atan2(target.y-cop.y,target.x-cop.x);
     let diff = targetAng - cop.angle;
     while (diff < -Math.PI) diff += Math.PI * 2;
     while (diff > Math.PI) diff -= Math.PI * 2;
-    cop.angle += Math.sign(diff)*Math.min(Math.abs(diff),.085);
-    const desired=Math.abs(diff)>.45?1.7:4.3;
-    cop.speed+=(desired-cop.speed)*.08;
+    cop.angle += Math.sign(diff)*Math.min(Math.abs(diff),cop.turnRate||.085);
+    const maxSpeed=cop.maxSpeed||4.3;
+    const desired=Math.abs(diff)>.45?maxSpeed*.4:maxSpeed;
+    cop.speed+=(desired-cop.speed)*(cop.acceleration||.08);
     const ox=cop.x,oy=cop.y;
     cop.x+=Math.cos(cop.angle)*cop.speed;cop.y+=Math.sin(cop.angle)*cop.speed;
-    const cs=Math.cos(cop.angle),sn=Math.sin(cop.angle);
-    const supported=[[24,12],[24,-12],[-24,12],[-24,-12]].every(([x,y])=>onRoadSurface(cop.x+x*cs-y*sn,cop.y+x*sn+y*cs,roads,bridges,scenicRoads,roadEnds));
-    if(!supported){cop.x=ox;cop.y=oy;cop.speed=0;cop.routeTimer=0;}
+    if(!policeFootprintOnRoad(cop)){cop.x=ox;cop.y=oy;cop.speed=0;cop.routeTimer=0;}
 
-    if (dist < 34) {
-      player.speed *= 0.75;
-      if (state.invulnTimer === 0) {
-        player.hp = Math.max(0, player.hp - 8);
-        sound.playImpact();
+    const distance=Math.hypot(player.x-cop.x,player.y-cop.y);
+    if(distance<450){
+      anyCopSees=true;
+      if(cop.role&&cop.role!=='patrol')cop.hasMadeContact=true;
+    }
+    const contactRadius=34+(cop.width||48)*.04;
+    if(distance<contactRadius){
+      const impactSpeed=player.speed||0;
+      const velocityX=Math.cos(player.angle||0)*impactSpeed,velocityY=Math.sin(player.angle||0)*impactSpeed;
+      const toward=(velocityX*(cop.x-player.x)+velocityY*(cop.y-player.y))/Math.max(1,Math.hypot(velocityX,velocityY)*distance);
+      if(Math.abs(impactSpeed)>3.2&&toward>.62)raiseWantedFromCrime(5,6);
+      player.speed*=.75;
+      if(cop.contactCooldown<=0&&state.invulnTimer===0){
+        player.hp=Math.max(0,player.hp-8);cop.contactCooldown=.65;sound.playImpact();
       }
     }
   }
 
-  if (anyCopSees) {
+  const backupStillResponding=state.wanted>=4&&policeCars.some(unit=>unit.role&&unit.role!=='patrol'&&!unit.hasMadeContact);
+  if (anyCopSees || backupStillResponding) {
     state.evading = false;
     state.evadeTimer = 5.0;
     if (evadeCard) evadeCard.style.display = 'none';
@@ -2018,8 +2126,10 @@ function updatePoliceAI(dt) {
 
     if (state.evadeTimer <= 0) {
       state.wanted = 0;
+      state.wantedCooldown=0;
       state.evading = false;
       policeCars.length = 0;
+      state.tacticalCallDispatched=false;state.guardCallDispatched=false;
       if (evadeCard) evadeCard.style.display = 'none';
       if (wantedPill) wantedPill.classList.remove('active', 'evading');
       showToast('🛡️ ПОГОНЯ ОКОНЧЕНА! РОЗЫСК СНЯТ');
@@ -2473,7 +2583,7 @@ function drawStreetActors(w,h,center,zoom){
   }
   const addVehicle=(vehicle,draw)=>actors.push({depth:vehicle.x+vehicle.y,draw});
   trafficCars.forEach(c=>addVehicle(c,()=>drawDetailedCar(ctx,c.x,c.y,c.angle,c.color,c.width||46,c.height||22,false,c.type,stuntHeightFor(c))));
-  policeCars.forEach(c=>addVehicle(c,()=>drawDetailedCar(ctx,c.x,c.y,c.angle,'#0f172a',48,24,true,'police',stuntHeightFor(c))));
+  policeCars.forEach(c=>addVehicle(c,()=>drawDetailedCar(ctx,c.x,c.y,c.angle,'#0f172a',c.width||48,c.height||24,true,c.model||'police',stuntHeightFor(c))));
   incidentPoliceCars.forEach(c=>addVehicle(c,()=>drawDetailedCar(ctx,c.x,c.y,c.angle,'#0f172a',48,24,true,'police',stuntHeightFor(c))));
   incidentResponseVehicles.forEach(c=>addVehicle(c,()=>drawDetailedCar(ctx,c.x,c.y,c.angle,c.color,c.width,c.height,false,c.model,stuntHeightFor(c))));
   for(const wreck of activeIncident?.wrecks||[])addVehicle(wreck,()=>drawDetailedCar(ctx,wreck.x,wreck.y,wreck.angle,wreck.color,wreck.width,wreck.height,false,wreck.type));
@@ -2519,12 +2629,13 @@ function drawDetailedCar(ctx, x, y, ang, color, w, h, isPolice = false, model = 
   ctx.translate(x, y);
   ctx.rotate(ang);
   const serviceType=model==='fireEngine'||model==='ambulance'?model:null;
-  const kind=isPolice?'police':serviceType==='fireEngine'?'truck':serviceType==='ambulance'?'van':model;
+  const tacticalPolice=isPolice&&model==='armoredPolice',nationalGuard=isPolice&&model==='nationalGuard';
+  const kind=nationalGuard?'truck':tacticalPolice?'van':isPolice?'police':serviceType==='fireEngine'?'truck':serviceType==='ambulance'?'van':model;
   const elevation=(kind==='bus'?9:kind==='van'?8.5:kind==='truck'?7.5:kind==='coupe'||kind==='sports'?5.2:6.5), cs=Math.cos(ang), sn=Math.sin(ang);
   // Inverse-rotated world vertical; after the camera transform this stays an
   // upright screen-space extrusion at every vehicle heading.
   const zx=-elevation*(cs+sn), zy=elevation*(sn-cs);
-  const paint=isPolice?'#dedfda':color;
+  const paint=nationalGuard?'#70765a':tacticalPolice?'#50595d':isPolice?'#dedfda':color;
   const bodies={
     coupe:[[-w*.5,-h*.34],[-w*.34,-h*.48],[w*.38,-h*.46],[w*.5,-h*.25],[w*.5,h*.25],[w*.38,h*.46],[-w*.34,h*.48],[-w*.5,h*.34]],
     sports:[[-w*.5,-h*.31],[-w*.31,-h*.47],[w*.4,-h*.43],[w*.5,-h*.22],[w*.5,h*.22],[w*.4,h*.43],[-w*.31,h*.47],[-w*.5,h*.31]],
@@ -2559,7 +2670,7 @@ function drawDetailedCar(ctx, x, y, ang, color, w, h, isPolice = false, model = 
   // Lower body faces provide real height from all eight driving directions.
   for(let i=0;i<body.length;i++){
     const a=body[i],b=body[(i+1)%body.length];
-    const side=isPolice?(i===0||i===4?'#1e4778':'#8f9697'):(i<4?'rgba(20,24,27,.94)':'rgba(8,11,13,.9)');
+    const side=nationalGuard?(i%2?'#444b39':'#545a43'):tacticalPolice?(i%2?'#333b40':'#41494d'):isPolice?(i===0||i===4?'#1e4778':'#8f9697'):(i<4?'rgba(20,24,27,.94)':'rgba(8,11,13,.9)');
     poly([a,b,[b[0]+zx,b[1]+zy],[a[0]+zx,a[1]+zy]],side,'#090b0d',.8);
   }
   const top=raised(body);
@@ -2572,7 +2683,13 @@ function drawDetailedCar(ctx, x, y, ang, color, w, h, isPolice = false, model = 
   ctx.strokeStyle='rgba(255,255,255,.24)';ctx.beginPath();ctx.moveTo(-w*.42+zx,-h*.43+zy);ctx.lineTo(w*.34+zx,-h*.45+zy);ctx.stroke();
 
   // Police livery follows both flanks instead of floating above the vehicle.
-  if(isPolice){
+  if(nationalGuard){
+    poly(raised([[-w*.43,-h*.45],[w*.37,-h*.45],[w*.43,-h*.31],[-w*.43,-h*.31]]),'#b39a4d','#4c452e',.7);
+    poly(raised([[-w*.43,h*.31],[w*.43,h*.31],[w*.37,h*.45],[-w*.43,h*.45]]),'#b39a4d','#4c452e',.7);
+  }else if(tacticalPolice){
+    poly(raised([[-w*.43,-h*.45],[w*.37,-h*.45],[w*.43,-h*.31],[-w*.43,-h*.31]]),'#263744','#111b21',.8);
+    poly(raised([[-w*.43,h*.31],[w*.43,h*.31],[w*.37,h*.45],[-w*.43,h*.45]]),'#263744','#111b21',.8);
+  }else if(isPolice){
     poly(raised([[-w*.43,-h*.47],[w*.34,-h*.48],[w*.4,-h*.35],[-w*.43,-h*.35]]),'#28558a','#153151',.7);
     poly(raised([[-w*.43,h*.35],[w*.4,h*.35],[w*.34,h*.48],[-w*.43,h*.47]]),'#28558a','#153151',.7);
   }else if(serviceType){
@@ -2604,7 +2721,15 @@ function drawDetailedCar(ctx, x, y, ang, color, w, h, isPolice = false, model = 
     const glass=i===1||i===2?'#263943':i===5||i===6?'#101b22':'#1a2b34';
     poly([a,b,c,d],glass,'#080d10',.8);
   }
-  poly(cabinTop,isPolice?'#f0f0eb':kind==='van'?'#899094':'rgba(70,79,84,.94)','#090d10',1);
+  poly(cabinTop,nationalGuard?'#73795e':tacticalPolice?'#747e82':isPolice?'#f0f0eb':kind==='van'?'#899094':'rgba(70,79,84,.94)','#090d10',1);
+
+  if(tacticalPolice){
+    const armorRoof=[[-w*.3,-h*.22],[w*.15,-h*.22],[w*.28,-h*.08],[w*.28,h*.08],[w*.15,h*.22],[-w*.3,h*.22],[-w*.36,h*.08],[-w*.36,-h*.08]];
+    poly(raised(armorRoof,2.05),'#30393d','#11171a',1);
+    ctx.strokeStyle='rgba(185,198,197,.52)';ctx.lineWidth=1.1;
+    for(const side of [-1,1]){ctx.beginPath();ctx.moveTo(-w*.22+zx*2.05,side*h*.2+zy*2.05);ctx.lineTo(w*.12+zx*2.05,side*h*.2+zy*2.05);ctx.stroke();}
+    ctx.fillStyle='#d8d8cf';ctx.font='bold 5px monospace';ctx.textAlign='center';ctx.fillText('SWAT',zx*2.06,zy*2.06+2);
+  }
 
   // Truck cargo and sport bonnet make the classes readable at a glance.
   if(kind==='bus'){
@@ -2616,6 +2741,13 @@ function drawDetailedCar(ctx, x, y, ang, color, w, h, isPolice = false, model = 
     ctx.strokeStyle='#1c2325';ctx.lineWidth=2;
     for(const side of [-1,1]){ctx.beginPath();ctx.moveTo(-w*.07+zx*1.1,side*h*.48+zy*1.1);ctx.lineTo(-w*.07+zx*1.1,side*h*.37+zy*1.1);ctx.stroke();}
     poly(raised([[w*.39,-h*.17],[w*.49,-h*.15],[w*.49,h*.15],[w*.39,h*.17]],1.25),'#c7b270','#16191a',.8);
+  }else if(kind==='truck'&&nationalGuard){
+    const hull=[[-w*.43,-h*.39],[w*.25,-h*.39],[w*.45,-h*.2],[w*.45,h*.2],[w*.25,h*.39],[-w*.43,h*.39]];
+    volume(hull,1.04,1.92,'#646b50','#444a39');
+    const hatch=[[-w*.12,-h*.2],[w*.12,-h*.2],[w*.2,0],[w*.12,h*.2],[-w*.12,h*.2],[-w*.2,0]];
+    volume(hatch,1.94,2.3,'#4d5441','#363c30');
+    ctx.strokeStyle='#c1a44e';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(-w*.08+zx*2.31,zy*2.31);ctx.lineTo(w*.22+zx*2.31,zy*2.31);ctx.stroke();
+    ctx.fillStyle='#ddd0a1';ctx.font='bold 5px monospace';ctx.textAlign='center';ctx.fillText('N.G.',-w*.29+zx*1.95,zy*1.95+2);
   }else if(kind==='truck'){
     const cargo=[[-w*.46,-h*.4],[-w*.08,-h*.4],[-w*.08,h*.4],[-w*.46,h*.4]];
     const box=volume(cargo,1.05,2.45,'#6f6558','#514940');
@@ -2973,8 +3105,10 @@ function setupInputListeners() {
       state.cash -= 80;
       player.hp = 100;
       state.wanted = 0;
+      state.wantedCooldown=0;
       state.evading = false;
       policeCars.length = 0;
+      state.tacticalCallDispatched=false;state.guardCallDispatched=false;
       showToast('🔧 МАШИНА ПОЛНОСТЬЮ ВОССТАНОВЛЕНА!');
       autoSaveProgress();
     } else {

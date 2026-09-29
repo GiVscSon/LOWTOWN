@@ -115,6 +115,10 @@ export function drawArchitecture(ctx, b, index) {
       ctx.strokeStyle='#ddd9ca';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(cx-18,cy);ctx.lineTo(cx+18,cy);ctx.stroke();ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(cx,cy-12);ctx.lineTo(cx,cy+12);ctx.stroke();
     }else if(type==='depot'){
       ctx.fillStyle='#b69054';for(let bay=0;bay<3;bay++)ctx.fillRect(cx-16+bay*11,cy-8,7,16);
+    }else if(b.civicType==='guardBase'){
+      ctx.fillStyle='#62694f';ctx.beginPath();ctx.moveTo(cx-17,cy-12);ctx.lineTo(cx+17,cy-12);ctx.lineTo(cx+14,cy+6);ctx.lineTo(cx,cy+15);ctx.lineTo(cx-14,cy+6);ctx.closePath();ctx.fill();
+      ctx.strokeStyle='#c1a44e';ctx.lineWidth=2;ctx.stroke();
+      ctx.fillStyle='#dfd4ad';ctx.font='bold 9px monospace';ctx.textAlign='center';ctx.fillText('NG',cx,cy+3);
     }else{
       ctx.fillStyle='#b9ad8b';ctx.fillRect(cx-15,cy-8,30,16);ctx.fillStyle='#625962';ctx.fillRect(cx-4,cy-8,8,16);ctx.fillRect(cx-15,cy-2,30,4);
     }
