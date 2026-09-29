@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import { pointInCoast } from '../src/game/coastline.js';
+import { pointInCoast, coastPoints } from '../src/game/coastline.js';
+import * as street from '../src/game/street_network.js';
 
 const noop=()=>{};
 const element={style:{},classList:{add:noop,remove:noop},appendChild:noop,addEventListener:noop,getContext:()=>({}),remove:noop};
-const sandbox={console,Math,performance:{now:()=>0},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,pointInCoast};
+const sandbox={console,Math,performance:{now:()=>0},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,pointInCoast,coastPoints,...street};
 vm.createContext(sandbox);
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
 vm.runInContext(source+`
@@ -14,6 +15,11 @@ const target=buildings.find(b=>b.archetype==='warehouse'&&isPositionOnSolidGroun
 const walker={x:target.x-12,y:target.y+target.h*.5,vx:1,visualScale:.91,fleeTimer:1,pause:0};
 const initialScale=walker.visualScale;
 for(let i=0;i<160;i++)movePedestrian(walker,3,0);
+const routeAssigned=pedestrians.filter(p=>p.route?.points?.length>=5).length;
+const beforeWalk=pedestrians.map(p=>({x:p.x,y:p.y}));
+pedestrians.forEach(p=>{p.pause=0;p.fleeTimer=0;p.goal=null;});
+for(let i=0;i<240;i++)updatePedestrians(1/60);
+const walkingNpcCount=pedestrians.filter((p,i)=>Math.hypot(p.x-beforeWalk[i].x,p.y-beforeWalk[i].y)>2).length;
 this.report={
   parks:parkZones.length,
   parkObstacles:parkObstacles.length,
@@ -21,6 +27,9 @@ this.report={
   archetypes:[...new Set(buildings.map(b=>b.archetype).filter(Boolean))],
   blockedBuildingCentre:isPedestrianBlocked(target.x+target.w*.5,target.y+target.h*.5),
   walkerBlocked:isPedestrianBlocked(walker.x,walker.y),
+  routeAssigned,
+  walkingNpcCount,
+  npcInsideObstacle:pedestrians.filter(p=>isPedestrianBlocked(p.x,p.y)).length,
   scaleStable:walker.visualScale===initialScale,
   configuredScales:pedestrians.every(p=>Number.isFinite(p.visualScale))
 };`,sandbox);
@@ -33,4 +42,7 @@ assert.equal(sandbox.report.blockedBuildingCentre,true,'building must block pede
 assert.equal(sandbox.report.walkerBlocked,false,'pedestrian entered an obstacle');
 assert.equal(sandbox.report.scaleStable,true,'walking changed pedestrian scale');
 assert.equal(sandbox.report.configuredScales,true,'pedestrian identity scale is missing');
+assert.ok(sandbox.report.routeAssigned>=100,'most city pedestrians should use authored sidewalk and park paths');
+assert.ok(sandbox.report.walkingNpcCount>=70,'pedestrians should make visible progress on their routes');
+assert.equal(sandbox.report.npcInsideObstacle,0,'an NPC entered a building, tree, car or water');
 console.log('PEDESTRIAN_WORLD_OK',JSON.stringify(sandbox.report));

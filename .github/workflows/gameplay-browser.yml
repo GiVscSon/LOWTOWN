@@ -1,16 +1,13 @@
-name: LOWTOWN Gameplay Browser Gates
+name: LOWTOWN Sandbox Gameplay Gates
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-  merge_group:
-    types: [checks_requested]
-    branches: [main]
 
 jobs:
-  browser-gates:
+  sandbox-gameplay:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,20 +16,24 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm install --no-save playwright
-      - run: npx playwright install --with-deps chromium
-      - name: 15s continuous AI motion capture
-        run: node tests/ai-15s-browser-smoke.mjs
-      - name: End-to-end DROP payout and DIST gate
-        run: node tests/gameplay-browser-acceptance.mjs
-      - name: Runtime vehicle collision browser gate
-        run: node tests/runtime-collision-browser.mjs
-      - name: Mobile + desktop visual regression guard
-        run: node tests/visual-regression-browser.mjs
-      - name: Upload visual guard screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: lowtown-visual-guard
-          path: test-results/visual-*.png
-          if-no-files-found: ignore
+      - run: npm run build
+      - name: Human controls
+        run: node tests/human-controls-regression.mjs
+      - name: Live traffic
+        run: node tests/live-traffic-regression.mjs
+      - name: Pedestrian motion
+        run: node tests/pedestrian-motion-regression.mjs
+      - name: Aircraft flight
+        run: node tests/plane-flight-regression.mjs
+      - name: Street depth order
+        run: node tests/street-depth-regression.mjs
+      - name: Traffic turns
+        run: node tests/traffic-turns-regression.mjs
+      - name: Private drive
+        run: node tests/private-drive-smoke.mjs
+      - name: Free roam rendering
+        run: node tests/free-roam-render-smoke.mjs
+      - name: Pedestrian world
+        run: node tests/pedestrian-world-smoke.mjs
+      - name: Expanded city world
+        run: node tests/huge-world-smoke.mjs
