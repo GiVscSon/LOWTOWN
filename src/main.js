@@ -306,6 +306,7 @@ const bridgeRails = [];
 const trafficCars = [];
 const policeCars = [];
 const incidentPoliceCars = [];
+const incidentResponseVehicles = [];
 const transitRoutes=[];
 const pedestrians = [];
 let cityIncidentDirector = null;
@@ -463,6 +464,7 @@ function initTopology() {
   trafficCars.length = 0;
   policeCars.length = 0;
   incidentPoliceCars.length = 0;
+  incidentResponseVehicles.length = 0;
   transitRoutes.length = 0;
   pedestrians.length = 0;
   streetLights.length = 0;
@@ -1234,6 +1236,120 @@ function updateIncidentPolice(dt){
   }
 }
 
+function nearestRoadNode(point){
+  return roadGraph.reduce((best,node)=>Math.hypot(node.x-point.x,node.y-point.y)<Math.hypot(best.x-point.x,best.y-point.y)?node:best,roadGraph[0]);
+}
+
+function responseRouteLength(route){
+  let length=0;
+  for(let i=1;i<route.length;i++)length+=Math.hypot(route[i].x-route[i-1].x,route[i].y-route[i-1].y);
+  return length;
+}
+
+function dispatchIncidentResponse(incident){
+  if(!incident||incident.responseDispatched||incident.responseDispatchAttempted||!roadGraph.length)return 0;
+  const services=incident.kind==='fire'?['fireEngine','ambulance']:
+    ['crash','fight','killing'].includes(incident.kind)?['ambulance']:[];
+  incident.responseDispatchAttempted=true;
+  if(!services.length)return 0;
+  const target=nearestRoadNode(incident);
+  const dispatchedServices=[];
+  for(const serviceType of services){
+    const civicType=serviceType==='fireEngine'?'firestation':'hospital';
+    const bases=buildings.filter(building=>building.civicType===civicType)
+      .map(building=>({x:building.x+building.w*.5,y:building.y+building.h*.5,building}))
+      .sort((a,b)=>Math.hypot(a.x-incident.x,a.y-incident.y)-Math.hypot(b.x-incident.x,b.y-incident.y));
+    const candidates=[];
+    for(const base of bases.slice(0,5)){
+      const start=nearestRoadNode(base);
+      const route=roadPath(roadGraph,start,target);
+      if(route.length<2||!route.every(node=>onRoadSurface(node.x,node.y,roads,bridges,scenicRoads,roadEnds)))continue;
+      candidates.push({base,start,route,distance:responseRouteLength(route)});
+    }
+    candidates.sort((a,b)=>a.distance-b.distance);
+    const choice=candidates[0];
+    if(!choice)continue;
+    const fireEngine=serviceType==='fireEngine';
+    const next=choice.route[1];
+    incidentResponseVehicles.push({
+      x:choice.start.x,y:choice.start.y,angle:Math.atan2(next.y-choice.start.y,next.x-choice.start.x),
+      speed:0,maxSpeed:fireEngine?4.35:5.9,width:fireEngine?72:54,height:fireEngine?34:27,
+      mass:fireEngine?8400:3300,model:serviceType,color:fireEngine?'#bd3e30':'#dedbd1',
+      route:choice.route.slice(1),routeTimer:0,responseTarget:{x:target.x,y:target.y},
+      baseTarget:{x:choice.start.x,y:choice.start.y},responseIncidentId:incident.id,
+      status:'enroute',sceneTimer:fireEngine?4.8:4.1,strobePhase:Math.random()*Math.PI*2
+    });
+    dispatchedServices.push(serviceType);
+  }
+  if(dispatchedServices.length){incident.responseDispatched=true;incident.respondingServices=dispatchedServices;}
+  return dispatchedServices.length;
+}
+
+function applyMedicalResponse(incident){
+  if(!incident)return;
+  incident.medicalTreated=true;
+  incident.medicalOutcome='checked';
+  for(const actor of incident.actors||[]){
+    if(actor.stance==='down'||['victim','injured','evacuee','defender'].includes(actor.role)){
+      actor.medicalTreated=true;
+      if(actor.stance==='down')actor.stance='assisted';
+      actor.reaction='calm';
+    }
+  }
+}
+
+function beginIncidentResponseReturn(unit){
+  unit.status='returning';
+  unit.responseTarget={...unit.baseTarget};
+  unit.route=roadPath(roadGraph,unit,unit.responseTarget).slice(1);
+  unit.routeTimer=0;
+  if(!unit.route.length){unit.returnedToBase=true;unit.removeAfterScene=true;}
+}
+
+function updateIncidentResponse(dt){
+  const frame=Math.min(Math.max(dt,0),.05)*60;
+  const active=cityIncidentDirector?.current();
+  for(let i=incidentResponseVehicles.length-1;i>=0;i--){
+    const unit=incidentResponseVehicles[i];
+    unit.strobePhase=(unit.strobePhase||0)+dt*14;
+    const incident=active?.id===unit.responseIncidentId?active:null;
+    if(unit.status==='onscene'){
+      unit.sceneTimer-=dt;
+      if(unit.sceneTimer<=0){
+        if(unit.model==='fireEngine'&&incident){incident.fireSuppressed=true;incident.fireResponse='contained';}
+        if(unit.model==='ambulance'&&incident){applyMedicalResponse(incident);incident.medicalResponse='treated';}
+        beginIncidentResponseReturn(unit);
+      }
+      continue;
+    }
+    if(unit.removeAfterScene){incidentResponseVehicles.splice(i,1);continue;}
+    if(!unit.route?.length)unit.route=roadPath(roadGraph,unit,unit.responseTarget).slice(1);
+    if(!unit.route.length){incidentResponseVehicles.splice(i,1);continue;}
+    while(unit.route.length>1&&Math.hypot(unit.route[0].x-unit.x,unit.route[0].y-unit.y)<30)unit.route.shift();
+    const target=unit.route[0]||unit.responseTarget;
+    const distance=Math.hypot(target.x-unit.x,target.y-unit.y);
+    const responseDistance=Math.hypot(unit.responseTarget.x-unit.x,unit.responseTarget.y-unit.y);
+    if(responseDistance<32){
+      if(unit.status==='returning'){unit.returnedToBase=true;incidentResponseVehicles.splice(i,1);continue;}
+      unit.status='onscene';unit.sceneTimer=unit.model==='fireEngine'?4.8:4.1;unit.speed=0;
+      if(incident&&unit.model==='fireEngine')incident.fireResponse='onScene';
+      if(incident&&unit.model==='ambulance')incident.medicalResponse='onScene';
+      continue;
+    }
+    const desiredAngle=Math.atan2(target.y-unit.y,target.x-unit.x);
+    const diff=Math.atan2(Math.sin(desiredAngle-unit.angle),Math.cos(desiredAngle-unit.angle));
+    unit.angle+=Math.sign(diff)*Math.min(Math.abs(diff),.105*frame);
+    const desired=Math.abs(diff)>.42?unit.maxSpeed*.48:unit.maxSpeed;
+    unit.speed+=(desired-unit.speed)*Math.min(1,(unit.model==='fireEngine'?.075:.12)*frame);
+    const oldX=unit.x,oldY=unit.y;
+    unit.x+=Math.cos(unit.angle)*unit.speed*frame;
+    unit.y+=Math.sin(unit.angle)*unit.speed*frame;
+    if(!onRoadSurface(unit.x,unit.y,roads,bridges,scenicRoads,roadEnds)){
+      unit.x=oldX;unit.y=oldY;unit.speed=0;unit.routeTimer=0;
+    }
+  }
+}
+
 function nearestSafeSpawn(x,y){
   return safeSpawnPoints.reduce((best,sp)=>Math.hypot(sp.x-x,sp.y-y)<Math.hypot(best.x-x,best.y-y)?sp:best,safeSpawnPoints[0]);
 }
@@ -1491,14 +1607,21 @@ function updatePhysics(dt) {
       incident.reportNoticeShown=true;
       showToast('📞 Свидетель сообщил о происшествии · патруль направлен');
     }
+    const services=dispatchIncidentResponse(incident);
+    if(services&&!incident.serviceNoticeShown&&Math.hypot(player.x-incident.x,player.y-incident.y)<1400){
+      incident.serviceNoticeShown=true;
+      const names=incident.respondingServices.map(type=>type==='fireEngine'?'пожарная бригада':'скорая помощь').join(' и ');
+      showToast(`🚒 Вызваны: ${names}`);
+    }
   }
   updateIncidentPolice(dt);
+  updateIncidentResponse(dt);
   updatePedestrians(dt);
 
   if (!roam?.special) updatePoliceAI(dt);
-  const stuntVehicles=[...trafficCars,...policeCars,...incidentPoliceCars];
+  const stuntVehicles=[...trafficCars,...policeCars,...incidentPoliceCars,...incidentResponseVehicles];
   stuntVehicles.forEach(vehicle=>updateStuntVehicle(vehicle,dt));
-  const vehicles = [...(!roam?.special&&stuntHeightFor(player)<16 ? [player] : []), ...trafficCars, ...policeCars, ...incidentPoliceCars];
+  const vehicles = [...(!roam?.special&&stuntHeightFor(player)<16 ? [player] : []), ...trafficCars, ...policeCars, ...incidentPoliceCars,...incidentResponseVehicles];
   // Repeated projection handles simultaneous wall/car contacts at intersections.
   for (let pass = 0; pass < 3; pass++) {
     for (let i = 0; i < vehicles.length; i++) {
@@ -2265,6 +2388,10 @@ function drawScreenPedestrian(ped,sx,sy,index,zoom=1){
   if(index%6===0){ctx.fillStyle='#25282b';ctx.fillRect(-3.1,-30,6.2,1.8);ctx.fillRect(-2.3,-31.7,4.6,2);}
   if(index%5===0){limb([[shoulder,-20],[shoulder+1,-12]],'#201c19',.8);ctx.fillStyle='#513d2e';ctx.fillRect(shoulder,-13,3,5);ctx.strokeStyle='#907453';ctx.lineWidth=.5;ctx.strokeRect(shoulder,-13,3,5);}
   if(ped.player){ctx.strokeStyle='#e8b84a';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(0,2,8,4,0,0,Math.PI*2);ctx.stroke();}
+  if(ped.medicalTreated){
+    ctx.fillStyle='#cbe5e7';ctx.fillRect(-2,-38,4,10);ctx.fillRect(-5,-35,10,4);
+    ctx.strokeStyle='#17252b';ctx.lineWidth=.7;ctx.strokeRect(-5,-38,10,10);
+  }
   if(ped.reaction==='fleeing'||ped.reaction==='curious'){
     ctx.fillStyle=ped.reaction==='fleeing'?'#ef6655':'#f0c46c';
     ctx.font='bold 8px monospace';ctx.textAlign='center';
@@ -2277,7 +2404,7 @@ function drawCityIncidentMarker(incident){
   const pulse=1+Math.sin(performance.now()/180)*.13;
   ctx.save();ctx.translate(incident.x,incident.y);
   ctx.transform(1/Math.sqrt(3),-1/Math.sqrt(3),1,1,0,0);
-  if(incident.kind==='fire'){
+  if(incident.kind==='fire'&&!incident.fireSuppressed){
     ctx.fillStyle='rgba(239,92,40,.2)';ctx.beginPath();ctx.ellipse(0,-17,33,24,0,0,Math.PI*2);ctx.fill();
     for(let i=0;i<5;i++){
       const drift=Math.sin(performance.now()/210+i*1.7)*5,rise=(performance.now()/70+i*13)%32;
@@ -2286,6 +2413,12 @@ function drawCityIncidentMarker(incident){
     }
     ctx.fillStyle='rgba(31,35,34,.3)';
     for(let i=0;i<4;i++){const drift=Math.sin(performance.now()/480+i)*8;const rise=(performance.now()/160+i*16)%50;ctx.beginPath();ctx.arc(-12+i*8+drift,-34-rise,5+i*1.2,0,Math.PI*2);ctx.fill();}
+  }else if(incident.kind==='fire'&&incident.fireSuppressed){
+    ctx.fillStyle='rgba(172,190,183,.16)';ctx.beginPath();ctx.ellipse(0,-14,26,15,0,0,Math.PI*2);ctx.fill();
+    for(let i=0;i<4;i++){
+      const drift=Math.sin(performance.now()/380+i*1.4)*5,rise=(performance.now()/145+i*11)%27;
+      ctx.fillStyle='rgba(194,205,196,.38)';ctx.beginPath();ctx.arc((i-1.5)*8+drift,-18-rise,4+i%2*2,0,Math.PI*2);ctx.fill();
+    }
   }
   ctx.globalAlpha=.78;ctx.fillStyle='rgba(10,13,15,.82)';ctx.strokeStyle='#e8b84a';ctx.lineWidth=2;
   ctx.beginPath();ctx.arc(0,-8,13*pulse,0,Math.PI*2);ctx.fill();ctx.stroke();
@@ -2342,6 +2475,7 @@ function drawStreetActors(w,h,center,zoom){
   trafficCars.forEach(c=>addVehicle(c,()=>drawDetailedCar(ctx,c.x,c.y,c.angle,c.color,c.width||46,c.height||22,false,c.type,stuntHeightFor(c))));
   policeCars.forEach(c=>addVehicle(c,()=>drawDetailedCar(ctx,c.x,c.y,c.angle,'#0f172a',48,24,true,'police',stuntHeightFor(c))));
   incidentPoliceCars.forEach(c=>addVehicle(c,()=>drawDetailedCar(ctx,c.x,c.y,c.angle,'#0f172a',48,24,true,'police',stuntHeightFor(c))));
+  incidentResponseVehicles.forEach(c=>addVehicle(c,()=>drawDetailedCar(ctx,c.x,c.y,c.angle,c.color,c.width,c.height,false,c.model,stuntHeightFor(c))));
   for(const wreck of activeIncident?.wrecks||[])addVehicle(wreck,()=>drawDetailedCar(ctx,wreck.x,wreck.y,wreck.angle,wreck.color,wreck.width,wreck.height,false,wreck.type));
   for(const vehicle of roam?.fleet||[])if(vehicle.kind!=='water')
     addVehicle(vehicle,()=>drawTransport(ctx,vehicle,performance.now()/1000,stuntHeightFor(vehicle)));
@@ -2384,7 +2518,8 @@ function drawDetailedCar(ctx, x, y, ang, color, w, h, isPolice = false, model = 
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(ang);
-  const kind=isPolice?'police':model;
+  const serviceType=model==='fireEngine'||model==='ambulance'?model:null;
+  const kind=isPolice?'police':serviceType==='fireEngine'?'truck':serviceType==='ambulance'?'van':model;
   const elevation=(kind==='bus'?9:kind==='van'?8.5:kind==='truck'?7.5:kind==='coupe'||kind==='sports'?5.2:6.5), cs=Math.cos(ang), sn=Math.sin(ang);
   // Inverse-rotated world vertical; after the camera transform this stays an
   // upright screen-space extrusion at every vehicle heading.
@@ -2440,6 +2575,16 @@ function drawDetailedCar(ctx, x, y, ang, color, w, h, isPolice = false, model = 
   if(isPolice){
     poly(raised([[-w*.43,-h*.47],[w*.34,-h*.48],[w*.4,-h*.35],[-w*.43,-h*.35]]),'#28558a','#153151',.7);
     poly(raised([[-w*.43,h*.35],[w*.4,h*.35],[w*.34,h*.48],[-w*.43,h*.47]]),'#28558a','#153151',.7);
+  }else if(serviceType){
+    const stripe=serviceType==='fireEngine'?'#f0cb65':'#c74739';
+    poly(raised([[-w*.43,-h*.45],[w*.37,-h*.45],[w*.43,-h*.32],[-w*.43,-h*.32]]),stripe,'#3b2822',.6);
+    poly(raised([[-w*.43,h*.32],[w*.43,h*.32],[w*.37,h*.45],[-w*.43,h*.45]]),stripe,'#3b2822',.6);
+    if(serviceType==='fireEngine'){
+      ctx.strokeStyle='#ddd5bf';ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(-w*.42+zx*2.1,-h*.18+zy*2.1);ctx.lineTo(-w*.08+zx*2.1,-h*.18+zy*2.1);ctx.moveTo(-w*.42+zx*2.1,h*.18+zy*2.1);ctx.lineTo(-w*.08+zx*2.1,h*.18+zy*2.1);ctx.stroke();
+    }else{
+      const cx=-w*.08+zx*2.2,cy=zy*2.2;ctx.fillStyle='#bd4338';ctx.fillRect(cx-1.5,cy-5,3,10);ctx.fillRect(cx-5,cy-1.5,10,3);
+    }
   }
 
   // Each class owns a distinct roofline instead of sharing one sedan shape.
@@ -2505,6 +2650,18 @@ function drawDetailedCar(ctx, x, y, ang, color, w, h, isPolice = false, model = 
     ctx.save();ctx.shadowBlur=8;ctx.shadowColor=flash?'#ef4444':'#3b82f6';
     poly([[-6.4+barX,-3.3+barY],[-.4+barX,-3.3+barY],[-.4+barX,3.3+barY],[-6.4+barX,3.3+barY]],flash?'#f04a43':'#8a1f2b');
     poly([[.4+barX,-3.3+barY],[6.4+barX,-3.3+barY],[6.4+barX,3.3+barY],[.4+barX,3.3+barY]],flash?'#193d8b':'#4386f0');ctx.restore();
+  }else if(serviceType){
+    const barX=zx*2.02,barY=zy*2.02,flash=Math.sin(performance.now()*.017+(serviceType==='ambulance'?Math.PI:0))>0;
+    poly([[-8+barX,-4+barY],[8+barX,-4+barY],[8+barX,4+barY],[-8+barX,4+barY]],'#24292b','#080a0b',.8);
+    ctx.save();ctx.shadowBlur=9;ctx.shadowColor=serviceType==='fireEngine'?(flash?'#f04438':'#ffd24f'):(flash?'#43a5fa':'#f24943');
+    if(serviceType==='fireEngine'){
+      poly([[-7+barX,-3+barY],[-1+barX,-3+barY],[-1+barX,3+barY],[-7+barX,3+barY]],flash?'#ffcf4a':'#e34a37');
+      poly([[1+barX,-3+barY],[7+barX,-3+barY],[7+barX,3+barY],[1+barX,3+barY]],flash?'#e34a37':'#ffcf4a');
+    }else{
+      poly([[-7+barX,-3+barY],[-1+barX,-3+barY],[-1+barX,3+barY],[-7+barX,3+barY]],flash?'#4296ef':'#d33a35');
+      poly([[1+barX,-3+barY],[7+barX,-3+barY],[7+barX,3+barY],[1+barX,3+barY]],flash?'#d33a35':'#4296ef');
+    }
+    ctx.restore();
   }else if(kind==='taxi'){
     const signX=zx*2.03,signY=zy*2.03;
     poly([[-5+signX,-3+signY],[6+signX,-3+signY],[6+signX,3+signY],[-5+signX,3+signY]],'#d7a52f','#17191a',.8);
