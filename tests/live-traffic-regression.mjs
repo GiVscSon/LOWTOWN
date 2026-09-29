@@ -4,12 +4,15 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { resolveContact, resolveScenery } from '../src/game/solid_contacts.js';
 import { advanceTrafficCar, resolveTrafficPair } from '../src/game/traffic_turns.js';
-import { coastPoints, pointInCoast } from '../src/game/coastline.js';
+import { coastPoints, pointInCoast, pointInBeach, BEACH_WIDTH } from '../src/game/coastline.js';
+import * as ocean from '../src/game/ocean_chunks.js';
+import * as surfaces from '../src/game/surface_physics.js';
+import * as incidents from '../src/game/city_incidents.js';
 import { projectIso, velocityForHeading, routeInput } from '../src/game/test_drive_core.js';
 const noop=()=>{};
 const element={style:{},classList:{add:noop,remove:noop},appendChild:noop,remove:noop,addEventListener:noop,getContext:()=>({})};
 let clock=0;
-const sandbox={...streetNetwork,Math,console,advanceClock:()=>clock+=1000/60,performance:{now:()=>clock},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,resolveContact,resolveScenery,advanceTrafficCar,resolveTrafficPair,coastPoints,pointInCoast,projectIso,velocityForHeading,routeInput};
+const sandbox={...streetNetwork,...ocean,...surfaces,...incidents,Math,console,advanceClock:()=>clock+=1000/60,performance:{now:()=>clock},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,resolveContact,resolveScenery,advanceTrafficCar,resolveTrafficPair,coastPoints,pointInCoast,pointInBeach,BEACH_WIDTH,projectIso,velocityForHeading,routeInput};
 vm.createContext(sandbox);
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
 vm.runInContext(source+`

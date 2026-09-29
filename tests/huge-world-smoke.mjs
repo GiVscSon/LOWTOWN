@@ -2,11 +2,14 @@ import * as streetNetwork from '../src/game/street_network.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import { pointInCoast, coastPoints } from '../src/game/coastline.js';
+import { pointInCoast, pointInBeach, coastPoints, BEACH_WIDTH } from '../src/game/coastline.js';
+import * as ocean from '../src/game/ocean_chunks.js';
+import * as surfaces from '../src/game/surface_physics.js';
+import * as incidents from '../src/game/city_incidents.js';
 
 const noop=()=>{};
 const element={style:{},classList:{add:noop,remove:noop},appendChild:noop,addEventListener:noop,getContext:()=>({}),remove:noop};
-const sandbox={...streetNetwork,console,Math,performance:{now:()=>0},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,pointInCoast,coastPoints};
+const sandbox={...streetNetwork,...ocean,...surfaces,...incidents,console,Math,performance:{now:()=>0},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,pointInCoast,pointInBeach,coastPoints,BEACH_WIDTH};
 vm.createContext(sandbox);
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
 vm.runInContext(source+`
@@ -26,7 +29,11 @@ this.report={
     const a=br.dir==='h'?{x:br.x-5,y:br.y+br.h/2}:{x:br.x+br.w/2,y:br.y-5};
     const b=br.dir==='h'?{x:br.x+br.w+5,y:br.y+br.h/2}:{x:br.x+br.w/2,y:br.y+br.h+5};
     return !islands.some(i=>pointInCoast(a.x,a.y,i))||!islands.some(i=>pointInCoast(b.x,b.y,i));
-  }).map(b=>b.id),
+  }).map(br=>{
+    const a=br.dir==='h'?{x:br.x-5,y:br.y+br.h/2}:{x:br.x+br.w/2,y:br.y-5};
+    const b=br.dir==='h'?{x:br.x+br.w+5,y:br.y+br.h/2}:{x:br.x+br.w/2,y:br.y+br.h+5};
+    return {id:br.id,a,b,landA:islands.filter(i=>pointInCoast(a.x,a.y,i)).map(i=>i.id),landB:islands.filter(i=>pointInCoast(b.x,b.y,i)).map(i=>i.id)};
+  }),
   bridgeRoadLinks:bridges.every(br=>{
     const ends=br.dir==='h'?[{x:br.x-150,y:br.y,w:150,h:br.h},{x:br.x+br.w,y:br.y,w:150,h:br.h}]:[{x:br.x,y:br.y-150,w:br.w,h:150},{x:br.x,y:br.y+br.h,w:br.w,h:150}];
     return ends.every(end=>roads.some(r=>overlap(end,r)));

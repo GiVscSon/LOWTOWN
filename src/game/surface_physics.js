@@ -1,38 +1,110 @@
-const finite=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
-const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
+const inside=(x,y,rect,pad=0)=>x>=rect.x-pad&&x<=rect.x+rect.w+pad&&y>=rect.y-pad&&y<=rect.y+rect.h+pad;
+const finite=(value,fallback=0)=>Number.isFinite(Number(value))?Number(value):fallback;
 
-export const SURFACE_TYPES=Object.freeze({DRY:'dry',WET:'wet',DIRT:'dirt',GRASS:'grass',OIL:'oil'});
+export const SURFACE_TYPES=Object.freeze({
+  ROAD:'road', BRIDGE:'bridge', GRAVEL:'gravel', SAND:'sand', GRASS:'grass',
+  CURB:'curb', TIMBER:'timber', OFFROAD:'offroad', WATER:'water', DRY:'dry', WET:'wet', OIL:'oil'
+});
 
 export const SURFACE_PROFILES=Object.freeze({
   dry:Object.freeze({grip:1,brake:1,drag:1,power:1}),
   wet:Object.freeze({grip:.68,brake:.72,drag:1.04,power:.98}),
   dirt:Object.freeze({grip:.54,brake:.62,drag:1.12,power:.9}),
+  sand:Object.freeze({grip:.43,brake:.48,drag:1.22,power:.72}),
   grass:Object.freeze({grip:.42,brake:.5,drag:1.18,power:.82}),
-  oil:Object.freeze({grip:.16,brake:.28,drag:.98,power:1})
+  curb:Object.freeze({grip:.62,brake:.7,drag:1.09,power:.9}),
+  timber:Object.freeze({grip:.7,brake:.74,drag:1.08,power:.92}),
+  offroad:Object.freeze({grip:.48,brake:.57,drag:1.16,power:.78}),
+  oil:Object.freeze({grip:.16,brake:.28,drag:.98,power:1}),
+  water:Object.freeze({grip:.01,brake:.08,drag:1.25,power:.15})
 });
 
+const SURFACE_ALIASES=Object.freeze({road:'dry',bridge:'dry',asphalt:'dry',tarmac:'dry',gravel:'dirt'});
 export function resolveSurface(surface='dry'){
-  const key=String(surface||'dry').toLowerCase();
+  const raw=String(surface||'dry').toLowerCase(),key=SURFACE_ALIASES[raw]||raw;
   return SURFACE_PROFILES[key]||SURFACE_PROFILES.dry;
 }
 
 export function applySurfacePhysics(physics={},surface='dry'){
-  const s=resolveSurface(surface);
+  const material=resolveSurface(surface);
   return {...physics,
-    lateralGrip:Math.max(.01,finite(physics.lateralGrip,1)*s.grip),
-    handbrakeGrip:Math.max(.01,finite(physics.handbrakeGrip,1)*s.grip),
-    handbrakeSlipGrip:Math.max(.01,finite(physics.handbrakeSlipGrip,1)*s.grip),
-    brakeForce:Math.max(0,finite(physics.brakeForce,0)*s.brake),
-    friction:Math.max(.05,finite(physics.friction,1)*s.grip),
-    drag:Math.max(.001,finite(physics.drag,1)*s.drag),
-    handbrakeDrag:Math.max(.001,finite(physics.handbrakeDrag,1)*s.drag),
-    engineForce:Math.max(0,finite(physics.engineForce,0)*s.power),
-    surfaceGrip:s.grip,
-    surfaceBrake:s.brake
+    lateralGrip:Math.max(.01,finite(physics.lateralGrip,1)*material.grip),
+    handbrakeGrip:Math.max(.01,finite(physics.handbrakeGrip,1)*material.grip),
+    handbrakeSlipGrip:Math.max(.01,finite(physics.handbrakeSlipGrip,1)*material.grip),
+    brakeForce:Math.max(0,finite(physics.brakeForce,0)*material.brake),
+    friction:Math.max(.05,finite(physics.friction,1)*material.grip),
+    drag:Math.max(.001,finite(physics.drag,1)*material.drag),
+    handbrakeDrag:Math.max(.001,finite(physics.handbrakeDrag,1)*material.drag),
+    engineForce:Math.max(0,finite(physics.engineForce,0)*material.power),
+    surfaceGrip:material.grip,
+    surfaceBrake:material.brake
   };
 }
 
 export function surfaceTelemetry(surface='dry',physics={}){
-  const s=resolveSurface(surface);
-  return {surface:String(surface||'dry').toLowerCase(),grip:clamp(s.grip,.01,1),brake:clamp(s.brake,.01,1),drag:s.drag,power:s.power,effectiveGrip:finite(physics.surfaceGrip,s.grip),effectiveBrake:finite(physics.surfaceBrake,s.brake)};
+  const raw=String(surface||'dry').toLowerCase(),material=resolveSurface(raw);
+  return {surface:raw,grip:material.grip,brake:material.brake,drag:material.drag,power:material.power,
+    effectiveGrip:finite(physics.surfaceGrip,material.grip),
+    effectiveBrake:finite(physics.surfaceBrake,material.brake)};
+}
+
+const MOVEMENT=Object.freeze({
+  road:    {speed:1,    acceleration:1,    steering:1,    slip:.18, coast:.965, demand:0},
+  bridge:  {speed:.98,  acceleration:.98,  steering:.96,  slip:.21, coast:.964, demand:0},
+  gravel:  {speed:.82,  acceleration:.78,  steering:.92,  slip:.29, coast:.95,  demand:1},
+  sand:    {speed:.61,  acceleration:.54,  steering:.76,  slip:.48, coast:.915,demand:1.4},
+  grass:   {speed:.68,  acceleration:.62,  steering:.82,  slip:.39, coast:.93, demand:.7},
+  curb:    {speed:.75,  acceleration:.68,  steering:.74,  slip:.38, coast:.94, demand:.25},
+  timber:  {speed:.70,  acceleration:.60,  steering:.84,  slip:.34, coast:.94, demand:.4},
+  offroad: {speed:.72,  acceleration:.64,  steering:.82,  slip:.41, coast:.93, demand:.9},
+  water:   {speed:0,    acceleration:0,    steering:0,    slip:1,   coast:.99, demand:0}
+});
+
+function nearPath(x,y,road){
+  const points=road.points||[];
+  for(let i=1;i<points.length;i++){
+    const [ax,ay]=points[i-1],[bx,by]=points[i],dx=bx-ax,dy=by-ay;
+    const t=clamp(((x-ax)*dx+(y-ay)*dy)/(dx*dx+dy*dy||1),0,1);
+    if(Math.hypot(x-ax-dx*t,y-ay-dy*t)<(road.width||0)/2)return true;
+  }
+  return false;
+}
+
+export function classifySurface(x,y,world={}){
+  if(!Number.isFinite(x)||!Number.isFinite(y))return SURFACE_TYPES.WATER;
+  const bridges=world.bridges||[],roads=world.roads||[],scenic=world.scenicRoads||[];
+  if(bridges.some(r=>inside(x,y,r)))return SURFACE_TYPES.BRIDGE;
+  if(roads.some(r=>inside(x,y,r)))return SURFACE_TYPES.ROAD;
+  if(scenic.some(r=>nearPath(x,y,r)))return SURFACE_TYPES.GRAVEL;
+  if(roads.some(r=>inside(x,y,r,12)))return SURFACE_TYPES.CURB;
+  if((world.piers||[]).some(r=>inside(x,y,r)))return SURFACE_TYPES.TIMBER;
+  if(world.beachAt?.(x,y))return SURFACE_TYPES.SAND;
+  if((world.parks||[]).some(r=>inside(x,y,r))&&world.landAt?.(x,y))return SURFACE_TYPES.GRASS;
+  if(world.landAt?.(x,y))return SURFACE_TYPES.OFFROAD;
+  return SURFACE_TYPES.WATER;
+}
+
+export function surfaceMovement(surface,vehicle={}){
+  const base=MOVEMENT[surface]||MOVEMENT.offroad;
+  const capability=clamp(Number(vehicle.offroad)||1,.55,1.5),demand=base.demand;
+  const adjustment=(capability-1)*demand;
+  return {
+    maxSpeed:clamp(base.speed+adjustment*.22,.35,1.12),
+    acceleration:clamp(base.acceleration+adjustment*.25,.3,1.15),
+    steering:clamp(base.steering+adjustment*.16,.45,1.12),
+    slipRetention:clamp(base.slip+(1-capability)*demand*.16,.12,.72),
+    coast:base.coast
+  };
+}
+
+export function sampleVehicleSurface(x,y,angle,width,height,world={}){
+  const c=Math.cos(angle||0),s=Math.sin(angle||0),hx=(width||48)*.34,hy=(height||24)*.42;
+  const samples=[[0,0],[hx,hy],[hx,-hy],[-hx,hy],[-hx,-hy]];
+  const counts=new Map();
+  for(const [lx,ly] of samples){
+    const surface=classifySurface(x+lx*c-ly*s,y+lx*s+ly*c,world);
+    counts.set(surface,(counts.get(surface)||0)+1);
+  }
+  return [...counts].sort((a,b)=>b[1]-a[1])[0]?.[0]||SURFACE_TYPES.WATER;
 }

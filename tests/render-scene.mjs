@@ -9,6 +9,9 @@ import * as coast from '../src/game/coastline.js';
 import * as roaming from '../src/game/free_roam.js';
 import * as architecture from '../src/game/architecture.js';
 import * as traffic from '../src/game/traffic_turns.js';
+import * as ocean from '../src/game/ocean_chunks.js';
+import * as surfaces from '../src/game/surface_physics.js';
+import * as incidents from '../src/game/city_incidents.js';
 const require=createRequire(import.meta.url);
 const {createCanvas}=require(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES+'/@napi-rs/canvas');
 const noop=()=>{},canvas=createCanvas(1440,960),elements=new Map(),renderTargets=new Map();
@@ -21,7 +24,7 @@ const element=id=>{
 element('gameCanvas').getContext=()=>canvas.getContext('2d');
 let tick=900;
 const math=Object.create(Math);let seed=7;math.random=()=>((seed=Math.imul(seed,1664525)+1013904223>>>0)/4294967296);
-const sandbox={...streetNetwork,Math:math,console,performance:{now:()=>tick*1000/60},document:{readyState:'loading',getElementById:element,createElement:()=>element(Symbol()),querySelectorAll:()=>[],addEventListener:noop},window:{innerWidth:1440,innerHeight:960,addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,...core,...contacts,...coast,...roaming,...architecture,...traffic};
+const sandbox={...streetNetwork,...ocean,...surfaces,...incidents,Math:math,console,performance:{now:()=>tick*1000/60},document:{readyState:'loading',getElementById:element,createElement:()=>element(Symbol()),querySelectorAll:()=>[],addEventListener:noop},window:{innerWidth:1440,innerHeight:960,addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,...core,...contacts,...coast,...roaming,...architecture,...traffic};
 vm.createContext(sandbox);
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
 vm.runInContext(source+'\ninitTopology();roam=createFreeRoam(player,parkedCars,buildings,trees,isPositionOnSolidGround,()=>{},solidProps,isPositionOnWaterObstacle);',sandbox);

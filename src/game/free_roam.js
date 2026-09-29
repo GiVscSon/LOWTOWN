@@ -1,13 +1,13 @@
 import { resolveScenery, resolveContact, contact, chassis } from './solid_contacts.js';
 export const VEHICLES = {
-  sedan: { name:'Седан', kind:'land', width:48,height:24,max:8.8,color:'#e09a3e' },
-  van: { name:'Фургон',kind:'land',width:64,height:28,max:6,accel:.12,steer:.034,color:'#9aa0a8' },
-  truck: { name:'Грузовик',kind:'land',width:84,height:32,max:5,accel:.075,steer:.024,color:'#807657' },
-  bike: { name:'Мотоцикл',kind:'land',width:30,height:12,max:11,accel:.22,steer:.052,color:'#d4523a' },
-  speedboat: { name:'Катер',kind:'water',width:66,height:26,max:8,color:'#d7d2bd' },
-  tug: { name:'Буксир',kind:'water',width:90,height:38,max:4,color:'#c18a42' },
-  helicopter: { name:'Вертолёт',kind:'air',width:64,height:26,max:8,color:'#7d8868' },
-  plane: { name:'Самолёт',kind:'air',width:86,height:80,max:13,color:'#c5c8c5' }
+  sedan: { name:'Седан', kind:'land', width:48,height:24,max:8.8,mass:1500,offroad:.78,color:'#e09a3e' },
+  van: { name:'Фургон',kind:'land',width:64,height:28,max:6,accel:.12,steer:.034,mass:2200,offroad:.96,color:'#9aa0a8' },
+  truck: { name:'Грузовик',kind:'land',width:84,height:32,max:5,accel:.075,steer:.024,mass:5200,offroad:1.28,color:'#807657' },
+  bike: { name:'Мотоцикл',kind:'land',width:30,height:12,max:11,accel:.22,steer:.052,mass:190,offroad:.9,color:'#d4523a' },
+  speedboat: { name:'Катер',kind:'water',width:66,height:26,max:8,mass:1800,color:'#d7d2bd' },
+  tug: { name:'Буксир',kind:'water',width:90,height:38,max:4,mass:12000,color:'#c18a42' },
+  helicopter: { name:'Вертолёт',kind:'air',width:64,height:26,max:8,mass:1900,color:'#7d8868' },
+  plane: { name:'Самолёт',kind:'air',width:86,height:80,max:13,mass:900,color:'#c5c8c5' }
 };
 export const PLANE_RUNWAYS = [
   { x: 1400, y: 2140, w: 650, h: 100 },
@@ -29,6 +29,24 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
     ['speedboat',2558,7680],['tug',4908,7740],['helicopter',6500,8080],
     ['speedboat',7080,4700],['tug',7080,7500],['speedboat',9720,8700],['tug',7100,10550]
   ].map(([type,x,y])=>({type,x,y,angle:VEHICLES[type].kind==='water'?Math.PI/2:0,...VEHICLES[type],speed:0}));
+  const vesselBlocked=(vehicle,x,y)=>{
+    const body=chassis({...vehicle,x,y}),cs=Math.cos(body.angle),sn=Math.sin(body.angle);
+    const fx=cs*body.length/2,fy=sn*body.length/2,rx=-sn*body.breadth/2,ry=cs*body.breadth/2;
+    return [[0,0],[fx+rx,fy+ry],[fx-rx,fy-ry],[-fx+rx,-fy+ry],[-fx-rx,-fy-ry]]
+      .some(([dx,dy])=>waterBlocked(x+dx,y+dy));
+  };
+  for(const vessel of fleet.filter(v=>v.kind==='water')){
+    if(!vesselBlocked(vessel,vessel.x,vessel.y))continue;
+    const origin={x:vessel.x,y:vessel.y};let placed=false;
+    for(let radius=16;radius<=224&&!placed;radius+=16){
+      for(let step=0;step<32;step++){
+        const angle=step*Math.PI/16,x=origin.x+Math.cos(angle)*radius,y=origin.y+Math.sin(angle)*radius;
+        if(vesselBlocked(vessel,x,y))continue;
+        if(fleet.some(other=>other!==vessel&&other.kind==='water'&&contact(chassis({...vessel,x,y}),chassis(other))))continue;
+        vessel.x=x;vessel.y=y;placed=true;break;
+      }
+    }
+  }
   let mode='sedan', altitude=0;
   const bodyClear=(x,y)=>!buildings.some(b=>x>b.x-5&&x<b.x+b.w+5&&y>b.y-5&&y<b.y+b.h+5)&&
     !trees.some(t=>Math.hypot(x-t.x,y-t.y)<11)&&!obstacles.some(o=>Math.abs(x-o.x)<(o.width||12)*.5+5&&Math.abs(y-o.y)<(o.height||12)*.5+5);
@@ -60,7 +78,7 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
     const candidates=[...fleet,...parked].filter(c=>Math.hypot(c.x-player.x,c.y-player.y)<115&&doorwayClear(player,c,c.kind==='water')).sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)-Math.hypot(b.x-player.x,b.y-player.y));
     const car=candidates[0]; if(!car)return notify('Подойдите к припаркованному транспорту');
     mode=car.type in VEHICLES?car.type:'sedan'; const profile=VEHICLES[mode];
-    Object.assign(player,{entityType:'vehicle',x:car.x,y:car.y,angle:car.angle,width:profile.width,height:profile.height,bodyColor:car.color||profile.color,hp:car.hp??player.hp??100,speed:0,vx:0,vy:0});
+    Object.assign(player,{entityType:'vehicle',x:car.x,y:car.y,angle:car.angle,width:profile.width,height:profile.height,mass:profile.mass||1500,bodyColor:car.color||profile.color,hp:car.hp??player.hp??100,speed:0,vx:0,vy:0});
     const list=fleet.includes(car)?fleet:parked; list.splice(list.indexOf(car),1);
     notify(profile.name+(profile.kind==='air'?' · кнопка «Высота» / Q — взлёт и посадка':''));
   }
@@ -84,7 +102,7 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
   function resetToSedan(x=player.x,y=player.y,angle=0){
     mode='sedan';altitude=0;fly=false;landingWarned=false;
     const profile=VEHICLES.sedan;
-    Object.assign(player,{entityType:'vehicle',x,y,angle,width:profile.width,height:profile.height,bodyColor:profile.color,speed:0,vx:0,vy:0,rpm:0,gear:'D1'});
+    Object.assign(player,{entityType:'vehicle',x,y,angle,width:profile.width,height:profile.height,mass:profile.mass||1500,bodyColor:profile.color,speed:0,vx:0,vy:0,rpm:0,gear:'D1'});
   }
   function step(keys,dt) {
     const profile=VEHICLES[mode]; if(profile?.kind==='land') return false;
@@ -139,9 +157,9 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
       if(hitsRoof){player.x=ox;player.y=oy;player.speed=0;}
       if(altitude<12){if(!solid(player.x,player.y)){player.x=ox;player.y=oy;player.speed=0;}resolveScenery(player,buildings,trees,obstacles);}
     }
-    // The expanded city is 10.1 x 11.7k; the previous legacy clamp stopped
-    // boats and aircraft at the old map edge and made the world feel cut off.
-    player.x=Math.max(-900,Math.min(11000,player.x));player.y=Math.max(-900,Math.min(12600,player.y));
+    // Vehicle positions are world-space coordinates, not a finite map tile.
+    // Ocean rendering streams around the player, so boats and aircraft can
+    // travel past every edge of the authored city without hitting an invisible wall.
     player.rpm=Math.abs(player.speed)/max;player.gear=profile.kind==='air'?`${Math.round(altitude)} м`:'ВОДА';return true;
   }
   function contacts(){if(mode==='foot'||altitude>12)return;for(const car of fleet)if(VEHICLES[car.type].kind===VEHICLES[mode].kind)resolveContact(player,car,true);}

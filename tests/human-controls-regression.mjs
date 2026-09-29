@@ -7,9 +7,12 @@ import * as coast from '../src/game/coastline.js';
 import * as roaming from '../src/game/free_roam.js';
 import * as street from '../src/game/street_network.js';
 import * as traffic from '../src/game/traffic_turns.js';
+import * as ocean from '../src/game/ocean_chunks.js';
+import * as surfaces from '../src/game/surface_physics.js';
+import * as incidents from '../src/game/city_incidents.js';
 const noop=()=>{},events={},elements=new Map();let clock=0;
 const element=id=>{if(elements.has(id))return elements.get(id);const listeners={};const e={style:{},classList:{add:noop,remove:noop},remove:noop,append:noop,appendChild:noop,listeners,addEventListener:(name,fn)=>listeners[name]=fn,getContext:()=>({})};elements.set(id,e);return e;};
-const sandbox={Math,console,assert,performance:{now:()=>clock},navigator:{vibrate:noop},document:{readyState:'loading',getElementById:element,createElement:()=>element(Symbol()),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:(name,fn)=>events[name]=fn},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,...core,...contacts,...coast,...roaming,...street,...traffic};
+const sandbox={Math,console,assert,performance:{now:()=>clock},navigator:{vibrate:noop},document:{readyState:'loading',getElementById:element,createElement:()=>element(Symbol()),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:(name,fn)=>events[name]=fn},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,...core,...contacts,...coast,...roaming,...street,...traffic,...ocean,...surfaces,...incidents};
 vm.createContext(sandbox);
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
 vm.runInContext(source+`\ninitTopology();roam=createFreeRoam(player,parkedCars,buildings,trees,isPositionOnSolidGround,()=>{},solidProps,isPositionOnWaterObstacle);sound.init=()=>{};setupInputListeners();trafficCars.length=0;pedestrians.length=0;`,sandbox);
@@ -44,7 +47,7 @@ for(const type of ['tug','plane']){
   press('KeyE');assert.equal(run('roam.mode'),type);
   if(type==='plane'){press('KeyW');step(70);release('KeyW');press('KeyQ');}
   const x=run('player.x'),y=run('player.y');press('KeyW');step(type==='plane'?150:50);release('KeyW');
-  assert(Math.hypot(run('player.x')-x,run('player.y')-y)>25,`${type} did not respond to throttle`);
+  assert(Math.hypot(run('player.x')-x,run('player.y')-y)>25,`${type} did not respond to throttle: from ${x},${y} to ${run('player.x')},${run('player.y')} speed=${run('player.speed')}`);
   if(type==='plane')assert(run('roam.altitude')>50,`plane failed to climb in full-world setup: altitude=${run('roam.altitude')} x=${run('player.x')} y=${run('player.y')} speed=${run('player.speed')}`);
 }
 run('roam.resetToSedan(1200,1200);state.wanted=2;state.invulnTimer=99999;policeCars.length=0;');
