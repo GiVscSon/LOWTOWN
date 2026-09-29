@@ -15,7 +15,8 @@ export function drawArchitecture(ctx, b, index) {
 
   ctx.save(); ctx.lineJoin='round';
   polygon(base.map(([x,y])=>[x+z*.52,y+z*.32]),'rgba(0,0,0,.48)');
-  const typePalette={warehouse:4,office:3,deco:5,townhouse:0,shop:2,pavilion:4,tenement:1};
+  const typePalette={warehouse:4,office:3,deco:5,townhouse:0,shop:2,pavilion:4,tenement:1,
+    hospital:3,firestation:2,airfield:3,civic:5,depot:4};
   const walls=palettes[typePalette[type]??index%palettes.length];
 
   // Street-facing walls, including the chamfered corners.
@@ -50,6 +51,18 @@ export function drawArchitecture(ctx, b, index) {
       for(let n=16;n<length-32;n+=58){cell(n/length,2,35/length,21,'#12191b');cell((n+3)/length,5,29/length,16,'#394246');}
       ctx.strokeStyle='rgba(205,194,166,.22)';for(let n=8;n<length;n+=12){ctx.beginPath();ctx.moveTo(...p(n/length,0));ctx.lineTo(...p(n/length,z));ctx.stroke();}
     }
+    if(type==='firestation'&&side===2&&length>90){
+      cell(.29,1,.43,29,'#5f2926');cell(.32,4,.37,23,'#323b3b');
+      ctx.strokeStyle='rgba(215,203,171,.48)';ctx.lineWidth=1.4;
+      for(let door=0;door<4;door++){
+        const q=p(.33+door*.095,5);ctx.beginPath();ctx.moveTo(q[0],q[1]);
+        const e=p(.33+door*.095,25);ctx.lineTo(e[0],e[1]);ctx.stroke();
+      }
+      cell(.46,29,.12,3,'#dc9a4a');
+    }
+    if(type==='hospital'&&side===2&&length>90){
+      cell(.13,28,.23,3,'#e6ddd0');cell(.21,23,.07,13,'#e6ddd0');
+    }
     if(type==='townhouse'&&length>75){
       ctx.strokeStyle='rgba(190,179,151,.4)';ctx.lineWidth=2;
       for(let floor=1;floor<floors;floor++){const q=p(.68,floor*24-4);ctx.strokeRect(q[0]-18,q[1]-7,36,10);ctx.beginPath();ctx.moveTo(q[0]-14,q[1]+3);ctx.lineTo(q[0]-8,q[1]+13);ctx.moveTo(q[0]+14,q[1]+3);ctx.lineTo(q[0]+8,q[1]+13);ctx.stroke();}
@@ -70,7 +83,8 @@ export function drawArchitecture(ctx, b, index) {
   }
 
   // Roof, parapet and rooftop clutter finish the silhouette.
-  const roofColors={warehouse:'#273033',office:'#17252d',deco:'#2c2630',townhouse:'#302a25',shop:'#252a27',pavilion:'#28332f',tenement:'#292728'};
+  const roofColors={warehouse:'#273033',office:'#17252d',deco:'#2c2630',townhouse:'#302a25',shop:'#252a27',pavilion:'#28332f',tenement:'#292728',
+    hospital:'#26343a',firestation:'#402b28',airfield:'#28363a',civic:'#332f38',depot:'#303333'};
   polygon(base.map(([x,y])=>[x-z,y-z]),roofColors[type]||(index%2?'#242526':'#2c2926'));
   ctx.strokeStyle='#777064';ctx.lineWidth=4;ctx.stroke();
   ctx.save();ctx.translate(-z,-z);ctx.strokeStyle='rgba(170,157,133,.24)';ctx.lineWidth=2;ctx.strokeRect(b.x+10,b.y+10,b.w-20,b.h-20);
@@ -89,6 +103,21 @@ export function drawArchitecture(ctx, b, index) {
   if(type==='office'||type==='deco'){
     ctx.fillStyle='#1c2428';ctx.fillRect(b.x+b.w*.48,b.y+20,32,20);ctx.strokeStyle=b.neon||'#ad8651';ctx.strokeRect(b.x+b.w*.48,b.y+20,32,20);
     if(type==='deco'){ctx.fillStyle='#3d3a3d';ctx.fillRect(b.x+b.w*.5-8,b.y-8,16,28);ctx.fillStyle=b.neon||'#d58c43';ctx.fillRect(b.x+b.w*.5-2,b.y-16,4,19);}
+  }
+  if(type==='hospital'||type==='firestation'||type==='airfield'||type==='depot'||type==='civic'){
+    const cx=b.x+b.w*.52,cy=b.y+b.h*.48;
+    ctx.strokeStyle='rgba(220,210,187,.6)';ctx.lineWidth=2;ctx.strokeRect(cx-24,cy-17,48,34);
+    if(type==='hospital'){
+      ctx.fillStyle='#ddd8ca';ctx.fillRect(cx-17,cy-12,34,24);ctx.fillStyle='#b44739';ctx.fillRect(cx-3,cy-9,6,18);ctx.fillRect(cx-9,cy-3,18,6);
+    }else if(type==='firestation'){
+      ctx.fillStyle='#69332c';ctx.fillRect(cx-18,cy-11,36,22);ctx.fillStyle='#c48632';ctx.fillRect(cx-13,cy-8,26,2);ctx.fillRect(cx-13,cy-3,26,2);ctx.fillRect(cx-13,cy+2,26,2);
+    }else if(type==='airfield'){
+      ctx.strokeStyle='#ddd9ca';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(cx-18,cy);ctx.lineTo(cx+18,cy);ctx.stroke();ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(cx,cy-12);ctx.lineTo(cx,cy+12);ctx.stroke();
+    }else if(type==='depot'){
+      ctx.fillStyle='#b69054';for(let bay=0;bay<3;bay++)ctx.fillRect(cx-16+bay*11,cy-8,7,16);
+    }else{
+      ctx.fillStyle='#b9ad8b';ctx.fillRect(cx-15,cy-8,30,16);ctx.fillStyle='#625962';ctx.fillRect(cx-4,cy-8,8,16);ctx.fillRect(cx-15,cy-2,30,4);
+    }
   }
   // Distinct roof masses, not the same flat slab on every property.
   if(type==='townhouse'||type==='pavilion'){
