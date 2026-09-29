@@ -2156,7 +2156,7 @@ function renderWorld() {
   ctx.save();
   const leadX = Math.cos(player.angle) * player.speed * 6;
   const leadY = Math.sin(player.angle) * player.speed * 6;
-  const flightAltitude=roam?.mode==='plane'?roam.altitude:0;
+  const flightAltitude=roam?.profile?.kind==='air'?roam.altitude:0;
   // Follow the aircraft itself, not its ground shadow, so the airframe stays
   // inside the viewport while the island below remains visible as an overview.
   const center = projectIso(player.x + leadX-flightAltitude, player.y + leadY-flightAltitude);
