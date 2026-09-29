@@ -751,8 +751,8 @@ function initTopology() {
   // contacts so visible trunks, water and street furniture cannot be crossed.
   parkZones.forEach((park,i)=>{
     park.trees=[];park.benches=[];park.feature={x:park.x+park.w*.53,y:park.y+park.h*.51,type:park.type};
-    for(let t=0;t<12;t++){
-      const edge=t%4,ratio=(Math.floor(t/4)+1)/4;
+    for(let t=0;t<16;t++){
+      const edge=t%4,ratio=(Math.floor(t/4)+1)/5;
       const x=edge===0?park.x+park.w*ratio:edge===1?park.x+park.w-18:edge===2?park.x+park.w*(1-ratio):park.x+18;
       const y=edge===0?park.y+18:edge===1?park.y+park.h*ratio:edge===2?park.y+park.h-18:park.y+park.h*(1-ratio);
       const tree={x,y,size:15+(t+i)%5,park:true};park.trees.push(tree);trees.push(tree);
