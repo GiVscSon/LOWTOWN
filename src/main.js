@@ -13,6 +13,8 @@ import { createRoadGraph, roadPath, roadTerminals, onRoadSurface, createWalkingR
 import './game/test_drive.css';
 // LOWTOWN // THREE ISLANDS VISUAL OVERHAUL // GTA 2 RETRO-NOIR ENGINE
 // High-detail procedural pedestrian sprites, isometric vehicle chassis, wet road reflections, neon glow & audio
+// Keep the authored inter-island shipping channels open between sand banks.
+const SAND_WIDTH=60;
 
 class SynthAudio {
   constructor() {
@@ -1200,7 +1202,9 @@ function isPositionOnSolidGround(x, y) {
 }
 
 function isPositionOnWaterObstacle(x,y){
-  return isPositionOnIslandLand(x,y)||piers.some(p=>x>=p.x&&x<=p.x+p.w&&y>=p.y&&y<=p.y+p.h);
+  // Match the visible sand edge; the wider walkable fringe includes shallows.
+  return isPositionOnIslandLand(x,y)||allIslands.some(isl=>pointInBeach(x,y,isl,SAND_WIDTH*(isl.natural?.48:1)))||
+    piers.some(p=>x>=p.x&&x<=p.x+p.w&&y>=p.y&&y<=p.y+p.h);
 }
 
 function surfaceAt(x,y){
@@ -2069,7 +2073,10 @@ function updatePhysics(dt) {
     c.collisionHold=Math.max(0,(c.collisionHold||0)-dt);
     const emergencyYield=[...policeCars,...incidentPoliceCars,...incidentResponseVehicles]
       .some(unit=>unit.status==='enroute'&&Math.hypot(unit.x-c.x,unit.y-c.y)<200&&
-        Math.abs((c.x-unit.x)*-Math.sin(unit.angle)+(c.y-unit.y)*Math.cos(unit.angle))<60);
+        Math.abs((c.x-unit.x)*-Math.sin(unit.angle)+(c.y-unit.y)*Math.cos(unit.angle))<60&&
+        // A same-direction car ahead must clear the route, not brake across it.
+        ((c.x-unit.x)*Math.cos(unit.angle)+(c.y-unit.y)*Math.sin(unit.angle)<=0||
+          Math.cos(c.angle-unit.angle)<.5));
     const obstacle = occupied || approachingRed || emergencyYield || c.collisionHold>0;
     const signalSpeed=approachingRed?Math.max(0,c.signalGap-3)/12:Infinity;
     const allowedSpeed=occupied||emergencyYield||c.collisionHold>0?0:
@@ -2726,7 +2733,7 @@ function renderWorld() {
     coastPath(ctx, isl);ctx.strokeStyle='rgba(9,31,38,.94)';ctx.lineWidth=420*coastalScale;ctx.stroke();
     ctx.strokeStyle='rgba(20,56,61,.96)';ctx.lineWidth=330*coastalScale;ctx.stroke();
     ctx.strokeStyle='rgba(64,104,96,.98)';ctx.lineWidth=255*coastalScale;ctx.stroke();
-    ctx.strokeStyle='rgba(174,151,103,.98)';ctx.lineWidth=188*coastalScale;ctx.stroke();
+    ctx.strokeStyle='rgba(174,151,103,.98)';ctx.lineWidth=SAND_WIDTH*2*coastalScale;ctx.stroke();
     ctx.fillStyle = districtProfiles[isl.id]?.land||'#202721';ctx.fill();
     ctx.strokeStyle = '#686556';ctx.lineWidth = 7;ctx.stroke();
     ctx.setLineDash([38*coastalScale,29*coastalScale]);

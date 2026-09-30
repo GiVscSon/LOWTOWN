@@ -19,6 +19,7 @@ export function createDriveLab({player,state,canvas,buildings,trafficCars,police
   const sampleCtx=sampleCanvas.getContext('2d',{willReadFrequently:true});
   const clear=()=>Object.keys(state.keys).forEach(k=>state.keys[k]=false);
   function reset() {
+    roam?.resetToSedan(1265,1200,0);
     Object.assign(player,{x:1265,y:1200,angle:0,vx:0,vy:0,speed:0,hp:100});
     Object.assign(state,{isDrowning:false,drownProgress:0,wanted:0,invulnTimer:180,isMapOpen:false,isGarageOpen:false});
     for(const id of ['mapModal','garageModal']) document.getElementById(id).style.display='none';

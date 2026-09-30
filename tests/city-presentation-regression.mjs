@@ -51,6 +51,36 @@ assert.equal(run('state.cash'),650);
 assert.equal(run('state.deathFlash'),0,'detention must not display a death');
 assert.equal(run('state.detainProgress'),0);
 
+// Cars in front of a responding unit must not freeze its approach.
+const yielding=runtimeCity(37);
+yielding.run(`trafficCars.splice(1);parkedCars.length=0;pedestrians.length=0;
+  Object.assign(player,{x:1000,y:1000,speed:0});
+  Object.assign(trafficCars[0],{x:1460,y:1200,angle:0,speed:3,cruiseSpeed:3,routeManaged:false,turn:null,collisionHold:0});
+  incidentResponseVehicles.push({x:1360,y:1200,angle:0,width:48,height:24,speed:0,status:'enroute'});
+  updateIncidentResponse=()=>{};cityIncidentDirector={update:()=>null};`);
+for(let i=0;i<120;i++){yielding.tick(1/60);yielding.run('updatePhysics(1/60)');}
+assert(yielding.run('trafficCars[0].x')>1600,'car ahead of an emergency unit must clear its path instead of creating a permanent queue');
+
+// A beach is walkable ground and must also stop a vessel's entire hull.
+const shore=runtimeCity(37);
+shore.run(`roam=createFreeRoam(player,parkedCars,buildings,trees,isPositionOnSolidGround,()=>{},solidProps,isPositionOnWaterObstacle,()=>policeCars);
+  function hullOnWater(v){const b=chassis(v),cs=Math.cos(b.angle),sn=Math.sin(b.angle);
+    return [[0,0],[b.length/2,b.breadth/2],[b.length/2,-b.breadth/2],[-b.length/2,b.breadth/2],[-b.length/2,-b.breadth/2]]
+      .every(([x,y])=>!isPositionOnWaterObstacle(b.x+x*cs-y*sn,b.y+x*sn+y*cs));}
+  this.beachSample=allIslands.flatMap(isl=>coastPoints(isl).flatMap(([x,y])=>Array.from({length:16},(_,i)=>({x:x+Math.cos(i*Math.PI/8)*30,y:y+Math.sin(i*Math.PI/8)*30}))))
+    .find(p=>!isPositionOnIslandLand(p.x,p.y)&&isPositionOnSolidGround(p.x,p.y));`);
+assert(shore.run('!!beachSample'));
+assert(shore.run('isPositionOnWaterObstacle(beachSample.x,beachSample.y)'),'walkable sand must not be navigable water');
+assert(shore.run('roam.fleet.filter(v=>v.kind===\'water\').every(hullOnWater)'),'fleet must spawn clear of beaches');
+shore.run(`roam.interact();const tug=roam.fleet.find(v=>v.type==='tug');Object.assign(player,{x:tug.x+20,y:tug.y});roam.interact();
+  this.boatStart={x:player.x,y:player.y};`);
+assert.equal(shore.run('roam.mode'),'tug');
+for(let i=0;i<300;i++){shore.run('roam.step({up:true},1/60)');assert(shore.run('hullOnWater(player)'),'tug hull crossed sand while approaching shore');}
+shore.run('this.bankPosition={x:player.x,y:player.y};');
+for(let i=0;i<120;i++){shore.run('roam.step({up:true,left:true},1/60)');assert(shore.run('hullOnWater(player)'), 'turning hull crossed sand');}
+for(let i=0;i<180;i++){shore.run('roam.step({down:true},1/60)');assert(shore.run('hullOnWater(player)'));}
+assert(shore.run('Math.hypot(player.x-bankPosition.x,player.y-bankPosition.y)')>50,'reverse must free a boat stopped at shore');
+
 // The normal physics loop must update police after changing movement mode.
 // Previously the special-mode guard froze pursuit on foot, water and in air.
 for(const mode of ['foot','tug','helicopter']){
