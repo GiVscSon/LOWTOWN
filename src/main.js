@@ -2879,10 +2879,10 @@ function drawStreetActors(w,h,center,zoom){
       actors.push({depth:roam.altitude>12?Infinity:player.x+player.y,draw:()=>drawTransport(ctx,{...roam.profile,type:roam.mode,x:player.x,y:player.y,angle:player.angle,speed:player.speed,occupied:true},performance.now()/1000,roam.altitude+stuntHeightFor(player))});
   }else{
     if(!state.isDrowning){
-      ctx.save();ctx.translate(player.x,player.y);ctx.rotate(player.angle);
-      const light=ctx.createRadialGradient(24,0,10,120,0,140);
-      light.addColorStop(0,'rgba(255,245,210,.4)');light.addColorStop(.5,'rgba(255,230,160,.16)');light.addColorStop(1,'rgba(255,230,160,0)');
-      ctx.fillStyle=light;ctx.beginPath();ctx.moveTo(24,-9);ctx.lineTo(140,-48);ctx.lineTo(140,48);ctx.lineTo(24,9);ctx.closePath();ctx.fill();ctx.restore();
+      ctx.save();ctx.translate(player.x,player.y);ctx.rotate(player.angle);ctx.translate(88,0);ctx.scale(1,.34);
+      const light=ctx.createRadialGradient(0,0,2,0,0,110);
+      light.addColorStop(0,'rgba(255,245,210,.28)');light.addColorStop(.55,'rgba(255,230,160,.12)');light.addColorStop(1,'rgba(255,230,160,0)');
+      ctx.fillStyle=light;ctx.fillRect(-110,-110,220,220);ctx.restore();
     }
     addVehicle(player,()=>{
       ctx.save();ctx.globalAlpha=state.isDrowning?Math.max(.2,1-state.drownProgress):1;
