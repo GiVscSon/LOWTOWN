@@ -1,3 +1,5 @@
+import * as authoredWorld from '../src/game/authored_archipelago.js';
+import { PLANE_RUNWAYS as LEGACY_RUNWAYS } from '../src/game/free_roam.js';
 import * as emergencyPassing from '../src/game/emergency_passing.js';
 import * as streetNetwork from '../src/game/street_network.js';
 import assert from 'node:assert/strict';
@@ -16,7 +18,7 @@ let depth=0,draws=0;const mapLabels=[];
 const noop=()=>{};
 const context=new Proxy({save(){depth++;},restore(){depth--;assert(depth>=0);},fillText(value){mapLabels.push(String(value));},createRadialGradient(){return {addColorStop:noop};},createLinearGradient(){return {addColorStop:noop};}}, {get(target,key){return key in target?target[key]:(...args)=>{for(const arg of args)if(typeof arg==='number')assert(Number.isFinite(arg),`Non-finite ${key}`);draws++;};},set(target,key,value){target[key]=value;return true;}});
 const element=()=>({width:900,height:700,style:{},classList:{add:noop,remove:noop},appendChild:noop,append:noop,addEventListener:noop,getContext:()=>context,remove:noop});
-const sandbox={...emergencyPassing,...streetNetwork,...ocean,...surfaces,...incidents,assert,console,Math,mapLabels,depth,draws,performance:{now:()=>100},document:{readyState:'loading',getElementById:element,createElement:element,querySelectorAll:()=>[],addEventListener:noop},window:{innerWidth:1100,innerHeight:800,addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,...core,...contacts,...coast,...roamModule,...architecture,...trafficTurns};
+const sandbox={...authoredWorld,LEGACY_RUNWAYS,...emergencyPassing,...streetNetwork,...ocean,...surfaces,...incidents,assert,console,Math,mapLabels,depth,draws,performance:{now:()=>100},document:{readyState:'loading',getElementById:element,createElement:element,querySelectorAll:()=>[],addEventListener:noop},window:{innerWidth:1100,innerHeight:800,addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,...core,...contacts,...coast,...roamModule,...architecture,...trafficTurns};
 Object.defineProperties(sandbox,{depth:{get:()=>depth},draws:{get:()=>draws}});
 vm.createContext(sandbox);
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');

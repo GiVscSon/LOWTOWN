@@ -28,7 +28,7 @@ function sampledPathIsClear(unit, points, blocker, canOccupy, sampleStep) {
         ...unit,
         x: previous.x + (point.x - previous.x) * t,
         y: previous.y + (point.y - previous.y) * t,
-        angle: previous.angle + turn * t
+        angle: targetAngle
       };
       if (!canOccupy(pose, blocker)) return false;
     }
@@ -37,9 +37,14 @@ function sampledPathIsClear(unit, points, blocker, canOccupy, sampleStep) {
   return true;
 }
 
+export function emergencyPassingPathClear(unit,points,canOccupy,sampleStep=10){
+  return sampledPathIsClear(unit,points,null,canOccupy,sampleStep);
+}
+
 /** Plan a short passing path; the caller validates the entire chassis and corridor. */
 export function planEmergencyPassingManeuver(unit, actors, {
   canOccupy,
+  canRejoin = () => true,
   lookAhead = 260,
   lateralPadding = 12,
   passPadding = 40,
@@ -63,7 +68,7 @@ export function planEmergencyPassingManeuver(unit, actors, {
       longitudinalClearance: (unit.width || 48) / 2 + longitudinalRadius + passPadding,
       lateralClearance: (unit.height || 24) / 2 + lateralRadius + lateralPadding
     };
-  }).filter(item => item.along > -12 && item.along < lookAhead &&
+  }).filter(item => item.along > 0 && item.along < lookAhead &&
     Math.abs(item.across) < item.lateralClearance)
     .sort((a, b) => a.along - b.along)[0];
 
@@ -83,6 +88,7 @@ export function planEmergencyPassingManeuver(unit, actors, {
           y: unit.y + forwardY * (pass + Math.max(42, offset + 10)) }
       ];
       for(const points of [forwardPoints,[{x:unit.x-forwardX*48,y:unit.y-forwardY*48,reverse:true},...forwardPoints]]){
+       if(!canRejoin({...unit,...points.at(-1)}))continue;
        if (sampledPathIsClear(unit, points, blocker.actor, canOccupy, sampleStep)) {
         return { blocker: blocker.actor, points, side, offset, angle,
           remainingAdvance:maxForward-pass-Math.max(42,offset+10),

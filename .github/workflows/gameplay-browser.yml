@@ -26,6 +26,8 @@ jobs:
         run: npm run test:air-medical
       - name: Street signals and resident behavior
         run: npm run test:living-world
+      - name: Stable crowd movement and populated emergency routes
+        run: npm run test:movement-stability
       - name: Live traffic
         run: node tests/live-traffic-regression.mjs
       - name: Pedestrian motion
@@ -42,5 +44,7 @@ jobs:
         run: node tests/free-roam-render-smoke.mjs
       - name: Pedestrian world
         run: node tests/pedestrian-world-smoke.mjs
+      - name: Authored islands, connected boardwalks and clear roads
+        run: npm run test:authored-world
       - name: Expanded city world
         run: node tests/huge-world-smoke.mjs
