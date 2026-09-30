@@ -1973,12 +1973,8 @@ function drawWetRoadSurface(r, index) {
   ctx.beginPath(); ctx.rect(r.x, r.y, r.w, r.h); ctx.clip();
   const across = r.dir === 'h' ? r.h : r.w;
   const length = r.dir === 'h' ? r.w : r.h;
-  const x2 = r.dir === 'h' ? r.x : r.x + r.w;
-  const y2 = r.dir === 'h' ? r.y + r.h : r.y;
-  const wet = ctx.createLinearGradient(r.x, r.y, x2, y2);
-  wet.addColorStop(0, 'rgba(255,255,255,.015)'); wet.addColorStop(.48, 'rgba(117,126,128,.13)'); wet.addColorStop(.54, 'rgba(0,0,0,.12)'); wet.addColorStop(1, 'rgba(255,255,255,.025)');
-  ctx.fillStyle = wet; ctx.fillRect(r.x, r.y, r.w, r.h);
-
+  // Reflections and wear sit on the shared asphalt material. A separate
+  // directional gradient for each road produces rectangular seams at turns.
   ctx.globalCompositeOperation = 'screen';
   for (let i = 0; i < Math.min(9, Math.floor(length / 180) + 2); i++) {
     const along = (stableVisualHash(index, i, 2) * .86 + .07) * length;
