@@ -1,5 +1,5 @@
 // Equal negative X/Y offsets become height after the isometric camera transform.
-export function drawArchitecture(ctx, b, index) {
+export function drawArchitecture(ctx, b, index, time=0) {
   const floors = b.floors ?? (2 + index % 5), z = floors * 24, r = Math.min(b.w/5,b.h/5,b.cornerRadius ?? (16 + index % 3 * 3));
   const type=b.archetype||['tenement','shop','warehouse','deco','townhouse','office'][index%6];
   const base = [[b.x+r,b.y],[b.x+b.w-r,b.y],[b.x+b.w,b.y+r],[b.x+b.w,b.y+b.h-r],[b.x+b.w-r,b.y+b.h],[b.x+r,b.y+b.h],[b.x,b.y+b.h-r],[b.x,b.y+r]];
@@ -39,7 +39,8 @@ export function drawArchitecture(ctx, b, index) {
     for(let floor=1;floor<floors;floor++)cell(0,floor*24-2,1,2.5,'rgba(12,9,8,.35)');
 
     for(let floor=0;floor<floors;floor++)for(let n=11;n<length-18;n+=28){
-      const lit=(n+floor*17+index*11)%13>4;
+      const householdPhase=floor===0?0:Math.floor((time+index*7+floor*13)/36)*3;
+      const lit=(n+floor*17+index*11+householdPhase)%13>4;
       cell(n/length,6+floor*24,15/length,13,'#090d10');
       cell((n+2)/length,8+floor*24,11/length,9,lit?(floor===0?'#ffd073':'#b98242'):'#172329');
       cell((n+7)/length,8+floor*24,1/length,9,'rgba(24,16,12,.72)');
