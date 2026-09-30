@@ -118,18 +118,18 @@ const junctionYield=JSON.parse(junction.run(`{
  trafficCars.length=0;parkedCars.length=0;pedestrians.length=0;policeCars.length=0;incidentPoliceCars.length=0;incidentResponseVehicles.length=0;cityIncidentDirector=null;
  Object.assign(player,{x:17000,y:17000,speed:0});state.invulnTimer=999999;
  const home=serviceBases.find(b=>b.building.sign==='EASTGATE FIRE & RESCUE').origin;
- const cop={x:8953.387181,y:1200,angle:0,width:72,height:34,maxSpeed:4.7,speed:0,model:'fireEngine',status:'returning',responseTarget:home,baseTarget:home,rotationBlocked:false};
- cop.route=[{x:8975,y:1200},...roadPath(roadGraph,{x:8975,y:1200},home).slice(1)];incidentResponseVehicles.push(cop);
+ const engine={x:8953.387181,y:1200,angle:0,width:72,height:34,maxSpeed:4.35,speed:0,model:'fireEngine',status:'returning',responseTarget:home,baseTarget:home,rotationBlocked:false};
+ engine.route=[{x:8975,y:1200},...roadPath(roadGraph,{x:8975,y:1200},home).slice(1)];incidentResponseVehicles.push(engine);
  const target={x:8975,y:1200},ambHome=serviceBases.find(b=>b.building.sign==='NORTHSIDE CLINIC').origin;
  const amb={x:9036.179455,y:1197.517612,angle:-3.182145922,width:54,height:27,maxSpeed:5.9,speed:0,model:'ambulance',status:'enroute',sceneTimer:1,responseTarget:target,baseTarget:ambHome,route:[target]};incidentResponseVehicles.push(amb);
  const bus={x:8976.445335,y:1238.783562,angle:-.4,width:82,height:30,speed:0,cruiseSpeed:1.12,routeManaged:true,type:'bus',axis:'x',routeIndex:1,routeWait:0,lastStopIndex:-1,route:{points:[{x:8787,y:1200},{x:10000,y:1200}],loop:false,stopIndices:[]},yieldHome:{cross:'y',value:1200}};
  trafficCars.push({x:9024.925185,y:1158.2,angle:0,width:46,height:22,type:'sedan',axis:'x',speed:0,cruiseSpeed:1.2,minX:450,maxX:10800,yieldHome:{cross:'y',value:1168,side:-1}},{x:9092.879823,y:1147.5,angle:0,width:48,height:23,type:'sports',axis:'x',speed:0,cruiseSpeed:1.2,minX:450,maxX:10800,yieldHome:{cross:'y',value:1168,side:-1}},bus,{x:8847.299667,y:1147.5,angle:0,width:48,height:23,type:'sports',axis:'x',speed:0,cruiseSpeed:1.2,minX:450,maxX:10800,yieldHome:{cross:'y',value:1168,side:-1}});
  let arrived=false,contacts=0,unsafe=0,reversed=false;
- const resolve=resolveContact;resolveContact=(a,b,f)=>{if((a===amb||a===cop||b===amb||b===cop)&&contact(chassis(a),chassis(b)))contacts++;return resolve(a,b,f);};
- for(let tick=0;tick<1800;tick++){updatePhysics(1/60);arrived||=amb.status==='onscene';reversed||=cop.speed<0||amb.speed<0;unsafe+=!emergencyPassingGroundClear(amb)||!emergencyPassingGroundClear(cop);}
- JSON.stringify({arrived,contacts,unsafe,reversed,police:{x:cop.x,y:cop.y,status:cop.status},ambulance:{x:amb.x,y:amb.y,status:amb.status,goal:amb.route?.[0],passing:amb.emergencyManeuver?.points},bus:{x:bus.x,y:bus.y,angle:bus.angle,side:bus.yieldHome?.side}});
+ const resolve=resolveContact;resolveContact=(a,b,f)=>{if((a===amb||a===engine||b===amb||b===engine)&&contact(chassis(a),chassis(b)))contacts++;return resolve(a,b,f);};
+ for(let tick=0;tick<3600&&(!engine.returnedToBase||!amb.returnedToBase);tick++){updatePhysics(1/60);arrived||=amb.status==='onscene';reversed||=engine.speed<0||amb.speed<0;unsafe+=!emergencyPassingGroundClear(amb)||!emergencyPassingGroundClear(engine);}
+ JSON.stringify({arrived,contacts,unsafe,reversed,fireEngine:{x:engine.x,y:engine.y,status:engine.status,returned:!!engine.returnedToBase},ambulance:{x:amb.x,y:amb.y,status:amb.status,returned:!!amb.returnedToBase,goal:amb.route?.[0],passing:amb.emergencyManeuver?.points},bus:{x:bus.x,y:bus.y,angle:bus.angle,side:bus.yieldHome?.side}});
 }`));
-assert(junctionYield.arrived&&junctionYield.reversed,JSON.stringify(junctionYield));
+assert(junctionYield.arrived&&junctionYield.reversed&&junctionYield.fireEngine.returned&&junctionYield.ambulance.returned,JSON.stringify(junctionYield));
 assert.equal(junctionYield.contacts,0);assert.equal(junctionYield.unsafe,0);
 
 // Preserve normal traffic and pedestrians: the previous isolated route matrix
