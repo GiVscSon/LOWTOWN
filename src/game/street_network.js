@@ -29,10 +29,27 @@ export function createRoadGraph(roads,bridges,accessPoints=[]){
   return nodes;
 }
 
-export function roadPath(graph,start,finish){
+export function roadPath(graph,start,finish,{fromSegment=false}={}){
   if(!graph.length)return [];
   const nearest=p=>graph.reduce((best,n,i)=>Math.hypot(n.x-p.x,n.y-p.y)<Math.hypot(graph[best].x-p.x,graph[best].y-p.y)?i:best,0);
-  const from=nearest(start),to=nearest(finish),queue=[from],parents=new Map([[from,null]]),costs=new Map([[from,0]]);
+  let from=nearest(start);
+  const to=nearest(finish);
+  if(fromSegment){
+    let best={distance:Math.hypot(graph[from].x-start.x,graph[from].y-start.y)};
+    for(let a=0;a<graph.length;a++)for(const b of graph[a].edges){
+      if(b<=a)continue;
+      const left=graph[a],right=graph[b],dx=right.x-left.x,dy=right.y-left.y,length=dx*dx+dy*dy;
+      const ratio=Math.max(0,Math.min(1,((start.x-left.x)*dx+(start.y-left.y)*dy)/(length||1)));
+      const x=left.x+dx*ratio,y=left.y+dy*ratio,distance=Math.hypot(x-start.x,y-start.y);
+      if(distance<best.distance-.001)best={x,y,distance,a,b};
+    }
+    if(best.a!==undefined){
+      // A moving vehicle already occupies an edge. Connect its current position
+      // to both ends so replanning cannot send it back to the nearest old node.
+      from=graph.length;graph=[...graph,{x:best.x,y:best.y,edges:new Set([best.a,best.b])}];
+    }
+  }
+  const queue=[from],parents=new Map([[from,null]]),costs=new Map([[from,0]]);
   // Street edges have unequal lengths. Minimise travel distance rather than
   // the number of intersections, which can choose a long detour to a base.
   while(queue.length){
@@ -167,7 +184,9 @@ export function assignWalkingRoutes(people,routes){
   people.forEach((p,index)=>{
     let best,dist=Infinity;
     const local=p.districtId?routes.filter(r=>r.districtId===p.districtId):routes;
-    const eligible=index%4===0&&local.some(r=>r.kind==='park')?local.filter(r=>r.kind==='park'):local;
+    const continuous=local.filter(r=>r.loop||r.points.length>=18);
+    const available=continuous.length?continuous:local;
+    const eligible=index%4===0&&available.some(r=>r.kind==='park')?available.filter(r=>r.kind==='park'):available;
     for(const route of eligible)for(let i=0;i<route.points.length;i++){
       const point=route.points[i],d=Math.hypot(p.x-point.x,p.y-point.y);
       if(d<dist&&!placed.some(q=>Math.hypot(q.x-point.x,q.y-point.y)<18)){best={route,i,point};dist=d;}
@@ -182,7 +201,14 @@ export function nextWalkingGoal(p){
   const route=p.route;if(!route?.points.length)return null;
   let next=p.routeIndex+p.routeDirection*3;
   if(route.loop)next=(next+route.points.length)%route.points.length;
-  else if(next<0||next>=route.points.length){p.routeDirection*=-1;next=Math.max(0,Math.min(route.points.length-1,p.routeIndex+p.routeDirection*3));p.pause=.8;}
+  else{
+    const end=p.routeDirection>0?route.points.length-1:0;
+    if(p.routeIndex===end){
+      p.routeDirection*=-1;next=p.routeIndex+p.routeDirection*3;
+      p.pause=3+(p.id||0)%4;
+    }
+    next=Math.max(0,Math.min(route.points.length-1,next));
+  }
   p.routeIndex=next;
   return route.points[next];
 }

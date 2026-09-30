@@ -28,13 +28,17 @@ function sampledPathIsClear(unit, points, blocker, canOccupy, sampleStep) {
         ...unit,
         x: previous.x + (point.x - previous.x) * t,
         y: previous.y + (point.y - previous.y) * t,
-        angle: previous.angle + turn * t
+        angle: targetAngle
       };
       if (!canOccupy(pose, blocker)) return false;
     }
     previous = { x: point.x, y: point.y, angle: targetAngle };
   }
   return true;
+}
+
+export function emergencyPassingPathClear(unit,points,canOccupy,sampleStep=10){
+  return sampledPathIsClear(unit,points,null,canOccupy,sampleStep);
 }
 
 /** Plan a short passing path; the caller validates the entire chassis and corridor. */
@@ -63,7 +67,7 @@ export function planEmergencyPassingManeuver(unit, actors, {
       longitudinalClearance: (unit.width || 48) / 2 + longitudinalRadius + passPadding,
       lateralClearance: (unit.height || 24) / 2 + lateralRadius + lateralPadding
     };
-  }).filter(item => item.along > -12 && item.along < lookAhead &&
+  }).filter(item => item.along > 0 && item.along < lookAhead &&
     Math.abs(item.across) < item.lateralClearance)
     .sort((a, b) => a.along - b.along)[0];
 

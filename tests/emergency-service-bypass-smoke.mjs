@@ -27,8 +27,7 @@ for(const [model,width,height,maxSpeed] of [['police',48,24,5.6],['ambulance',54
   `));
   assert(result.passes>=1&&result.lateral>28,JSON.stringify(result));
   assert(result.x>2040&&Math.abs(result.y-1200)<12&&result.rejoined,JSON.stringify(result));
-  // Contact counts are diagnostic: a bump is acceptable if the responder
-  // clears the blocker, rejoins its route, and stays on safe ground.
+  assert.equal(result.collisions,0,JSON.stringify(result));
   assert.equal(result.unsafe,0,JSON.stringify(result));
   assert(result.maxStep<=maxSpeed+.01,JSON.stringify(result));results.push(result);
  }
@@ -46,7 +45,7 @@ const safeWait=JSON.parse(city.run(`
  for(var tick=0;tick<600;tick++){tryPlanEmergencyPassing(unit,1/60);advanceServiceRoute(unit,1/60);}
  JSON.stringify({blocked,collision,safe,resumed:unit.x>2040});
 `));
-assert(safeWait.blocked&&safeWait.safe&&safeWait.resumed,JSON.stringify(safeWait));
+assert(safeWait.blocked&&safeWait.safe&&!safeWait.collision&&safeWait.resumed,JSON.stringify(safeWait));
 
 // A complete dispatched fire cycle with one slow traffic obstacle. Other
 // responders are covered by the independent complete-route matrix.
@@ -86,7 +85,8 @@ const yielding=JSON.parse(integratedCity.run(`
  }
  JSON.stringify({yielded,contacts,safe,reverseSteps,passes:unit.emergencyPasses||0,arrived,returned:!!unit.returnedToBase,x:unit.x,y:unit.y,status:unit.status,points:unit.emergencyManeuver?.points,car:{x:car.x,y:car.y,speed:car.speed}});
 `));
-assert(yielding.yielded&&yielding.safe&&yielding.passes>0&&yielding.arrived&&yielding.returned&&yielding.reverseSteps>0,JSON.stringify(yielding));
+assert(yielding.yielded&&yielding.safe&&yielding.arrived&&yielding.returned,JSON.stringify(yielding));
+assert.equal(yielding.contacts,0,'giving way and passing must avoid contact, without requiring an unnecessary reverse');
 const directory=new URL('../artifacts/living-city/',import.meta.url);mkdirSync(directory,{recursive:true});
 writeFileSync(new URL('service-bypass.json',directory),JSON.stringify({results,safeWait,loop,yielding},null,2));
 console.log('EMERGENCY SERVICE BYPASS PASS',JSON.stringify({results,safeWait,loop,yielding}));

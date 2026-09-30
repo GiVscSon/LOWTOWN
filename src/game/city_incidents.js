@@ -112,15 +112,19 @@ export function updateCrowdReactions(people, incident, dt = 0) {
     const person = people[index];
     person.reaction = 'calm';
     person.lookAt = null;
+    const hazardous=incident&&!(incident.kind==='fire'&&incident.fireSuppressed)&&
+      !(incident.kind==='crash'&&incident.medicalTreated);
+    if(!hazardous||person.avoidZone?.id!==incident.id)person.avoidZone=null;
 
     if (incident) {
       const dx = person.x - incident.x, dy = person.y - incident.y;
       const distance = Math.hypot(dx, dy);
-      const isInDanger = distance <= incident.dangerRadius;
-      const panicNearby = !isInDanger && danger.some(entry =>
+      const isInDanger = hazardous&&distance <= incident.dangerRadius;
+      const panicNearby = hazardous&&!isInDanger && danger.some(entry =>
         Math.hypot(person.x - entry.person.x, person.y - entry.person.y) < 82);
 
       if (isInDanger || panicNearby) {
+        person.avoidZone={id:incident.id,x:incident.x,y:incident.y,radius:incident.dangerRadius+45};
         const away = Math.hypot(dx, dy) || 1;
         person.eventFleeX = dx / away;
         person.eventFleeY = dy / away;

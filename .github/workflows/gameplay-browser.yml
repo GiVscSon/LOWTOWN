@@ -26,6 +26,8 @@ jobs:
         run: npm run test:air-medical
       - name: Street signals and resident behavior
         run: npm run test:living-world
+      - name: Stable crowd movement and populated emergency routes
+        run: npm run test:movement-stability
       - name: Live traffic
         run: node tests/live-traffic-regression.mjs
       - name: Pedestrian motion
