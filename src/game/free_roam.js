@@ -99,7 +99,7 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
       notify('Самолёту нужен разбег по полосе: разгонитесь и нажмите Q');return;
     }
     fly=altitude<2?true:!fly;landingWarned=false;
-    notify(fly?(mode==='plane'?'Взлёт · удерживайте скорость, A/D — курс':'Взлёт · Q — перейти к снижению'):'Снижение · самолёт садится на полосу');
+    notify(fly?(mode==='plane'?'Взлёт · удерживайте скорость, A/D — курс':'Взлёт · Q — перейти к снижению'):(mode==='plane'?'Снижение · самолёт садится на полосу':'Снижение · выберите свободную площадку'));
   }
   function resetToSedan(x=player.x,y=player.y,angle=0){
     mode='sedan';altitude=0;fly=false;landingWarned=false;
@@ -182,7 +182,12 @@ export function drawTransport(ctx,car,time=0,altitude=0) {
   const poly=(points,fill,stroke=false)=>{ctx.beginPath();points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();ctx.fillStyle=fill;ctx.fill();if(stroke)ctx.stroke();};
   const extrude=(shape,top,side='rgba(24,28,29,.94)',lift=1)=>{
     const ox=zx*lift,oy=zy*lift;
-    for(let i=0;i<shape.length;i++){const a=shape[i],b=shape[(i+1)%shape.length];poly([a,b,[b[0]+ox,b[1]+oy],[a[0]+ox,a[1]+oy]],side);}
+    const orientation=Math.sign(shape.reduce((area,a,i)=>{const b=shape[(i+1)%shape.length];return area+a[0]*b[1]-b[0]*a[1];},0));
+    for(let i=0;i<shape.length;i++){
+      const a=shape[i],b=shape[(i+1)%shape.length],nx=(b[1]-a[1])*orientation,ny=(a[0]-b[0])*orientation;
+      if(nx*(cs+sn)+ny*(cs-sn)<=0)continue;
+      poly([a,b,[b[0]+ox,b[1]+oy],[a[0]+ox,a[1]+oy]],side);
+    }
     const raised=shape.map(([x,y])=>[x+ox,y+oy]);poly(raised,top,true);return raised;
   };
   const lights=(frontX,halfH)=>{ctx.fillStyle='#ffe6a0';ctx.shadowColor='#ffd36a';ctx.shadowBlur=5;ctx.fillRect(frontX+zx,-halfH+3+zy,3,5);ctx.fillRect(frontX+zx,halfH-8+zy,3,5);ctx.shadowBlur=0;};
@@ -238,11 +243,26 @@ export function drawTransport(ctx,car,time=0,altitude=0) {
     }
     ctx.fillStyle='#ffe2a0';ctx.beginPath();ctx.arc(13+zx,zy,2.5,0,Math.PI*2);ctx.fill();
   } else if(car.type==='truck'){
-    ctx.fillStyle='#060708';for(const x of [-28,3,28])for(const y of [-car.height*.55,car.height*.45])ctx.fillRect(x-5,y,11,5);
-    extrude([[-42,-16],[12,-16],[12,16],[-42,16]],car.color||'#807657','#34332d');
-    extrude([[13,-15],[40,-13],[42,13],[13,15]],'#9b8c68','#3b3931',1.3);
-    ctx.strokeStyle='rgba(222,211,174,.26)';for(let x=-35;x<8;x+=10){ctx.beginPath();ctx.moveTo(x+zx,-14+zy);ctx.lineTo(x+zx,14+zy);ctx.stroke();}
-    poly([[24+zx*1.45,-11+zy*1.45],[37+zx*1.45,-9+zy*1.45],[37+zx*1.45,9+zy*1.45],[24+zx*1.45,11+zy*1.45]],'#263f49',true);lights(39,14);
+    const w=car.width,h=car.height;
+    ctx.fillStyle='#080b0c';ctx.fillRect(-w*.48,-h*.41,w*.96,h*.82);
+    for(const x of [-w*.35,-w*.18,w*.34])for(const y of [-h*.56,h*.40])ctx.fillRect(x-5,y,10,5);
+    const cargo={x:-w*.2,draw(){
+      extrude([[-w*.49,-h*.49],[w*.12,-h*.49],[w*.12,h*.49],[-w*.49,h*.49]],car.color||'#807657','#48483c',1.3);
+      ctx.strokeStyle='rgba(229,218,185,.28)';ctx.lineWidth=1;
+      for(let x=-w*.43;x<w*.08;x+=9){ctx.beginPath();ctx.moveTo(x+zx*1.3,-h*.43+zy*1.3);ctx.lineTo(x+zx*1.3,h*.43+zy*1.3);ctx.stroke();}
+      ctx.fillStyle='#a24433';ctx.fillRect(-w*.5,-h*.4,2,4);ctx.fillRect(-w*.5,h*.27,2,4);
+    }};
+    const cab={x:w*.32,draw(){
+      const lift=.95,rx=zx*lift,ry=zy*lift;
+      extrude([[w*.16,-h*.45],[w*.45,-h*.45],[w*.5,-h*.32],[w*.5,h*.32],[w*.45,h*.45],[w*.16,h*.45]],'#a69772','#4c4b41',lift);
+      poly([[w*.38+rx,-h*.38+ry],[w*.47+rx,-h*.27+ry],[w*.47+rx,h*.27+ry],[w*.38+rx,h*.38+ry]],'#29404a',true);
+      ctx.fillStyle='#bdad83';ctx.fillRect(w*.19+rx,-h*.35+ry,w*.16,h*.7);
+      ctx.fillStyle='#657f83';ctx.fillRect(w*.23+rx,-h*.45+ry,w*.12,2);ctx.fillRect(w*.23+rx,h*.38+ry,w*.12,2);
+      ctx.fillStyle='#272e2d';ctx.fillRect(w*.49,-h*.3,3,h*.6);
+      ctx.fillStyle='#e8ddb9';ctx.fillRect(w*.49,-h*.35,3,4);ctx.fillRect(w*.49,h*.22,3,4);
+      ctx.fillStyle='#444b47';ctx.fillRect(w*.20,-h*.61,6,3);ctx.fillRect(w*.20,h*.52,6,3);
+    }};
+    [cargo,cab].sort((a,b)=>(a.x-b.x)*(cs+sn)).forEach(part=>part.draw());
   } else {
     const w=car.width,h=car.height;
     ctx.fillStyle='#060708';for(const x of [-w*.3,w*.26])for(const y of [-h*.55,h*.44])ctx.fillRect(x-5,y,11,5);

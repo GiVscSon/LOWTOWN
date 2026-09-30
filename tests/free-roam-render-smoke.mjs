@@ -1,3 +1,4 @@
+import * as emergencyPassing from '../src/game/emergency_passing.js';
 import * as streetNetwork from '../src/game/street_network.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -15,7 +16,7 @@ let depth=0,draws=0;const mapLabels=[];
 const noop=()=>{};
 const context=new Proxy({save(){depth++;},restore(){depth--;assert(depth>=0);},fillText(value){mapLabels.push(String(value));},createRadialGradient(){return {addColorStop:noop};},createLinearGradient(){return {addColorStop:noop};}}, {get(target,key){return key in target?target[key]:(...args)=>{for(const arg of args)if(typeof arg==='number')assert(Number.isFinite(arg),`Non-finite ${key}`);draws++;};},set(target,key,value){target[key]=value;return true;}});
 const element=()=>({width:900,height:700,style:{},classList:{add:noop,remove:noop},appendChild:noop,append:noop,addEventListener:noop,getContext:()=>context,remove:noop});
-const sandbox={...streetNetwork,...ocean,...surfaces,...incidents,assert,console,Math,mapLabels,depth,draws,performance:{now:()=>100},document:{readyState:'loading',getElementById:element,createElement:element,querySelectorAll:()=>[],addEventListener:noop},window:{innerWidth:1100,innerHeight:800,addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,...core,...contacts,...coast,...roamModule,...architecture,...trafficTurns};
+const sandbox={...emergencyPassing,...streetNetwork,...ocean,...surfaces,...incidents,assert,console,Math,mapLabels,depth,draws,performance:{now:()=>100},document:{readyState:'loading',getElementById:element,createElement:element,querySelectorAll:()=>[],addEventListener:noop},window:{innerWidth:1100,innerHeight:800,addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,...core,...contacts,...coast,...roamModule,...architecture,...trafficTurns};
 Object.defineProperties(sandbox,{depth:{get:()=>depth},draws:{get:()=>draws}});
 vm.createContext(sandbox);
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
@@ -53,6 +54,9 @@ const smokeIncident=cityIncidentDirector.start('fire',{x:pedestrians[3].x,y:pede
 smokeIncident.reported=true;
 updatePhysics(1/60);renderWorld();
 const responseStartDistance=incidentPoliceCars.length?Math.hypot(incidentPoliceCars[0].x-incidentPoliceCars[0].responseTarget.x,incidentPoliceCars[0].y-incidentPoliceCars[0].responseTarget.y):Infinity;
+// Independently advancing only the services leaves every traffic obstacle frozen.
+// This render fixture isolates routes; dynamic bypass has its own live obstacle regression.
+[...incidentResponseVehicles,...incidentPoliceCars].forEach(unit=>unit.priorityPassing=false);
 const incidentUnits=incidentResponseVehicles.slice();
 const serviceStartDistances=incidentUnits.map(c=>Math.hypot(c.x-c.responseTarget.x,c.y-c.responseTarget.y));
 const remainingRoute=unit=>responseRouteLength(unit.route)+(unit.route[0]?Math.hypot(unit.x-unit.route[0].x,unit.y-unit.route[0].y):0);

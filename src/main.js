@@ -1,7 +1,8 @@
 import { drawArchitecture, drawRoundedJunction, drawStreetTree, drawStreetFurniture } from './game/architecture.js';
 import { velocityForHeading, projectIso, routeInput } from './game/test_drive_core.js';
 import { createDriveLab } from './game/test_drive_lab.js';
-import { resolveContact, resolveScenery } from './game/solid_contacts.js';
+import { resolveContact, resolveScenery, contact, chassis } from './game/solid_contacts.js';
+import { planEmergencyPassingManeuver } from './game/emergency_passing.js';
 import { coastPath, coastPoints, pointInCoast, pointInBeach, BEACH_WIDTH } from './game/coastline.js';
 import { createFreeRoam, drawTransport, PLANE_RUNWAYS } from './game/free_roam.js';
 import { visibleOceanChunks } from './game/ocean_chunks.js';
@@ -467,20 +468,76 @@ function updateStuntVehicle(vehicle,dt=1/60) {
   return state.height;
 }
 
-function junctionCrosswalkStripes(horizontal,vertical) {
+let roadPaintGeometry=null;
+
+function junctionCrosswalkStripes(horizontal,vertical,approaches={north:true,south:true,west:true,east:true}) {
   const stripes=[];
   for(let x=vertical.x+8;x<vertical.x+vertical.w-8;x+=15){
-    stripes.push({x,y:horizontal.y+7,w:7,h:19,approach:'north'});
-    stripes.push({x,y:horizontal.y+horizontal.h-26,w:7,h:19,approach:'south'});
+    if(approaches.north)stripes.push({x,y:horizontal.y-28,w:7,h:20,approach:'north'});
+    if(approaches.south)stripes.push({x,y:horizontal.y+horizontal.h+8,w:7,h:20,approach:'south'});
   }
   for(let y=horizontal.y+8;y<horizontal.y+horizontal.h-8;y+=15){
-    stripes.push({x:vertical.x-28,y,w:20,h:7,approach:'west'});
-    stripes.push({x:vertical.x+vertical.w+8,y,w:20,h:7,approach:'east'});
+    if(approaches.west)stripes.push({x:vertical.x-28,y,w:20,h:7,approach:'west'});
+    if(approaches.east)stripes.push({x:vertical.x+vertical.w+8,y,w:20,h:7,approach:'east'});
   }
   return stripes;
 }
 
+function subtractRoadIntervals(start,end,masks){
+  const segments=[];let cursor=start;
+  for(const [a,b] of masks.sort((a,b)=>a[0]-b[0])){
+    if(b<=cursor||a>=end)continue;
+    if(a>cursor)segments.push([cursor,Math.min(a,end)]);
+    cursor=Math.max(cursor,b);if(cursor>=end)break;
+  }
+  if(cursor<end)segments.push([cursor,end]);return segments;
+}
+
+function buildRoadPaintGeometry(){
+  const junctions=[],curbs=[],lanes=[];
+  for(const horizontal of roads.filter(r=>r.dir==='h'))for(const vertical of roads.filter(r=>r.dir==='v')){
+    const overlapX=Math.min(horizontal.x+horizontal.w,vertical.x+vertical.w)-Math.max(horizontal.x,vertical.x);
+    const overlapY=Math.min(horizontal.y+horizontal.h,vertical.y+vertical.h)-Math.max(horizontal.y,vertical.y);
+    if(overlapX<0||overlapY<0||horizontal.h<55||vertical.w<55)continue;
+    const x=vertical.x,y=horizontal.y,w=vertical.w,h=horizontal.h;
+    const approaches={
+      north:vertical.y<y-32,south:vertical.y+vertical.h>y+h+32,
+      west:horizontal.x<x-32,east:horizontal.x+horizontal.w>x+w+32};
+    const existing=junctions.find(j=>j.x===x&&j.y===y&&j.w===w&&j.h===h);
+    if(existing){
+      existing.horizontalRoads.push(horizontal);existing.verticalRoads.push(vertical);
+      for(const face of Object.keys(approaches))existing.approaches[face]||=approaches[face];
+    }else junctions.push({x,y,w,h,horizontalRoads:[horizontal],verticalRoads:[vertical],approaches});
+  }
+  for(const road of roads){
+    const horizontal=road.dir==='h',start=horizontal?road.x:road.y,end=start+(horizontal?road.w:road.h);
+    for(const side of [0,1]){
+      const fixed=horizontal?road.y+side*road.h:road.x+side*road.w,masks=[];
+      for(const other of [...roads,...bridges]){
+        if(other===road)continue;
+        const lo=horizontal?other.y:other.x,hi=lo+(horizontal?other.h:other.w);
+        if(fixed>lo+.01&&fixed<hi-.01)masks.push(horizontal?[other.x,other.x+other.w]:[other.y,other.y+other.h]);
+      }
+      for(const j of junctions){
+        if(horizontal&&Math.abs(fixed-(j.y+side*j.h))<.01){
+          const face=side?'south':'north';
+          masks.push([j.x-(j.approaches.west&&j.approaches[face]?34:0),j.x+j.w+(j.approaches.east&&j.approaches[face]?34:0)]);
+        }else if(!horizontal&&Math.abs(fixed-(j.x+side*j.w))<.01){
+          const face=side?'east':'west';
+          masks.push([j.y-(j.approaches.north&&j.approaches[face]?34:0),j.y+j.h+(j.approaches.south&&j.approaches[face]?34:0)]);
+        }
+      }
+      for(const [a,b] of subtractRoadIntervals(start,end,masks))curbs.push(horizontal?{x1:a,y1:fixed,x2:b,y2:fixed}:{x1:fixed,y1:a,x2:fixed,y2:b});
+    }
+    const masks=junctions.filter(j=>(horizontal?j.horizontalRoads:j.verticalRoads).includes(road)).map(j=>horizontal?[j.x-40,j.x+j.w+40]:[j.y-40,j.y+j.h+40]);
+    const fixed=horizontal?road.y+road.h/2:road.x+road.w/2;
+    for(const [a,b] of subtractRoadIntervals(start,end,masks))lanes.push(horizontal?{x1:a,y1:fixed,x2:b,y2:fixed,phase:a}:{x1:fixed,y1:a,x2:fixed,y2:b,phase:a});
+  }
+  return {junctions,curbs,lanes};
+}
+
 function initTopology() {
+  roadPaintGeometry=null;
   roads.length = 0;
   scenicRoads.length = 0;
   roadEnds.length = 0;
@@ -1267,25 +1324,140 @@ function buildServiceAccess(){
 function advanceServiceRoute(unit,dt){
   const frame=Math.min(Math.max(Number(dt)||0,0),.05)*60;
   if(!frame||!unit.route?.length)return;
-  while(unit.route.length>1&&Math.hypot(unit.route[0].x-unit.x,unit.route[0].y-unit.y)<12)unit.route.shift();
-  const target=unit.route[0],distance=Math.hypot(target.x-unit.x,target.y-unit.y);
-  const wanted=Math.atan2(target.y-unit.y,target.x-unit.x);
+  const passing=unit.emergencyManeuver;
+  if(passing?.points.length&&passing.lastBlockerPosition){
+    const along=(passing.blocker.x-passing.lastBlockerPosition.x)*Math.cos(passing.angle)+
+      (passing.blocker.y-passing.lastBlockerPosition.y)*Math.sin(passing.angle);
+    // Keep the merge point beyond a moving car instead of returning to its lane
+    // using the position at which the initial maneuver was planned.
+    const shift=Math.max(0,Math.min(along,passing.remainingAdvance));
+    if(shift>0&&emergencyPassingActors(unit).includes(passing.blocker)){
+      for(const point of passing.points.slice(Math.max(0,passing.points.length-2))){
+        point.x+=Math.cos(passing.angle)*shift;point.y+=Math.sin(passing.angle)*shift;
+      }
+      passing.remainingAdvance-=shift;
+    }
+    passing.lastBlockerPosition={x:passing.blocker.x,y:passing.blocker.y};
+  }
+  const path=unit.emergencyManeuver?.points||unit.route;
+  const maneuver=!!unit.emergencyManeuver;
+  while(path.length>(maneuver?0:1)&&Math.hypot(path[0].x-unit.x,path[0].y-unit.y)<(maneuver?4:12)){
+    if(path.shift().reverse)unit.speed=0;
+  }
+  if(maneuver&&!path.length){unit.emergencyManeuver=null;unit.emergencyBlocked=false;unit.emergencyPassCheck=0;return;}
+  const target=path[0],distance=Math.hypot(target.x-unit.x,target.y-unit.y);
+  const wanted=Math.atan2(target.y-unit.y,target.x-unit.x)+(target.reverse?Math.PI:0);
   const diff=Math.atan2(Math.sin(wanted-unit.angle),Math.cos(wanted-unit.angle));
   const old={x:unit.x,y:unit.y,angle:unit.angle};
   unit.angle+=Math.sign(diff)*Math.min(Math.abs(diff),.105*frame);
-  const desired=Math.abs(diff)>.55?0:unit.maxSpeed*Math.min(1,distance/50);
+  const desired=unit.emergencyBlocked||Math.abs(diff)>.35?0:
+    (target.reverse?-Math.min(2,unit.maxSpeed):unit.maxSpeed)*Math.min(1,distance/50);
   unit.speed+=(desired-unit.speed)*(1-Math.pow(1-(unit.model==='fireEngine'?.075:.12),frame));
-  const step=Math.min(distance,Math.max(0,unit.speed)*frame);
+  const step=Math.min(distance,Math.abs(unit.speed)*frame)*Math.sign(unit.speed);
   unit.x+=Math.cos(unit.angle)*step;unit.y+=Math.sin(unit.angle)*step;
-  if(!policeFootprintOnRoad(unit)){
+  if(!serviceFootprintSupported(unit)||(unit.priorityPassing!==false&&!emergencyPassingPoseClear(unit,unit))){
     unit.x=old.x;unit.y=old.y;unit.speed=0;
-    if(!policeFootprintOnRoad(unit))unit.angle=old.angle;
+    if(!serviceFootprintSupported(unit)||(unit.priorityPassing!==false&&!emergencyPassingPoseClear(unit,unit)))unit.angle=old.angle;
+    if(maneuver){
+      unit.emergencyStalled=(unit.emergencyStalled||0)+dt;
+      if(unit.emergencyStalled>1&&policeFootprintOnRoad(unit)){unit.emergencyManeuver=null;unit.emergencyPassCheck=0;unit.emergencyStalled=0;}
+    }
+  }else{
+    unit.emergencyStalled=0;
   }
+}
+
+function emergencyPassingActors(unit){
+  const groundFleet=(roam?.fleet||[]).filter(actor=>actor.kind!=='water');
+  const playerIsAirborne=(roam?.altitude||0)>12;
+  const actors=[...trafficCars,...parkedCars,...policeCars,...incidentPoliceCars,
+    ...incidentResponseVehicles,...groundFleet,...(!playerIsAirborne&&roam?.mode!=='foot'&&!unit.role?[player]:[])];
+  return [...new Set(actors)].filter(actor=>actor&&actor!==unit);
+}
+
+function emergencyPassingGroundClear(pose){
+  const cs=Math.cos(pose.angle||0),sn=Math.sin(pose.angle||0),hl=(pose.width||48)/2,hw=(pose.height||24)/2;
+  if(!policeFootprintOnRoad(pose)&&![[0,0],[hl,hw],[hl,-hw],[-hl,hw],[-hl,-hw]].every(([x,y])=>
+    isPositionOnSolidGround(pose.x+x*cs-y*sn,pose.y+x*sn+y*cs)))return false;
+  const body=chassis(pose);
+  const radius=Math.hypot(hl,hw);
+  const near=(x,y,w,h)=>Math.abs(pose.x-x)<=w/2+radius&&Math.abs(pose.y-y)<=h/2+radius;
+  const overlaps=rect=>{
+    const width=rect.w||rect.width||12,height=rect.h||rect.height||12,x=rect.x+width/2,y=rect.y+height/2;
+    return near(x,y,width,height)&&contact(body,chassis({x,y,width,height,angle:rect.angle||0}));
+  };
+  if(buildings.some(building=>overlaps(building)))return false;
+  if(trees.some(tree=>near(tree.x,tree.y,20,20)&&contact(body,chassis({x:tree.x,y:tree.y,width:20,height:20}))))return false;
+  if(solidProps.some(prop=>{
+    const width=prop.width||12,height=prop.height||12,bounds=Math.hypot(width,height);
+    return near(prop.x,prop.y,bounds,bounds)&&contact(body,chassis({x:prop.x,y:prop.y,width,height,angle:prop.angle||0}));
+  }))return false;
+  if(bridgeRails.some(rail=>overlaps(rail)))return false;
+  return true;
+}
+
+function serviceFootprintSupported(unit){
+  return policeFootprintOnRoad(unit)||(!!unit.emergencyManeuver&&emergencyPassingGroundClear(unit));
+}
+
+function emergencyPassingPoseClear(pose,unit=pose){
+  if(!emergencyPassingGroundClear(pose))return false;
+  const body=chassis(pose);
+  const halfLength=(pose.width||48)/2,halfWidth=(pose.height||24)/2;
+  const near=(x,y,width,height)=>Math.abs(pose.x-x)<=halfLength+width/2+12&&
+    Math.abs(pose.y-y)<=halfWidth+height/2+12;
+  for(const person of pedestrians){
+    if(near(person.x,person.y,18,18)&&contact(body,chassis({x:person.x,y:person.y,width:18,height:18,angle:person.angle||0})))return false;
+  }
+  if(roam?.mode==='foot'&&near(player.x,player.y,18,18)&&
+    contact(body,chassis({x:player.x,y:player.y,width:18,height:18,angle:player.angle||0})))return false;
+  const actorClear=actor=>{
+    if(!actor||actor===unit)return true;
+    const width=(actor.width||48)+8,height=(actor.height||24)+8;
+    return !near(actor.x,actor.y,width,height)||!contact(body,chassis({...actor,width,height}));
+  };
+  for(const list of [trafficCars,parkedCars,policeCars,incidentPoliceCars,incidentResponseVehicles]){
+    for(const actor of list)if(!actorClear(actor))return false;
+  }
+  for(const actor of roam?.fleet||[]){
+    if(actor.kind!=='air'&&actor.kind!=='water'&&!actorClear(actor))return false;
+  }
+  const playerIsAirborne=(roam?.altitude||0)>12;
+  if(!playerIsAirborne&&roam?.mode!=='foot'&&!unit.role&&!actorClear(player))return false;
+  return true;
+}
+
+function tryPlanEmergencyPassing(unit,dt){
+  if(!['enroute','returning'].includes(unit.status)||unit.priorityPassing===false){
+    unit.emergencyBlocked=false;
+    return;
+  }
+  if(unit.emergencyManeuver?.points?.length)return;
+  unit.emergencyPassCheck=Math.max(0,(unit.emergencyPassCheck||0)-dt);
+  if(unit.emergencyPassCheck>0)return;
+  unit.emergencyPassCheck=.25;
+  const next=unit.route?.[0];
+  if(next&&Math.abs(Math.atan2(Math.sin(Math.atan2(next.y-unit.y,next.x-unit.x)-unit.angle),
+    Math.cos(Math.atan2(next.y-unit.y,next.x-unit.x)-unit.angle)))>.32){
+    unit.emergencyBlocked=false;
+    return;
+  }
+  const plan=planEmergencyPassingManeuver(unit,emergencyPassingActors(unit),{
+    canOccupy:pose=>emergencyPassingPoseClear(Math.hypot(pose.x-unit.x,pose.y-unit.y)<10?pose:
+      {...pose,width:(pose.width||48)+10,height:(pose.height||24)+10},unit),
+    lookAhead:Math.min(260,next?Math.hypot(next.x-unit.x,next.y-unit.y)-10:260),
+    maxForward:next?Math.hypot(next.x-unit.x,next.y-unit.y)-15:Infinity
+  });
+  unit.emergencyBlocked=!!plan&&!plan.points.length;
+  if(!plan?.points.length)return;
+  unit.emergencyManeuver=plan;
+  unit.emergencyPasses=(unit.emergencyPasses||0)+1;
+  unit.emergencyBlocked=false;
 }
 
 function dispatchIncidentPolice(incident){
   if(!incident||incident.policeDispatched||!roadGraph.length)return false;
-  const target=roadGraph.reduce((best,node)=>Math.hypot(node.x-incident.x,node.y-incident.y)<Math.hypot(best.x-incident.x,best.y-incident.y)?node:best,roadGraph[0]);
+  const target=nearestResponseRoadNode(incident);
   const candidates=serviceBases.filter(base=>base.kind==='police').map(base=>({base,node:base.origin,distance:Math.hypot(base.origin.x-target.x,base.origin.y-target.y)}))
     .sort((a,b)=>a.distance-b.distance);
   if(!candidates.length)return false;
@@ -1321,17 +1493,27 @@ function updateIncidentPolice(dt){
       continue;
     }
     const responseDistance=Math.hypot(unit.responseTarget.x-unit.x,unit.responseTarget.y-unit.y);
-    if(responseDistance<18){
+    if(responseDistance<18&&!unit.emergencyManeuver&&!unit.emergencyBlocked){
       if(unit.status==='returning'){unit.returnedToBase=true;incidentPoliceCars.splice(i,1);continue;}
+      unit.emergencyManeuver=null;unit.emergencyBlocked=false;
       unit.arrived=true;unit.status='onscene';unit.arrivalTimer=8;unit.speed=0;continue;
     }
     if(!unit.route?.length)unit.route=roadPath(roadGraph,unit,unit.responseTarget);
+    tryPlanEmergencyPassing(unit,dt);
     advanceServiceRoute(unit,dt);
   }
 }
 
 function nearestRoadNode(point){
   return roadGraph.reduce((best,node)=>Math.hypot(node.x-point.x,node.y-point.y)<Math.hypot(best.x-point.x,best.y-point.y)?node:best,roadGraph[0]);
+}
+
+function nearestResponseRoadNode(point){
+  // End nodes can support a point while leaving the nose of a truck over water.
+  const supported=roadGraph.filter(node=>[0,Math.PI/2].every(angle=>
+    policeFootprintOnRoad({...node,width:72,height:34,angle})));
+  return supported.reduce((best,node)=>Math.hypot(node.x-point.x,node.y-point.y)<Math.hypot(best.x-point.x,best.y-point.y)?node:best,
+    supported[0]||nearestRoadNode(point));
 }
 
 function responseRouteLength(route){
@@ -1346,7 +1528,7 @@ function dispatchIncidentResponse(incident){
     ['crash','fight','killing'].includes(incident.kind)?['ambulance']:[];
   incident.responseDispatchAttempted=true;
   if(!services.length)return 0;
-  const target=nearestRoadNode(incident);
+  const target=nearestResponseRoadNode(incident);
   const dispatchedServices=[];
   for(const serviceType of services){
     const civicType=serviceType==='fireEngine'?'firestation':'hospital';
@@ -1397,6 +1579,7 @@ function applyMedicalResponse(incident){
 
 function beginIncidentResponseReturn(unit){
   unit.status='returning';
+  unit.emergencyManeuver=null;unit.emergencyBlocked=false;
   unit.responseTarget={...unit.baseTarget};
   unit.route=roadPath(roadGraph,unit,unit.responseTarget).slice(1);
   unit.routeTimer=0;
@@ -1423,13 +1606,15 @@ function updateIncidentResponse(dt){
     if(!unit.route?.length)unit.route=roadPath(roadGraph,unit,unit.responseTarget).slice(1);
     if(!unit.route.length){incidentResponseVehicles.splice(i,1);continue;}
     const responseDistance=Math.hypot(unit.responseTarget.x-unit.x,unit.responseTarget.y-unit.y);
-    if(responseDistance<18){
+    if(responseDistance<18&&!unit.emergencyManeuver&&!unit.emergencyBlocked){
       if(unit.status==='returning'){unit.returnedToBase=true;incidentResponseVehicles.splice(i,1);continue;}
+      unit.emergencyManeuver=null;unit.emergencyBlocked=false;
       unit.status='onscene';unit.sceneTimer=unit.model==='fireEngine'?4.8:4.1;unit.speed=0;
       if(incident&&unit.model==='fireEngine')incident.fireResponse='onScene';
       if(incident&&unit.model==='ambulance')incident.medicalResponse='onScene';
       continue;
     }
+    tryPlanEmergencyPassing(unit,dt);
     advanceServiceRoute(unit,dt);
   }
 }
@@ -1439,13 +1624,14 @@ function nearestSafeSpawn(x,y){
 }
 
 function respawnPlayer(reason='авария'){
+  const detained=reason==='задержание';
   const spawn=nearestSafeSpawn(player.x,player.y);
   roam?.resetToSedan(spawn.x,spawn.y,0);
   if(!roam)Object.assign(player,{x:spawn.x,y:spawn.y,angle:0,speed:0,vx:0,vy:0});
   player.hp=player.maxHp||100;
-  state.isDrowning=false;state.drownProgress=0;state.deathFlash=1;state.invulnTimer=180;
+  state.isDrowning=false;state.drownProgress=0;state.deathFlash=detained?0:1;state.invulnTimer=180;state.detainProgress=0;
   state.wanted=0;state.wantedCooldown=0;state.evading=false;policeCars.length=0;state.tacticalCallDispatched=false;state.guardCallDispatched=false;state.cash=Math.max(0,state.cash-100);
-  showToast(`☠️ ВЫ ПОГИБЛИ: ${reason.toUpperCase()} · ВОЗРОЖДЕНИЕ (-$100)`);
+  showToast(detained?'🚨 ВЫ ЗАДЕРЖАНЫ · ШТРАФ (-$100)':`☠️ ВЫ ПОГИБЛИ: ${reason.toUpperCase()} · ВОЗРОЖДЕНИЕ (-$100)`);
 }
 
 function updatePhysics(dt) {
@@ -1544,7 +1730,7 @@ function updatePhysics(dt) {
   if (Math.abs(player.speed) > 0.12) {
     const dir = player.speed >= 0 ? 1 : -1;
     const steeringAuthority = Math.min(1, 0.28 + Math.abs(player.speed) / 3.2)*surfaceResponse.steering;
-    const turnSpeed = (state.keys.handbrake ? 0.063 : (roam?.profile?.steer||0.044)) * steeringAuthority;
+    const turnSpeed = (state.keys.handbrake ? 0.063 : (roam?.profile?.steer||0.044)) * steeringAuthority * Math.min(1,Math.abs(player.speed)/2.2);
     if (state.keys.left) player.angle -= turnSpeed * dir;
     if (state.keys.right) player.angle += turnSpeed * dir;
   }
@@ -1664,7 +1850,10 @@ function updatePhysics(dt) {
       return ahead>32&&ahead<118&&c[cross]>=(axis==='x'?r.y:r.x)-15&&c[cross]<=(axis==='x'?r.y+r.h:r.x+r.w)+15;
     });
     c.collisionHold=Math.max(0,(c.collisionHold||0)-dt);
-    const obstacle = occupied || approachingRed || c.collisionHold>0;
+    const emergencyYield=[...policeCars,...incidentPoliceCars,...incidentResponseVehicles]
+      .some(unit=>unit.status==='enroute'&&Math.hypot(unit.x-c.x,unit.y-c.y)<200&&
+        Math.abs((c.x-unit.x)*-Math.sin(unit.angle)+(c.y-unit.y)*Math.cos(unit.angle))<60);
+    const obstacle = occupied || approachingRed || emergencyYield || c.collisionHold>0;
     if(c.routeManaged){
       const pose={x:c.x,y:c.y,angle:c.angle};
       advanceRouteActor(c,c.route,dt,{speed:obstacle?0:c.cruiseSpeed,dwell:2.1,stopRadius:12});
@@ -1714,7 +1903,7 @@ function updatePhysics(dt) {
   const stuntVehicles=[...trafficCars,...policeCars,...incidentPoliceCars,...incidentResponseVehicles];
   stuntVehicles.forEach(vehicle=>updateStuntVehicle(vehicle,dt));
   const vehicles = [...(!roam?.special&&stuntHeightFor(player)<16 ? [player] : []), ...trafficCars, ...policeCars, ...incidentPoliceCars,...incidentResponseVehicles];
-  const responsePoses=new Map([...policeCars,...incidentPoliceCars,...incidentResponseVehicles].filter(policeFootprintOnRoad)
+  const responsePoses=new Map([...policeCars,...incidentPoliceCars,...incidentResponseVehicles].filter(serviceFootprintSupported)
     .map(unit=>[unit,{x:unit.x,y:unit.y,angle:unit.angle}]));
   // Repeated projection handles simultaneous wall/car contacts at intersections.
   for (let pass = 0; pass < 3; pass++) {
@@ -1732,7 +1921,7 @@ function updatePhysics(dt) {
       if(stuntHeightFor(vehicles[i])<16)resolveScenery(vehicles[i], buildings, trees, solidProps);
     }
   }
-  for(const [unit,pose] of responsePoses)if(!policeFootprintOnRoad(unit)){Object.assign(unit,pose);unit.speed=0;}
+  for(const [unit,pose] of responsePoses)if(!serviceFootprintSupported(unit)){Object.assign(unit,pose);unit.speed=0;}
   roam?.contacts();
 
   if(player.hp<=0)respawnPlayer('тяжёлая авария');
@@ -2143,6 +2332,7 @@ function updatePoliceAI(dt) {
 
   if (state.wanted === 0) {
     policeCars.length = 0;
+    state.detainProgress=0;
     state.tacticalCallDispatched=false;state.guardCallDispatched=false;
     if (evadeCard) evadeCard.style.display = 'none';
     if (wantedPill) { wantedPill.classList.remove('active', 'evading'); }
@@ -2152,6 +2342,7 @@ function updatePoliceAI(dt) {
   const response=wantedResponseProfile(state.wanted);
   reconcilePoliceRoster(response);
   let anyCopSees = false;
+  let canDetain=false;
   for (let i = policeCars.length - 1; i >= 0; i--) {
     const cop = policeCars[i];
     cop.strobePhase += .3*frame;
@@ -2169,19 +2360,38 @@ function updatePoliceAI(dt) {
     cop.routeTimer=(cop.routeTimer||0)-dt;
     if(cop.routeTimer<=0||!cop.route?.length){cop.route=roadPath(roadGraph,cop,player);cop.routeTimer=2;}
     while(cop.route.length>1&&Math.hypot(cop.route[0].x-cop.x,cop.route[0].y-cop.y)<(cop.width||48)*.58)cop.route.shift();
+    const standoff=((cop.width||48)+(roam?.mode==='foot'?16:player.width||48))/2+26;
+    const targetMoving=roam?.mode==='foot'?(player.gait||0)>.1:Math.abs(player.speed||0)>1;
+    const atLastNode=cop.route.length===1&&Math.hypot(cop.route[0].x-cop.x,cop.route[0].y-cop.y)<22;
+    const holding=!targetMoving&&(initialDistance<standoff||atLastNode);
+    if(holding){
+      cop.status='containing';cop.speed=0;cop.emergencyManeuver=null;cop.emergencyBlocked=false;
+      if(initialDistance<standoff&&(roam?.altitude||0)<12&&state.invulnTimer===0)canDetain=true;
+    }else{
+    cop.status='enroute';
+    tryPlanEmergencyPassing(cop,dt);
+    if(cop.emergencyManeuver){
+      advanceServiceRoute(cop,dt);
+    }else{
     const target=cop.route[0]||cop;
     const targetAng=Math.atan2(target.y-cop.y,target.x-cop.x);
     let diff = targetAng - cop.angle;
     while (diff < -Math.PI) diff += Math.PI * 2;
     while (diff > Math.PI) diff -= Math.PI * 2;
     const oldAngle=cop.angle;
-    cop.angle += Math.sign(diff)*Math.min(Math.abs(diff),(cop.turnRate||.085)*frame);
     const maxSpeed=cop.maxSpeed||4.3;
-    const desired=Math.abs(diff)>.45?maxSpeed*.4:maxSpeed;
+    cop.angle += Math.sign(diff)*Math.min(Math.abs(diff),(cop.turnRate||.085)*frame*Math.min(1,Math.max(.18,Math.abs(cop.speed)/maxSpeed)));
+    const arrivalSpeed=cop.route.length===1?Math.min(1,Math.hypot(target.x-cop.x,target.y-cop.y)/60):1;
+    const desired=(Math.abs(diff)>.45?maxSpeed*.4:maxSpeed)*arrivalSpeed;
     cop.speed+=(desired-cop.speed)*(1-Math.pow(1-(cop.acceleration||.08),frame));
     const ox=cop.x,oy=cop.y;
     cop.x+=Math.cos(cop.angle)*cop.speed*frame;cop.y+=Math.sin(cop.angle)*cop.speed*frame;
     if(!policeFootprintOnRoad(cop)){cop.x=ox;cop.y=oy;cop.speed=0;cop.routeTimer=0;if(!policeFootprintOnRoad(cop))cop.angle=oldAngle;}
+    if(cop.emergencyBlocked||!emergencyPassingPoseClear(cop,cop)){
+      cop.x=ox;cop.y=oy;cop.angle=oldAngle;cop.speed=0;
+    }
+    }
+    }
 
     const distance=Math.hypot(player.x-cop.x,player.y-cop.y);
     if(distance<450){
@@ -2200,6 +2410,10 @@ function updatePoliceAI(dt) {
       }
     }
   }
+
+  state.detainProgress=canDetain?(state.detainProgress||0)+dt:Math.max(0,(state.detainProgress||0)-dt*2);
+  if(canDetain&&state.detainProgress<=dt)showToast('🚨 Полиция блокирует машину · уезжайте, чтобы избежать задержания');
+  if(state.detainProgress>=3){respawnPlayer('задержание');return;}
 
   const backupStillResponding=state.wanted>=4&&policeCars.some(unit=>unit.role&&unit.role!=='patrol'&&!unit.hasMadeContact);
   if (anyCopSees || backupStillResponding) {
@@ -2353,56 +2567,23 @@ function renderWorld() {
     ctx.setLineDash([]);
   });
 
-  // 3. Wet Asphalt Roads with Sidewalks & Crosswalks
-  roads.forEach((r, roadIndex) => {
-    // Sidewalk border
-    ctx.fillStyle = PALETTE.sidewalk;
-    ctx.fillRect(r.x - 12, r.y - 12, r.w + 24, r.h + 24);
-    ctx.strokeStyle = PALETTE.curb;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(r.x - 12, r.y - 12, r.w + 24, r.h + 24);
-
-    // Asphalt
-    ctx.fillStyle = PALETTE.asphalt;
-    ctx.fillRect(r.x, r.y, r.w, r.h);
-    drawWetRoadSurface(r, roadIndex);
-
-    // Markings
-    ctx.strokeStyle = PALETTE.roadMarkingWhite;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(r.x, r.y, r.w, r.h);
-
-    ctx.strokeStyle = PALETTE.roadMarkingYellow;
-    ctx.lineWidth = 2.5;
-    ctx.setLineDash([16, 20]);
-    ctx.beginPath();
-    if (r.dir === 'h') {
-      ctx.moveTo(r.x, r.y + r.h / 2);
-      ctx.lineTo(r.x + r.w, r.y + r.h / 2);
-    } else {
-      ctx.moveTo(r.x + r.w / 2, r.y);
-      ctx.lineTo(r.x + r.w / 2, r.y + r.h);
-    }
-    ctx.stroke();
-    ctx.setLineDash([]);
-  });
-
-  drawRoadTerminals(ctx,roadEnds);
-  drawTransitStops();
-
-  // Repaint each junction as one continuous surface, then place four aligned
-  // crossings at the approaches. This hides stacked road-edge seams on T and
-  // four-way intersections instead of leaving short stripes in the asphalt.
-  for (const horizontal of roads.filter(r => r.dir === 'h')) {
-    for (const vertical of roads.filter(r => r.dir === 'v')) {
-      if (vertical.x < horizontal.x || vertical.x + vertical.w > horizontal.x + horizontal.w || horizontal.y < vertical.y || horizontal.y + horizontal.h > vertical.y + vertical.h) continue;
-      ctx.fillStyle = PALETTE.asphalt;
-      ctx.fillRect(vertical.x - 15, horizontal.y - 15, vertical.w + 30, horizontal.h + 30);
-      drawRoundedJunction(ctx,horizontal,vertical,PALETTE.asphalt);
-      ctx.fillStyle = 'rgba(220,216,197,.48)';
-      junctionCrosswalkStripes(horizontal,vertical).forEach(stripe=>ctx.fillRect(stripe.x,stripe.y,stripe.w,stripe.h));
-    }
-  }
+  // Paint the entire sidewalk union before asphalt. Individual road rectangles
+  // must never put a kerb or an opaque repair patch across another street.
+  const roadPaint=roadPaintGeometry||(roadPaintGeometry=buildRoadPaintGeometry());
+  ctx.fillStyle=PALETTE.sidewalk;ctx.beginPath();
+  roads.forEach(r=>ctx.rect(r.x-12,r.y-12,r.w+24,r.h+24));ctx.fill();
+  ctx.fillStyle=PALETTE.asphalt;ctx.beginPath();
+  roads.forEach(r=>ctx.rect(r.x,r.y,r.w,r.h));ctx.fill();
+  for(const j of roadPaint.junctions)drawRoundedJunction(ctx,{y:j.y,h:j.h},{x:j.x,w:j.w},PALETTE.asphalt,j.approaches);
+  roads.forEach(drawWetRoadSurface);
+  ctx.strokeStyle=PALETTE.curb;ctx.lineWidth=2;ctx.beginPath();
+  for(const edge of roadPaint.curbs){ctx.moveTo(edge.x1,edge.y1);ctx.lineTo(edge.x2,edge.y2);}ctx.stroke();
+  ctx.strokeStyle=PALETTE.roadMarkingYellow;ctx.lineWidth=2.5;ctx.setLineDash([16,20]);
+  for(const lane of roadPaint.lanes){ctx.lineDashOffset=-lane.phase;ctx.beginPath();ctx.moveTo(lane.x1,lane.y1);ctx.lineTo(lane.x2,lane.y2);ctx.stroke();}
+  ctx.setLineDash([]);ctx.lineDashOffset=0;
+  drawRoadTerminals(ctx,roadEnds);drawTransitStops();
+  ctx.fillStyle='rgba(220,216,197,.48)';
+  for(const j of roadPaint.junctions)junctionCrosswalkStripes({y:j.y,h:j.h},{x:j.x,w:j.w},j.approaches).forEach(s=>ctx.fillRect(s.x,s.y,s.w,s.h));
 
   // 4. District texture and lived-in ground detail.
   drawDistrictGroundDetails();
@@ -2638,30 +2819,18 @@ function drawCityIncidentMarker(incident){
   ctx.restore();
 }
 
-function convexHull(points){
-  const sorted=points.slice().sort((a,b)=>a.x-b.x||a.y-b.y);
-  const cross=(o,a,b)=>(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x);
-  const half=[];for(const p of sorted){while(half.length>1&&cross(half[half.length-2],half[half.length-1],p)<=0)half.pop();half.push(p);}
-  const lower=half.slice();half.length=0;for(const p of sorted.reverse()){while(half.length>1&&cross(half[half.length-2],half[half.length-1],p)<=0)half.pop();half.push(p);}
-  lower.pop();half.pop();return lower.concat(half);
-}
-
-function pointInPolygon2d(x,y,poly){
-  let inside=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){
-    const a=poly[i],b=poly[j];if(((a.y>y)!==(b.y>y))&&(x<(b.x-a.x)*(y-a.y)/(b.y-a.y)+a.x))inside=!inside;
-  }return inside;
-}
-
-function pedestrianOccluded(ped,sx,sy,w,h,center,zoom){
-  const depth=ped.x+ped.y;
-  return buildings.some((b,index)=>{
-    const frontDepth=b.x+b.y+b.w+b.h;if(depth>=frontDepth-8)return false;
-    if(Math.abs(ped.x-(b.x+b.w*.5))>b.w+420||Math.abs(ped.y-(b.y+b.h*.5))>b.h+420)return false;
-    const z=(b.floors??(2+index%5))*24;
-    const corners=[[b.x,b.y],[b.x+b.w,b.y],[b.x+b.w,b.y+b.h],[b.x,b.y+b.h],[b.x-z,b.y-z],[b.x+b.w-z,b.y-z],[b.x+b.w-z,b.y+b.h-z],[b.x-z,b.y+b.h-z]];
-    const hull=convexHull(corners.map(([x,y])=>{const q=projectIso(x,y);return{x:w/2+(q.x-center.x)*zoom,y:h/2+(q.y-center.y)*zoom};}));
-    return pointInPolygon2d(sx,sy-8,hull);
-  });
+function streetActorDepth(actor){
+  let depth=actor.x+actor.y;
+  for(const b of buildings){
+    const right=b.x+b.w,front=b.y+b.h;
+    // A person beside either visible wall is in front of that wall, even
+    // before reaching the building's nearest corner. Rear walls still occlude
+    // naturally through painter order; never discard the entire sprite.
+    const alongRight=actor.x>=right-1&&actor.x<=right+60&&actor.y>=b.y&&actor.y<=front+30;
+    const alongFront=actor.y>=front-1&&actor.y<=front+60&&actor.x>=b.x&&actor.x<=right+30;
+    if(alongRight||alongFront)depth=Math.max(depth,right+front+1);
+  }
+  return depth;
 }
 
 function drawStreetActors(w,h,center,zoom){
@@ -2681,7 +2850,7 @@ function drawStreetActors(w,h,center,zoom){
   if(activeIncident&&Math.abs(activeIncident.x-player.x)<1500&&Math.abs(activeIncident.y-player.y)<1500){
     actors.push({depth:activeIncident.x+activeIncident.y+2,draw:()=>drawCityIncidentMarker(activeIncident)});
   }
-  const addVehicle=(vehicle,draw)=>actors.push({depth:vehicle.x+vehicle.y,draw});
+  const addVehicle=(vehicle,draw)=>actors.push({depth:streetActorDepth(vehicle),draw});
   trafficCars.forEach(c=>addVehicle(c,()=>drawDetailedCar(ctx,c.x,c.y,c.angle,c.color,c.width||46,c.height||22,false,c.type,stuntHeightFor(c))));
   policeCars.forEach(c=>addVehicle(c,()=>drawDetailedCar(ctx,c.x,c.y,c.angle,'#0f172a',c.width||48,c.height||24,true,c.model||'police',stuntHeightFor(c))));
   incidentPoliceCars.forEach(c=>addVehicle(c,()=>drawDetailedCar(ctx,c.x,c.y,c.angle,'#0f172a',48,24,true,'police',stuntHeightFor(c))));
@@ -2695,8 +2864,8 @@ function drawStreetActors(w,h,center,zoom){
   people.forEach((ped,index)=>{
     const ground=projectIso(ped.x,ped.y);
     const sx=w/2+(ground.x-center.x)*zoom,sy=h/2+(ground.y-center.y)*zoom;
-    if(sx<-40||sx>w+40||sy<-60||sy>h+30||pedestrianOccluded(ped,sx,sy,w,h,center,zoom))return;
-    actors.push({depth:ped.x+ped.y,draw:()=>{
+    if(sx<-40||sx>w+40||sy<-60||sy>h+30)return;
+    actors.push({depth:streetActorDepth(ped),draw:()=>{
       ctx.save();ctx.translate(ped.x,ped.y);
       // Undo the isometric basis. The outer camera zoom still applies.
       ctx.transform(1/Math.sqrt(3),-1/Math.sqrt(3),1,1,0,0);
@@ -2725,6 +2894,10 @@ function drawStreetActors(w,h,center,zoom){
 }
 
 function drawDetailedCar(ctx, x, y, ang, color, w, h, isPolice = false, model = 'sedan', lift = 0) {
+  if(!isPolice&&model==='truck'){
+    drawTransport(ctx,{type:'truck',kind:'land',x,y,angle:ang,color,width:w,height:h},performance.now()/1000,lift);
+    return;
+  }
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(ang);

@@ -27,10 +27,12 @@ assert(coverage.bases.every(b=>b.clear&&b.routes),'base entrances must be clear 
 // Exercise arrival, service and the entire return leg, including shore nodes.
 // Traffic is tested separately below; this isolates navigation failures.
 const services=JSON.parse(city.run(`JSON.stringify(safeSpawnPoints.map(destination=>{
+  trafficCars.length=0;parkedCars.length=0;
   incidentResponseVehicles.length=0;incidentPoliceCars.length=0;
   const incident=cityIncidentDirector.start('fire',destination,{duration:600});
   dispatchIncidentResponse(incident);dispatchIncidentPolice(incident);
   const units=[...incidentResponseVehicles,...incidentPoliceCars];
+  units.forEach(unit=>unit.priorityPassing=false);
   let offRoad=0,maxStep=0,scenery=0;
   for(let tick=0;tick<24000&&(incidentResponseVehicles.length||incidentPoliceCars.length);tick++){
     const before=new Map(units.map(unit=>[unit,{x:unit.x,y:unit.y}]));
@@ -56,6 +58,7 @@ for(const fps of [30,60,120]){
   const c=runtimeCity(31);
   const result=JSON.parse(c.run(`
     reconcilePoliceRoster=()=>{};state.wanted=1;state.invulnTimer=999;
+    trafficCars.length=0;parkedCars.length=0;pedestrians.length=0;
     Object.assign(player,{x:1900,y:1200,angle:0,speed:0});
     policeCars.push({x:1200,y:1200,angle:0,speed:0,maxSpeed:3,route:[{x:1900,y:1200}],routeTimer:99,strobePhase:0});
     for(let tick=0;tick<${fps*2};tick++)updatePoliceAI(1/${fps});

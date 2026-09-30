@@ -3,6 +3,7 @@ import vm from 'node:vm';
 import * as street from '../../src/game/street_network.js';
 import * as core from '../../src/game/test_drive_core.js';
 import * as contacts from '../../src/game/solid_contacts.js';
+import * as emergencyPassing from '../../src/game/emergency_passing.js';
 import * as coast from '../../src/game/coastline.js';
 import * as roaming from '../../src/game/free_roam.js';
 import * as traffic from '../../src/game/traffic_turns.js';
@@ -21,7 +22,7 @@ export function runtimeCity(seed = 19) {
     document: { readyState: 'loading', getElementById: element, createElement: element,
       querySelectorAll: () => [], addEventListener: noop }, window: { addEventListener: noop },
     localStorage: { getItem: () => null, setItem: noop }, setTimeout: noop, setInterval: noop,
-    requestAnimationFrame: noop, ...street, ...core, ...contacts, ...coast, ...roaming,
+    requestAnimationFrame: noop, ...street, ...core, ...contacts, ...emergencyPassing, ...coast, ...roaming,
     ...traffic, ...ocean, ...surfaces, ...incidents });
   const source = readFileSync(new URL('../../src/main.js', import.meta.url), 'utf8').replace(/^import .*;\n/gm, '');
   vm.runInContext(`${source}\ninitTopology();`, context);
