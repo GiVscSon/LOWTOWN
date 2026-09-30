@@ -81,6 +81,23 @@ assert(turns.run(`{
   !!contact(chassis(engine),chassis(ambulance))&&!emergencyPassingPoseClear(ambulance,ambulance);
 }`),'clearance checks must include the rotated length of both vehicles');
 
+const returnTurn=JSON.parse(turns.run(`{
+  incidentResponseVehicles.length=0;
+  const unit={x:5424,y:1200,angle:2.6166,width:72,height:34,maxSpeed:4.35,speed:0,
+    model:'fireEngine',status:'returning',route:[{x:6265,y:1200}],responseTarget:{x:6265,y:1200}};
+  incidentResponseVehicles.push(unit);
+  trafficCars.push({x:5330,y:1200,angle:Math.PI,width:82,height:30},
+    {x:5424,y:1151,angle:Math.PI,width:82,height:30});
+  let reversed=false,contacts=0;
+  for(let tick=0;tick<600;tick++){
+    tryPlanEmergencyPassing(unit,1/60);advanceServiceRoute(unit,1/60);reversed||=unit.speed<0;
+    contacts+=trafficCars.filter(car=>contact(chassis(unit),chassis(car))).length;
+  }
+  JSON.stringify({reversed,contacts,x:unit.x,completed:!unit.emergencyManeuver});
+}`));
+assert(returnTurn.reversed&&returnTurn.completed&&returnTurn.x>6200,JSON.stringify(returnTurn));
+assert.equal(returnTurn.contacts,0,'a blocked return turn must make space before rotating');
+
 // Preserve normal traffic and pedestrians: the previous isolated route matrix
 // could pass even while all responders got stuck in a populated city.
 const city=runtimeCity(73);
@@ -115,6 +132,6 @@ assert(services.returned.every(u=>u.returned),JSON.stringify(services));assert.e
 assert.equal(services.contacts,0,'response vehicles must not collide with traffic while giving way');
 assert(services.maxStep<12.1,JSON.stringify(services));assert.equal(services.people,152);assert.equal(services.traffic,65);
 mkdirSync('artifacts/movement',{recursive:true});
-const report={people,police,yielding,services:{...services,seconds:ticks/30}};
+const report={people,police,yielding,returnTurn,services:{...services,seconds:ticks/30}};
 writeFileSync('artifacts/movement/regression-report.json',JSON.stringify(report,null,2));
 console.log('MOVEMENT STABILITY PASS',JSON.stringify(report));

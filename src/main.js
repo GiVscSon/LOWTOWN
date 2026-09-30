@@ -1666,9 +1666,15 @@ function tryPlanEmergencyPassing(unit,dt){
       Math.cos(Math.atan2(next.y-unit.y,next.x-unit.x)-unit.angle));
     if(Math.abs(error)>Math.PI*.6){
       const heading=Math.round(unit.angle/(Math.PI/2))*Math.PI/2;
-      for(const distance of [64,96,128]){
-        const points=[{x:unit.x+Math.cos(heading)*distance,y:unit.y+Math.sin(heading)*distance},{...next}];
-        if(!emergencyPassingPathClear(unit,points,pose=>policeFootprintOnRoad(pose)&&emergencyPassingPoseClear(pose,unit)))continue;
+      for(const reverse of [false,true])for(const distance of [32,48,64,96,128]){
+        const direction=reverse?-1:1;
+        const points=[{x:unit.x+Math.cos(heading)*distance*direction,
+          y:unit.y+Math.sin(heading)*distance*direction,reverse},{...next}];
+        if(!emergencyPassingPathClear(unit,points,pose=>{
+          const reserved=Math.hypot(pose.x-unit.x,pose.y-unit.y)<10?pose:
+            {...pose,width:(pose.width||48)+8,height:(pose.height||24)+8};
+          return policeFootprintOnRoad(reserved)&&emergencyPassingPoseClear(reserved,unit);
+        }))continue;
         unit.emergencyManeuver={points,trail:[{x:unit.x,y:unit.y,angle:unit.angle}],reason:'CLEAR_TURN'};
         unit.emergencyTurns=(unit.emergencyTurns||0)+1;unit.emergencyBlocked=false;return;
       }
@@ -3904,6 +3910,8 @@ function boot() {
           id:`${u.model||u.role}:${u.responseIncidentId||0}:${u.responseBase||''}`,model:u.model,status:u.status,
           x:u.x,y:u.y,angle:u.angle,speed:u.speed,goal:u.route?.[0],remaining:u.route?.length,
           passing:!!u.emergencyManeuver,blocked:!!u.emergencyBlocked,
+          neighbors:emergencyPassingActors(u).filter(a=>Math.hypot(a.x-u.x,a.y-u.y)<160)
+            .map(a=>({x:a.x,y:a.y,angle:a.angle,width:a.width,height:a.height,type:a.type,model:a.model})),
           supported:serviceFootprintSupported(u),safe:emergencyPassingGroundClear(u)})),
         yieldingTraffic:trafficCars.filter(c=>c.yieldHome).length,
         incident:cityIncidentDirector.current()?{id:cityIncidentDirector.current().id,
