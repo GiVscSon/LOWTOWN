@@ -50,4 +50,31 @@ assert.equal(run('state.wanted'),0,'stationary blocked suspect must be detained'
 assert.equal(run('state.cash'),650);
 assert.equal(run('state.deathFlash'),0,'detention must not display a death');
 assert.equal(run('state.detainProgress'),0);
-console.log('PASS: shared intersection paint, T approaches, wall depth, police containment and timed detention');
+
+// The normal physics loop must update police after changing movement mode.
+// Previously the special-mode guard froze pursuit on foot, water and in air.
+for(const mode of ['foot','tug','helicopter']){
+  const c=runtimeCity(37);
+  c.run(`trafficCars.length=0;parkedCars.length=0;pedestrians.length=0;
+    Object.assign(player,{x:1460,y:1200,speed:0});
+    roam=createFreeRoam(player,parkedCars,buildings,trees,isPositionOnSolidGround,()=>{},solidProps,isPositionOnWaterObstacle,()=>policeCars);
+    roam.interact();`);
+  if(mode==='foot')c.run('Object.assign(player,{x:1460,y:1200});');
+  else c.run(`const selected=roam.fleet.find(v=>v.type==='${mode}');Object.assign(player,{x:selected.x+20,y:selected.y});roam.interact();`);
+  assert.equal(c.run('roam.mode'),mode);
+  if(mode==='helicopter')c.run('roam.toggleFlight();for(let i=0;i<220;i++)updatePhysics(1/60);');
+  c.run(`state.wanted=1;state.invulnTimer=0;state.cash=750;state.detainProgress=0;reconcilePoliceRoster=()=>{};
+    const node=roadGraph.filter(n=>policeFootprintOnRoad({x:n.x,y:n.y,angle:0,width:48,height:24})).reduce((best,n)=>Math.hypot(n.x-player.x,n.y-player.y)<Math.hypot(best.x-player.x,best.y-player.y)?n:best);
+    policeCars.push({role:'patrol',x:${mode==='foot'?'1410':'node.x'},y:${mode==='foot'?'1200':'node.y'},angle:0,width:48,height:24,speed:0,strobePhase:0,routeTimer:0});`);
+  for(let i=0;i<120;i++){c.tick(1/60);c.run('updatePhysics(1/60)');}
+  assert(c.run('policeCars[0].strobePhase')>30,`${mode}: police froze outside sedan mode`);
+  assert(c.run('policeCars.every(policeFootprintOnRoad)'),`${mode}: police left road`);
+  if(mode==='foot'){
+    assert(Math.abs(c.run('state.detainProgress')-2)<1e-8,'normal foot physics must advance detention');
+    for(let i=0;i<61;i++){c.tick(1/60);c.run('updatePhysics(1/60)');}
+    assert.equal(c.run('state.wanted'),0);
+    assert.equal(c.run('state.cash'),650);
+    assert.equal(c.run('roam.mode'),'sedan');
+  }else if(mode==='helicopter')assert.equal(c.run('state.detainProgress'),0,'aircraft at height must not be arrested from ground projection');
+}
+console.log('PASS: shared intersection paint, T approaches, wall depth, police containment, timed detention and pursuit on foot/water/air');

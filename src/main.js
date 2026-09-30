@@ -1899,7 +1899,7 @@ function updatePhysics(dt) {
   updateIncidentResponse(dt);
   updatePedestrians(dt);
 
-  if (!roam?.special) updatePoliceAI(dt);
+  updatePoliceAI(dt);
   const stuntVehicles=[...trafficCars,...policeCars,...incidentPoliceCars,...incidentResponseVehicles];
   stuntVehicles.forEach(vehicle=>updateStuntVehicle(vehicle,dt));
   const vehicles = [...(!roam?.special&&stuntHeightFor(player)<16 ? [player] : []), ...trafficCars, ...policeCars, ...incidentPoliceCars,...incidentResponseVehicles];

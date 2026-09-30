@@ -19,15 +19,18 @@ const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').repl
 vm.runInContext(source+`
 initTopology();
 let maxJump=0,water=0,invalid=0,turns=0,offRoad=0,pedBlocked=0;
+const travel=trafficCars.map(()=>0),dwell=trafficCars.map(()=>0),carTurns=trafficCars.map(()=>0);
 for(let tick=0;tick<1800;tick++){
   advanceClock();
   const before=trafficCars.map(c=>({x:c.x,y:c.y}));
   updatePhysics(1/60);
   trafficCars.forEach((c,i)=>{
-    maxJump=Math.max(maxJump,Math.hypot(c.x-before[i].x,c.y-before[i].y));
+    const distance=Math.hypot(c.x-before[i].x,c.y-before[i].y);
+    maxJump=Math.max(maxJump,distance);travel[i]+=distance;
+    if(c.routeWait>0)dwell[i]++;
     if(!isPositionOnSolidGround(c.x,c.y))water++;
     if(!Number.isFinite(c.x+c.y+c.speed+c.angle))invalid++;
-    if(c.turn)turns++;
+    if(c.turn){turns++;carTurns[i]++;}
     if(!onRoadSurface(c.x,c.y,roads,bridges,scenicRoads,roadEnds))offRoad++;
   });
   pedestrians.forEach(p=>{if(isPedestrianSceneryBlocked(p.x,p.y))pedBlocked++;});
@@ -40,7 +43,13 @@ const impactDamage=100-player.hp;
 Object.assign(player,{x:target.x+65,y:target.y,angle:target.angle,speed:0,vx:0,vy:0,hp:100});
 state.wanted=0;state.invulnTimer=0;
 for(let tick=0;tick<90;tick++){advanceClock();updatePhysics(1/60);}
-this.result={cars:trafficCars.length,maxJump,water,invalid,turns,offRoad,pedBlocked,impactDamage,stationaryDamage:100-player.hp,stationaryWanted:state.wanted};
+const motionByType=Object.fromEntries([...new Set(trafficCars.map(c=>c.type))].map(type=>{
+  const indices=trafficCars.flatMap((c,i)=>c.type===type?[i]:[]);
+  return [type,{count:indices.length,moving:indices.filter(i=>travel[i]>20).length,
+    minTravel:Math.min(...indices.map(i=>travel[i])),maxTravel:Math.max(...indices.map(i=>travel[i])),
+    dwellFrames:indices.reduce((sum,i)=>sum+dwell[i],0),turnFrames:indices.reduce((sum,i)=>sum+carTurns[i],0)}];
+}));
+this.result={cars:trafficCars.length,motionByType,maxJump,water,invalid,turns,offRoad,pedBlocked,impactDamage,stationaryDamage:100-player.hp,stationaryWanted:state.wanted};
 `,sandbox);
 console.log(sandbox.result);
 assert(sandbox.result.cars>=50);
@@ -53,3 +62,4 @@ assert.equal(sandbox.result.pedBlocked,0,'pedestrian entered solid scenery');
 assert(sandbox.result.impactDamage>0,'player and traffic contact did not cause damage');
 assert.equal(sandbox.result.stationaryDamage,0,'idle player took damage from traffic');
 assert.equal(sandbox.result.stationaryWanted,0,'idle player was blamed for traffic contact');
+for(const [type,motion] of Object.entries(sandbox.result.motionByType))assert(motion.moving>0,`${type}: entire class failed to move`);
