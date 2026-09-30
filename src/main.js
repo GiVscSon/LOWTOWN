@@ -1601,6 +1601,9 @@ function advanceServiceRoute(unit,dt){
       if(!last||Math.hypot(unit.x-last.x,unit.y-last.y)>8)(passing.trail||=[]).push({x:unit.x,y:unit.y,angle:unit.angle});
     }
   }
+  const progress=Math.hypot(unit.x-old.x,unit.y-old.y);
+  unit.emergencyMotionStall=progress<.05&&distance>4?(unit.emergencyMotionStall||0)+dt:0;
+  if(progress>.05&&!target.reverse)unit.emergencyReverseDistance=0;
 }
 
 function emergencyPassingActors(unit){
@@ -1668,7 +1671,26 @@ function emergencyPassingPoseClear(pose,unit=pose){
   return true;
 }
 
+function tryReverseForServiceYield(unit){
+  // A yielding bus may need room to straighten before either responder can
+  // pass it. Back away on the verified lane instead of waiting nose to nose.
+  if(unit.emergencyMotionStall>1&&!unit.emergencyReverseWait&&(unit.emergencyReverseDistance||0)<128){
+    const nearby=emergencyPassingActors(unit).some(actor=>
+      (actor.routeManaged||['enroute','returning'].includes(actor.status))&&
+      Math.hypot(actor.x-unit.x,actor.y-unit.y)<140);
+    if(nearby)for(const distance of [32,48,64]){
+      const stage={x:unit.x-Math.cos(unit.angle)*distance,y:unit.y-Math.sin(unit.angle)*distance,reverse:true};
+      if(!emergencyPassingPathClear(unit,[stage],pose=>policeFootprintOnRoad(pose)&&emergencyPassingPoseClear(pose,unit),4))continue;
+      unit.emergencyManeuver={points:[stage],trail:[{x:unit.x,y:unit.y,angle:unit.angle}],reason:'MAKE_YIELD_ROOM'};
+      unit.emergencyBlocked=false;unit.emergencyMotionStall=0;unit.emergencyReverseWait=5;
+      unit.emergencyReverseDistance=(unit.emergencyReverseDistance||0)+distance;return true;
+    }
+  }
+  return false;
+}
+
 function tryPlanEmergencyPassing(unit,dt){
+  unit.emergencyReverseWait=Math.max(0,(unit.emergencyReverseWait||0)-dt);
   if(!['enroute','returning'].includes(unit.status)||unit.priorityPassing===false){
     unit.emergencyBlocked=false;
     return;
@@ -1703,7 +1725,7 @@ function tryPlanEmergencyPassing(unit,dt){
   if(next&&Math.abs(Math.atan2(Math.sin(Math.atan2(next.y-unit.y,next.x-unit.x)-unit.angle),
     Math.cos(Math.atan2(next.y-unit.y,next.x-unit.x)-unit.angle)))>.32){
     unit.emergencyBlocked=false;unit.emergencyPassCheck=.75;
-    return;
+    tryReverseForServiceYield(unit);return;
   }
   let corridor=next?Math.hypot(next.x-unit.x,next.y-unit.y):260;
   let reachesDestination=true;
@@ -1711,6 +1733,17 @@ function tryPlanEmergencyPassing(unit,dt){
     const dx=point.x-unit.x,dy=point.y-unit.y;
     if(Math.abs(-dx*Math.sin(unit.angle)+dy*Math.cos(unit.angle))>16){reachesDestination=false;break;}
     corridor=Math.max(corridor,dx*Math.cos(unit.angle)+dy*Math.sin(unit.angle));
+  }
+  // A curbside vehicle can enter the planner's precautionary corridor while
+  // leaving the actual route open, particularly after merging back to it.
+  // Keep following that route when its turn and immediate approach are clear.
+  if(next){
+    const distance=Math.hypot(next.x-unit.x,next.y-unit.y),length=Math.min(distance,100);
+    const point={x:unit.x+(next.x-unit.x)*length/Math.max(distance,1),
+      y:unit.y+(next.y-unit.y)*length/Math.max(distance,1)};
+    if(emergencyPassingPathClear(unit,[point],pose=>policeFootprintOnRoad(pose)&&emergencyPassingPoseClear(pose,unit),4)){
+      unit.emergencyBlocked=false;unit.emergencyBlocker=null;return;
+    }
   }
   const plan=planEmergencyPassingManeuver(unit,emergencyPassingActors(unit),{
     canOccupy:pose=>emergencyPassingPoseClear(Math.hypot(pose.x-unit.x,pose.y-unit.y)<10?pose:
@@ -1722,7 +1755,10 @@ function tryPlanEmergencyPassing(unit,dt){
   unit.emergencyBlocked=!!plan&&!plan.points.length;
   if(unit.emergencyBlocked)unit.emergencyPassCheck=1;
   unit.emergencyBlocker=unit.emergencyBlocked?plan.blocker:null;
-  if(!plan?.points.length)return;
+  if(!plan?.points.length){
+    tryReverseForServiceYield(unit);
+    return;
+  }
   unit.emergencyManeuver=plan;
   plan.trail=[{x:unit.x,y:unit.y,angle:unit.angle}];
   unit.emergencyPasses=(unit.emergencyPasses||0)+1;
@@ -1993,7 +2029,8 @@ function respawnPlayer(reason='авария'){
 function yieldTrafficToServices(car,dt){
   if(car.turn)return false;
   const cs=Math.cos(car.angle),sn=Math.sin(car.angle);
-  const horizontal=Math.abs(cs)>.98,vertical=Math.abs(sn)>.98;
+  const horizontal=car.routeManaged?Math.abs(cs)>=Math.abs(sn):Math.abs(cs)>.98;
+  const vertical=car.routeManaged?!horizontal:Math.abs(sn)>.98;
   if(!horizontal&&!vertical)return false;
   const axis=horizontal?'x':'y',cross=horizontal?'y':'x';
   // Finish crossing before pulling over. Waiting for a parallel responder
@@ -2008,7 +2045,7 @@ function yieldTrafficToServices(car,dt){
     return along>0&&along<Math.max(72,(car.width||46)+34)&&
       Math.abs(-dx*sn+dy*cs)<((car.height||24)+(unit.height||24))/2+12;
   });
-  if(inJunction&&!heldByResponder&&!trafficTouchesResponder({...car,x:car.x+cs*8,y:car.y+sn*8}))return false;
+  if(inJunction&&!(car.routeManaged&&car.yieldHome)&&!heldByResponder&&!trafficTouchesResponder({...car,x:car.x+cs*8,y:car.y+sn*8}))return false;
   const approaching=units.some(unit=>{
     if(!['enroute','returning'].includes(unit.status))return false;
     const uc=Math.cos(unit.angle),us=Math.sin(unit.angle),dx=car.x-unit.x,dy=car.y-unit.y;
@@ -2023,9 +2060,19 @@ function yieldTrafficToServices(car,dt){
     car.x>=r.x&&car.x<=r.x+r.w&&car.y>=r.y&&car.y<=r.y+r.h);
   if(!road)return approaching;
   const center=horizontal?road.y+road.h/2:road.x+road.w/2;
-  if(approaching&&!car.yieldHome)car.yieldHome={cross,value:car[cross]};
-  const side=Math.sign(car.yieldHome.value-center)||-Math.sign(horizontal?cs:sn);
-  const target=approaching?center+side*((horizontal?road.h:road.w)/2-(car.height||24)/2-1):car.yieldHome.value;
+  if(approaching&&!car.yieldHome)car.yieldHome={cross,value:car[cross],side:
+    Math.sign(car[cross]-center)||-Math.sign(horizontal?cs:sn)};
+  const side=car.yieldHome.side??(Math.sign(car[cross]-center)||Math.sign(car.yieldHome.value-center)||-Math.sign(horizontal?cs:sn));
+  car.yieldHome.side=side;
+  if(approaching&&car.routeManaged){
+    const heading=horizontal?(cs>=0?0:Math.PI):(sn>=0?Math.PI/2:-Math.PI/2);
+    const error=Math.atan2(Math.sin(heading-car.angle),Math.cos(heading-car.angle));
+    const pose={...car,angle:car.angle+Math.sign(error)*Math.min(Math.abs(error),.07*dt*60)};
+    if(emergencyPassingPoseClear(pose,car))car.angle=pose.angle;
+  }
+  const across=horizontal?Math.abs(Math.sin(car.angle))*(car.width||46)/2+Math.abs(Math.cos(car.angle))*(car.height||24)/2:
+    Math.abs(Math.cos(car.angle))*(car.width||46)/2+Math.abs(Math.sin(car.angle))*(car.height||24)/2;
+  const target=approaching?center+side*((horizontal?road.h:road.w)/2-across-1):car.yieldHome.value;
   const delta=Math.max(-.35*dt*60,Math.min(.35*dt*60,target-car[cross]));
   const pose={...car,[cross]:car[cross]+delta};
   if(policeFootprintOnRoad(pose)&&emergencyPassingPoseClear(pose,car))car[cross]=pose[cross];
