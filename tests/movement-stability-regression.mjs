@@ -3,6 +3,8 @@ import {mkdirSync,writeFileSync} from 'node:fs';
 import {runtimeCity} from './helpers/runtime-city.mjs';
 import {roadPath,nextWalkingGoal} from '../src/game/street_network.js';
 
+mkdirSync('artifacts/movement',{recursive:true});
+
 const graph=[{x:0,y:0,edges:new Set([1])},{x:100,y:0,edges:new Set([0,2])},
   {x:200,y:0,edges:new Set([1])}];
 assert.deepEqual(roadPath(graph,{x:25,y:0},graph[2],{fromSegment:true}).map(p=>p.x),[25,100,200]);
@@ -131,13 +133,11 @@ const services=JSON.parse(city.run(`JSON.stringify({units:units.size,contacts,un
   fire:!!incident.fireSuppressed,medical:!!incident.medicalTreated,
   returned:[...units].map(u=>({model:u.model,returned:!!u.returnedToBase,status:u.status,
     x:u.x,y:u.y,angle:u.angle,goal:u.route?.[0],blocked:!!u.emergencyBlocked})),traffic:trafficCars.length,people:pedestrians.length})`));
-mkdirSync('artifacts/movement',{recursive:true});
 writeFileSync('artifacts/movement/service-contact-report.json',JSON.stringify(services,null,2));
 assert.equal(services.units,3);assert(services.fire&&services.medical,JSON.stringify(services));
 assert(services.returned.every(u=>u.returned),JSON.stringify(services));assert.equal(services.unsafe,0);
 assert.equal(services.contacts,0,'response vehicles must not collide with traffic while giving way');
 assert(services.maxStep<12.1,JSON.stringify(services));assert.equal(services.people,152);assert.equal(services.traffic,65);
-mkdirSync('artifacts/movement',{recursive:true});
 const report={people,police,yielding,returnTurn,services:{...services,seconds:ticks/30}};
 writeFileSync('artifacts/movement/regression-report.json',JSON.stringify(report,null,2));
 console.log('MOVEMENT STABILITY PASS',JSON.stringify(report));
