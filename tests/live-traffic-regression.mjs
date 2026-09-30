@@ -1,8 +1,9 @@
+import * as emergencyPassing from '../src/game/emergency_passing.js';
 import * as streetNetwork from '../src/game/street_network.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import { resolveContact, resolveScenery } from '../src/game/solid_contacts.js';
+import { resolveContact, resolveScenery, contact, chassis } from '../src/game/solid_contacts.js';
 import { advanceTrafficCar, resolveTrafficPair } from '../src/game/traffic_turns.js';
 import { coastPoints, pointInCoast, pointInBeach, BEACH_WIDTH } from '../src/game/coastline.js';
 import * as ocean from '../src/game/ocean_chunks.js';
@@ -12,7 +13,7 @@ import { projectIso, velocityForHeading, routeInput } from '../src/game/test_dri
 const noop=()=>{};
 const element={style:{},classList:{add:noop,remove:noop},appendChild:noop,remove:noop,addEventListener:noop,getContext:()=>({})};
 let clock=0;
-const sandbox={...streetNetwork,...ocean,...surfaces,...incidents,Math,console,advanceClock:()=>clock+=1000/60,performance:{now:()=>clock},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,resolveContact,resolveScenery,advanceTrafficCar,resolveTrafficPair,coastPoints,pointInCoast,pointInBeach,BEACH_WIDTH,projectIso,velocityForHeading,routeInput};
+const sandbox={...emergencyPassing,...streetNetwork,...ocean,...surfaces,...incidents,Math,console,advanceClock:()=>clock+=1000/60,performance:{now:()=>clock},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,resolveContact,resolveScenery,contact,chassis,advanceTrafficCar,resolveTrafficPair,coastPoints,pointInCoast,pointInBeach,BEACH_WIDTH,projectIso,velocityForHeading,routeInput};
 vm.createContext(sandbox);
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
 vm.runInContext(source+`

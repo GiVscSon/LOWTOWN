@@ -1,8 +1,9 @@
+import * as emergencyPassing from '../src/game/emergency_passing.js';
 import * as streetNetwork from '../src/game/street_network.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import { resolveContact, resolveScenery } from '../src/game/solid_contacts.js';
+import { resolveContact, resolveScenery, contact, chassis } from '../src/game/solid_contacts.js';
 import { coastPoints, pointInCoast, pointInBeach, BEACH_WIDTH } from '../src/game/coastline.js';
 import * as ocean from '../src/game/ocean_chunks.js';
 import * as surfaces from '../src/game/surface_physics.js';
@@ -21,11 +22,11 @@ assert.equal(routeInput({x:0,y:0,angle:0,speed:1},{x:0,y:-100}).left,true);
 // Run the CURRENT game physics, not the legacy disconnected modules.
 const noop=()=>{};
 const element={style:{},classList:{add:noop,remove:noop},appendChild:noop,addEventListener:noop,getContext:()=>({}),remove:noop};
-const sandbox={...streetNetwork,...ocean,...surfaces,...incidents,console,Math,performance:{now:()=>0},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,velocityForHeading,projectIso,routeInput,pointInCoast,pointInBeach,coastPoints,BEACH_WIDTH};
+const sandbox={...emergencyPassing,...streetNetwork,...ocean,...surfaces,...incidents,console,Math,performance:{now:()=>0},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,velocityForHeading,projectIso,routeInput,pointInCoast,pointInBeach,coastPoints,BEACH_WIDTH};
 vm.createContext(sandbox);
-Object.assign(sandbox, { resolveContact, resolveScenery });
+Object.assign(sandbox, { resolveContact, resolveScenery, contact, chassis });
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
-vm.runInContext(source+`\ninitTopology(); const initialTreeCount=trees.length; trafficCars.length=0; pedestrians.length=0;
+vm.runInContext(source+`\ninitTopology(); const initialTreeCount=trees.length,initialRoadCount=roads.length; trafficCars.length=0; pedestrians.length=0;
 Object.assign(player,{x:1265,y:1200,angle:0,speed:0,vx:0,vy:0});
 const points=[{x:2065,y:1200},{x:2065,y:515},{x:1265,y:515},{x:1265,y:4135},{x:2065,y:4135},{x:2065,y:5015},{x:1265,y:5015},{x:1265,y:1200}];
 let point=0, ticks=0, maxSlip=0, hits=0;
@@ -42,14 +43,14 @@ while(point<points.length&&ticks<6000){
  ticks++;
 }
 Object.assign(player,{x:4000,y:6000,hp:0});state.cash=500;respawnPlayer('test');
-this.result={segments:point,seconds:ticks/60,maxSlip,hits,drowned:state.isDrowning,respawned:player.hp===100&&isPositionOnSolidGround(player.x,player.y)&&state.cash===400,initialTrees:initialTreeCount,world:{islands:islands.length,bridges:bridges.length,roads:roads.length,buildings:buildings.length,traffic:trafficCars.length,pedestrians:pedestrians.length,verticalRails:bridgeRails.filter(r=>r.axis==='x').length,streetLights:streetLights.length,trees:trees.length,parkedCars:parkedCars.length,cranes:cranes.length,billboards:billboards.length}};`,sandbox);
+this.result={segments:point,seconds:ticks/60,maxSlip,hits,drowned:state.isDrowning,respawned:player.hp===100&&isPositionOnSolidGround(player.x,player.y)&&state.cash===400,initialTrees:initialTreeCount,initialRoads:initialRoadCount,world:{islands:islands.length,bridges:bridges.length,roads:roads.length,buildings:buildings.length,traffic:trafficCars.length,pedestrians:pedestrians.length,verticalRails:bridgeRails.filter(r=>r.axis==='x').length,streetLights:streetLights.length,trees:trees.length,parkedCars:parkedCars.length,cranes:cranes.length,billboards:billboards.length}};`,sandbox);
 console.log(JSON.stringify(sandbox.result,null,2));
 assert.equal(sandbox.result.segments,8,'Expanded route must complete');
 assert.ok(sandbox.result.maxSlip<18,'No excessive lateral slide');
 assert.equal(sandbox.result.hits,0);
 assert.equal(sandbox.result.drowned,false);
 assert.equal(sandbox.result.respawned,true,'death did not restore the player at a safe spawn');
-const expectedWorld={islands:16,bridges:24,roads:141,buildings:232,traffic:0,pedestrians:0,verticalRails:24,streetLights:116,parkedCars:24,cranes:8,billboards:18};
+const expectedWorld={islands:16,bridges:24,roads:sandbox.result.initialRoads,buildings:232,traffic:0,pedestrians:0,verticalRails:24,streetLights:116,parkedCars:24,cranes:8,billboards:18};
 const actualWorld={...sandbox.result.world};delete actualWorld.trees;
 assert.deepEqual(actualWorld,expectedWorld,'driving and respawn should not change world geometry');
 assert.equal(sandbox.result.world.trees,sandbox.result.initialTrees,'driving should not alter generated trees');

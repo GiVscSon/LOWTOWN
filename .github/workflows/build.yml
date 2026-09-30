@@ -28,12 +28,69 @@ jobs:
           npm run test:pages-smoke
       - name: Run aerial city visual sweep
         run: npm run test:aerial-visual
+      - name: Test living city and complete emergency response routes
+        run: npm run test:living-city
+      - name: Test emergency passing and safe waiting
+        run: npm run test:service-bypass
+      - name: Test intersection paint, actor depth and police arrival
+        run: npm run test:city-presentation
       - name: Upload aerial city screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: lowtown-aerial-visuals
-          path: artifacts/aerial-city/
+          path: |
+            artifacts/aerial-city/
+            !artifacts/aerial-city/district-*.png
+            artifacts/living-city/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload west island survey
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lowtown-islands-west
+          path: |
+            artifacts/aerial-city/district-core.png
+            artifacts/aerial-city/district-docks.png
+            artifacts/aerial-city/district-lantern.png
+            artifacts/aerial-city/district-oldmill.png
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload central island survey
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lowtown-islands-central
+          path: |
+            artifacts/aerial-city/district-redhook.png
+            artifacts/aerial-city/district-blackwood.png
+            artifacts/aerial-city/district-marrow.png
+            artifacts/aerial-city/district-southport.png
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload east island survey
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lowtown-islands-east
+          path: |
+            artifacts/aerial-city/district-velvet.png
+            artifacts/aerial-city/district-eastgate.png
+            artifacts/aerial-city/district-cinder.png
+            artifacts/aerial-city/district-aerodrome.png
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload south island survey
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lowtown-islands-south
+          path: |
+            artifacts/aerial-city/district-saints.png
+            artifacts/aerial-city/district-refinery.png
+            artifacts/aerial-city/district-campus.png
+            artifacts/aerial-city/district-marina.png
           if-no-files-found: ignore
           retention-days: 14
       - name: Test player drive acceptance

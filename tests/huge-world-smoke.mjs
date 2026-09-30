@@ -56,7 +56,7 @@ this.report={
   naturalIslets:islets.length,
   connectedDistricts:safeSpawnPoints.every(sp=>roadPath(roadGraph,safeSpawnPoints[0],sp).length>0),
   terminals:roadEnds.length,
-  unfinishedRoadEnds:roads.filter(r=>!r.bridgeApproach).flatMap(r=>r.dir==='h'?[{x:r.x,y:r.y+r.h/2,road:r},{x:r.x+r.w,y:r.y+r.h/2,road:r}]:[{x:r.x+r.w/2,y:r.y,road:r},{x:r.x+r.w/2,y:r.y+r.h,road:r}]).filter(p=>![...roads,...bridges].some(r=>r!==p.road&&p.x>=r.x-1&&p.x<=r.x+r.w+1&&p.y>=r.y-1&&p.y<=r.y+r.h+1)&&!roadEnds.some(t=>Math.hypot(t.x-p.x,t.y-p.y)<=t.radius)).length,
+  unfinishedRoadEnds:roads.filter(r=>!r.bridgeApproach&&!r.serviceAccess).flatMap(r=>r.dir==='h'?[{x:r.x,y:r.y+r.h/2,road:r},{x:r.x+r.w,y:r.y+r.h/2,road:r}]:[{x:r.x+r.w/2,y:r.y,road:r},{x:r.x+r.w/2,y:r.y+r.h,road:r}]).filter(p=>![...roads,...bridges].some(r=>r!==p.road&&p.x>=r.x-1&&p.x<=r.x+r.w+1&&p.y>=r.y-1&&p.y<=r.y+r.h+1)&&!roadEnds.some(t=>Math.hypot(t.x-p.x,t.y-p.y)<=t.radius)).length,
   routedPedestrians:pedestrians.filter(p=>p.route?.points.length>=5).length,
   uniqueCoasts:new Set(islands.map(i=>coastPoints(i).slice(0,12).map(p=>p.map(Math.round).join(':')).join('|'))).size,
   civicBuildings:buildings.filter(b=>b.civicType).length,
@@ -82,7 +82,7 @@ if(testRamp){
 }`,sandbox);
 
 assert.equal(sandbox.report.connectedDistricts,true,'every district must have a road route');
-assert.equal(sandbox.report.routedPedestrians,108);
+assert.equal(sandbox.report.routedPedestrians,sandbox.report.pedestrians,'every resident must have a walking route');
 assert(sandbox.report.terminals>0);
 assert.equal(sandbox.report.unfinishedRoadEnds,0);
 console.log('HUGE_WORLD_REPORT',JSON.stringify(sandbox.report));

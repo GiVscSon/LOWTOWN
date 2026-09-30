@@ -6,7 +6,7 @@ import { chromium } from 'playwright';
 
 const root = new URL('../', import.meta.url).pathname;
 const artifactDir = process.env.LOWTOWN_AERIAL_ARTIFACT_DIR || `${root}artifacts/aerial-city`;
-const url = 'http://127.0.0.1:4174/';
+const url = 'http://127.0.0.1:4174/?cityQA=1';
 const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--host', '127.0.0.1', '--port', '4174', '--strictPort'], {
   cwd: root,
   stdio: 'ignore'
@@ -140,7 +140,8 @@ try {
   await page.waitForFunction(() => /\d+ м/.test(document.querySelector('#hudGear')?.textContent || ''), null, { timeout: 5000 });
   await page.keyboard.press('q');
   await hold('w');
-  await page.waitForTimeout(3600);
+  await page.waitForFunction(()=>Number.parseInt(document.querySelector('#hudGear')?.textContent||'',10)>=205,null,{timeout:20000});
+  await page.waitForTimeout(300);
   await release('w');
   const airHeight = await page.locator('#hudGear').textContent();
   assert(Number.parseInt(airHeight, 10) >= 180, `helicopter did not reach useful aerial height: ${airHeight}`);
@@ -156,6 +157,33 @@ try {
   await turnRight();
   await flyStraight('aerial-northwest', 18000);
 
+  // The flight above verifies real controls. Stable survey positions then make
+  // every district visible and comparable, rather than inferring whole-city
+  // coverage from four timed legs which can end over open water.
+  await page.setViewportSize({width:2800,height:1800});
+  const districts=await page.evaluate(()=>window.__lowtownCityQA.districts());
+  assert.equal(districts.length,16);
+  const survey=[];
+  for(const district of districts){
+    const position=await page.evaluate(id=>window.__lowtownCityQA.viewDistrict(id),district.id);
+    assert.equal(position.mode,'helicopter');assert(position.altitude>=180);
+    await screenshot(`district-${district.id}`);
+    survey.push(position);
+  }
+  const citySnapshot=await page.evaluate(()=>window.__lowtownCityQA.snapshot());
+  assert(citySnapshot.districts.every(d=>d.people>=8),'every district needs residents');
+  assert.equal(citySnapshot.badPeople,0,'residents entered scenery during the browser sweep');
+  assert.equal(citySnapshot.trafficOffRoad,0,'traffic left roads during the browser sweep');
+  assert.equal(citySnapshot.serviceBases.length,10,'all ground response bases need road access');
+  await page.setViewportSize({width:900,height:600});
+  await screenshot('aerial-mobile');
+  await page.locator('#btnOpenMap').click();
+  await page.locator('#mapModal').waitFor({state:'visible'});
+  await page.screenshot({path:`${artifactDir}/map-mobile.png`});
+  const mapBounds=await page.locator('#mapModal .modal-card').boundingBox();
+  assert(mapBounds&&mapBounds.x>=0&&mapBounds.y>=0&&mapBounds.x+mapBounds.width<=902&&mapBounds.y+mapBounds.height<=602,'mobile map overflows the viewport');
+  await page.locator('#btnCloseMap').click();
+
   assert.equal(errors.length, 0, `browser reported errors during the aerial sweep:\n${errors.join('\n')}`);
   writeFileSync(`${artifactDir}/report.json`, JSON.stringify({
     url,
@@ -163,6 +191,8 @@ try {
     flightAltitude: airHeight.trim(),
     cameraZoom: { ground: groundZoom, aerial: aerialZoom },
     screenshots: shots,
+    survey,
+    citySnapshot,
     browserErrors: errors
   }, null, 2));
   console.log(`AERIAL CITY VISUAL SMOKE: PASS full map plus ${shots.length} helicopter views; altitude=${airHeight.trim()}`);

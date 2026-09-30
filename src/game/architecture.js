@@ -85,7 +85,7 @@ export function drawArchitecture(ctx, b, index) {
   // Roof, parapet and rooftop clutter finish the silhouette.
   const roofColors={warehouse:'#273033',office:'#17252d',deco:'#2c2630',townhouse:'#302a25',shop:'#252a27',pavilion:'#28332f',tenement:'#292728',
     hospital:'#26343a',firestation:'#402b28',airfield:'#28363a',civic:'#332f38',depot:'#303333'};
-  polygon(base.map(([x,y])=>[x-z,y-z]),roofColors[type]||(index%2?'#242526':'#2c2926'));
+  polygon(base.map(([x,y])=>[x-z,y-z]),b.roof||roofColors[type]||(index%2?'#242526':'#2c2926'));
   ctx.strokeStyle='#777064';ctx.lineWidth=4;ctx.stroke();
   ctx.save();ctx.translate(-z,-z);ctx.strokeStyle='rgba(170,157,133,.24)';ctx.lineWidth=2;ctx.strokeRect(b.x+10,b.y+10,b.w-20,b.h-20);
   for(let y=b.y+28;y<b.y+b.h-12;y+=28){ctx.beginPath();ctx.moveTo(b.x+13,y);ctx.lineTo(b.x+b.w-13,y);ctx.stroke();}
@@ -194,9 +194,10 @@ export function drawStreetFurniture(ctx,p){
   }
 }
 
-export function drawRoundedJunction(ctx,h,v,asphalt){
+export function drawRoundedJunction(ctx,h,v,asphalt,approaches={north:true,south:true,west:true,east:true}){
   const radius=34;
-  for(const [x,y,sx,sy] of [[v.x,h.y,-1,-1],[v.x+v.w,h.y,1,-1],[v.x+v.w,h.y+h.h,1,1],[v.x,h.y+h.h,-1,1]]){
+  for(const [x,y,sx,sy,a,b] of [[v.x,h.y,-1,-1,'west','north'],[v.x+v.w,h.y,1,-1,'east','north'],[v.x+v.w,h.y+h.h,1,1,'east','south'],[v.x,h.y+h.h,-1,1,'west','south']]){
+    if(!approaches[a]||!approaches[b])continue;
     ctx.save();ctx.translate(x,y);ctx.scale(sx,sy);ctx.beginPath();ctx.moveTo(-2,-2);ctx.lineTo(radius,-2);ctx.lineTo(radius,0);ctx.quadraticCurveTo(0,0,0,radius);ctx.lineTo(-2,radius);ctx.closePath();ctx.fillStyle=asphalt;ctx.fill();
     ctx.beginPath();ctx.moveTo(radius,0);ctx.quadraticCurveTo(0,0,0,radius);ctx.strokeStyle='#5d5b54';ctx.lineWidth=3;ctx.stroke();ctx.restore();
   }

@@ -18,6 +18,14 @@ const CITY_SHAPES = {
   campus:    { sx: 1.035, sy: 1.055, wave: .080, phase: 15, lobes: 3, coves: [4, 18] },
   marina:    { sx: 1.085, sy: 1.095, wave: .060, phase: 16, lobes: 4, coves: [9, 13] }
 };
+// Unequal headlands give the northern/southern coasts recognisable profiles.
+// Only undeveloped shoreline anchors move; side channels and landfalls retain
+// their existing envelope. Extensions are capped inside the city world bounds.
+const HEADLANDS={core:[35,15,20,55],docks:[10,65,35,10],lantern:[95,20,15,65],
+  oldmill:[15,95,70,10],redhook:[50,10,15,70],blackwood:[85,30,60,20],
+  marrow:[20,70,80,15],southport:[65,15,10,75],velvet:[25,95,65,20],
+  eastgate:[70,20,20,40],cinder:[30,85,75,20],aerodrome:[15,70,20,60],
+  saints:[60,25,25,60],refinery:[20,65,60,15],campus:[95,15,20,80],marina:[35,80,70,15]};
 export function coastPoints(island) {
   if(cache.has(island))return cache.get(island);
   const { x, y, w, h } = island;
@@ -58,7 +66,11 @@ export function coastPoints(island) {
       // Keep bridge approaches and the outer street envelope on dry land; the
       // profile changes only the undeveloped coast beyond those protected arcs.
       const radial=protectedLandfalls.has(i)?Math.max(1.015,1+wave):Math.max(.94,1+wave+cove);
-      return [x+w/2+(px-w/2)*shape.sx*radial,y+h/2+(py-h/2)*shape.sy*radial];
+      let coastY=y+h/2+(py-h/2)*shape.sy*radial;
+      const capes=HEADLANDS[island.id]||[0,0,0,0];
+      if(i===1)coastY-=capes[0];if(i===3)coastY-=capes[1];
+      if(i===10)coastY+=capes[2];if(i===12)coastY+=capes[3];
+      return [x+w/2+(px-w/2)*shape.sx*radial,Math.max(y-230,Math.min(y+h+200,coastY))];
     });
   // Closed Catmull-Rom shoreline: the same dense curve drives rendering and collision.
   const points=[];

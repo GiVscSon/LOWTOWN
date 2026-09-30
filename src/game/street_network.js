@@ -1,11 +1,15 @@
 // Shared geometry for readable road endings and pedestrian routes.
 const inside=(x,y,r,pad=0)=>x>=r.x-pad&&x<=r.x+r.w+pad&&y>=r.y-pad&&y<=r.y+r.h+pad;
-export function createRoadGraph(roads,bridges){
+export function createRoadGraph(roads,bridges,accessPoints=[]){
   const nodes=[],lookup=new Map(),lines=[...roads,...bridges].map(r=>({...r,nodes:[]}));
   const add=(x,y,line)=>{const key=`${x.toFixed(1)}:${y.toFixed(1)}`;let id=lookup.get(key);if(id===undefined){id=nodes.length;nodes.push({x,y,edges:new Set()});lookup.set(key,id);}line.nodes.push(id);return id;};
   for(const r of lines){
     if(r.dir==='h'){add(r.x,r.y+r.h/2,r);add(r.x+r.w,r.y+r.h/2,r);}
     else{add(r.x+r.w/2,r.y,r);add(r.x+r.w/2,r.y+r.h,r);}
+    for(const point of accessPoints){
+      const cross=r.dir==='h'?point.y-(r.y+r.h/2):point.x-(r.x+r.w/2);
+      if(Math.abs(cross)<.1&&inside(point.x,point.y,r))add(point.x,point.y,r);
+    }
   }
   for(let i=0;i<lines.length;i++)for(let j=i+1;j<lines.length;j++){
     const a=lines[i],b=lines[j];
@@ -28,8 +32,19 @@ export function createRoadGraph(roads,bridges){
 export function roadPath(graph,start,finish){
   if(!graph.length)return [];
   const nearest=p=>graph.reduce((best,n,i)=>Math.hypot(n.x-p.x,n.y-p.y)<Math.hypot(graph[best].x-p.x,graph[best].y-p.y)?i:best,0);
-  const from=nearest(start),to=nearest(finish),queue=[from],parents=new Map([[from,null]]);
-  for(let q=0;q<queue.length&&!parents.has(to);q++)for(const next of graph[queue[q]].edges)if(!parents.has(next)){parents.set(next,queue[q]);queue.push(next);}
+  const from=nearest(start),to=nearest(finish),queue=[from],parents=new Map([[from,null]]),costs=new Map([[from,0]]);
+  // Street edges have unequal lengths. Minimise travel distance rather than
+  // the number of intersections, which can choose a long detour to a base.
+  while(queue.length){
+    queue.sort((a,b)=>(costs.get(a)+Math.hypot(graph[a].x-graph[to].x,graph[a].y-graph[to].y))-
+      (costs.get(b)+Math.hypot(graph[b].x-graph[to].x,graph[b].y-graph[to].y)));
+    const current=queue.shift();if(current===to)break;
+    for(const next of graph[current].edges){
+      const cost=costs.get(current)+Math.hypot(graph[next].x-graph[current].x,graph[next].y-graph[current].y);
+      if(cost>=(costs.get(next)??Infinity))continue;
+      costs.set(next,cost);parents.set(next,current);if(!queue.includes(next))queue.push(next);
+    }
+  }
   if(!parents.has(to))return [];
   const path=[];for(let id=to;id!==null;id=parents.get(id))path.unshift({x:graph[id].x,y:graph[id].y});
   return path;
@@ -85,7 +100,7 @@ export function advanceRouteActor(actor,route,dt,{speed=1.4,dwell=1.6,stopRadius
 export function roadTerminals(roads,bridges,solid){
   const ends=[];
   for(const road of roads){
-    if(road.bridgeApproach)continue;
+    if(road.bridgeApproach||road.serviceAccess)continue;
     const horizontal=road.dir==='h',width=horizontal?road.h:road.w;
     for(const side of [-1,1]){
       const edge={x:horizontal?road.x+(side>0?road.w:0):road.x+road.w/2,y:horizontal?road.y+road.h/2:road.y+(side>0?road.h:0)};
@@ -136,7 +151,7 @@ export function createWalkingRoutes(roads,parks,clear){
     if(points.length>=5)routes.push({points,kind,loop:loop&&unbroken});
   }
   for(const r of roads){
-    if(r.bridgeApproach)continue;
+    if(r.bridgeApproach||r.serviceAccess)continue;
     if(r.dir==='h')for(const y of [r.y-22,r.y+r.h+22])sample([{x:r.x+25,y},{x:r.x+r.w-25,y}],'sidewalk');
     else for(const x of [r.x-22,r.x+r.w+22])sample([{x,y:r.y+25},{x,y:r.y+r.h-25}],'sidewalk');
   }
@@ -151,7 +166,8 @@ export function assignWalkingRoutes(people,routes){
   const placed=[];
   people.forEach((p,index)=>{
     let best,dist=Infinity;
-    const eligible=index%4===0&&routes.some(r=>r.kind==='park')?routes.filter(r=>r.kind==='park'):routes;
+    const local=p.districtId?routes.filter(r=>r.districtId===p.districtId):routes;
+    const eligible=index%4===0&&local.some(r=>r.kind==='park')?local.filter(r=>r.kind==='park'):local;
     for(const route of eligible)for(let i=0;i<route.points.length;i++){
       const point=route.points[i],d=Math.hypot(p.x-point.x,p.y-point.y);
       if(d<dist&&!placed.some(q=>Math.hypot(q.x-point.x,q.y-point.y)<18)){best={route,i,point};dist=d;}

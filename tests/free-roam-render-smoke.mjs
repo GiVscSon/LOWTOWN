@@ -1,3 +1,4 @@
+import * as emergencyPassing from '../src/game/emergency_passing.js';
 import * as streetNetwork from '../src/game/street_network.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -15,7 +16,7 @@ let depth=0,draws=0;const mapLabels=[];
 const noop=()=>{};
 const context=new Proxy({save(){depth++;},restore(){depth--;assert(depth>=0);},fillText(value){mapLabels.push(String(value));},createRadialGradient(){return {addColorStop:noop};},createLinearGradient(){return {addColorStop:noop};}}, {get(target,key){return key in target?target[key]:(...args)=>{for(const arg of args)if(typeof arg==='number')assert(Number.isFinite(arg),`Non-finite ${key}`);draws++;};},set(target,key,value){target[key]=value;return true;}});
 const element=()=>({width:900,height:700,style:{},classList:{add:noop,remove:noop},appendChild:noop,append:noop,addEventListener:noop,getContext:()=>context,remove:noop});
-const sandbox={...streetNetwork,...ocean,...surfaces,...incidents,assert,console,Math,mapLabels,depth,draws,performance:{now:()=>100},document:{readyState:'loading',getElementById:element,createElement:element,querySelectorAll:()=>[],addEventListener:noop},window:{innerWidth:1100,innerHeight:800,addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,...core,...contacts,...coast,...roamModule,...architecture,...trafficTurns};
+const sandbox={...emergencyPassing,...streetNetwork,...ocean,...surfaces,...incidents,assert,console,Math,mapLabels,depth,draws,performance:{now:()=>100},document:{readyState:'loading',getElementById:element,createElement:element,querySelectorAll:()=>[],addEventListener:noop},window:{innerWidth:1100,innerHeight:800,addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,...core,...contacts,...coast,...roamModule,...architecture,...trafficTurns};
 Object.defineProperties(sandbox,{depth:{get:()=>depth},draws:{get:()=>draws}});
 vm.createContext(sandbox);
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
@@ -53,12 +54,18 @@ const smokeIncident=cityIncidentDirector.start('fire',{x:pedestrians[3].x,y:pede
 smokeIncident.reported=true;
 updatePhysics(1/60);renderWorld();
 const responseStartDistance=incidentPoliceCars.length?Math.hypot(incidentPoliceCars[0].x-incidentPoliceCars[0].responseTarget.x,incidentPoliceCars[0].y-incidentPoliceCars[0].responseTarget.y):Infinity;
+// Independently advancing only the services leaves every traffic obstacle frozen.
+// This render fixture isolates routes; dynamic bypass has its own live obstacle regression.
+[...incidentResponseVehicles,...incidentPoliceCars].forEach(unit=>unit.priorityPassing=false);
 const incidentUnits=incidentResponseVehicles.slice();
 const serviceStartDistances=incidentUnits.map(c=>Math.hypot(c.x-c.responseTarget.x,c.y-c.responseTarget.y));
+const remainingRoute=unit=>responseRouteLength(unit.route)+(unit.route[0]?Math.hypot(unit.x-unit.route[0].x,unit.y-unit.route[0].y):0);
+const serviceStartRoutes=incidentUnits.map(remainingRoute);
 for(let i=0;i<240;i++)updateIncidentPolice(1/60);
 for(let i=0;i<240;i++)updateIncidentResponse(1/60);
 const responseEndDistance=incidentPoliceCars.length?Math.hypot(incidentPoliceCars[0].x-incidentPoliceCars[0].responseTarget.x,incidentPoliceCars[0].y-incidentPoliceCars[0].responseTarget.y):Infinity;
 const serviceEndDistances=incidentUnits.map(c=>Math.hypot(c.x-c.responseTarget.x,c.y-c.responseTarget.y));
+const serviceEndRoutes=incidentUnits.map(remainingRoute);
 for(let i=0;i<9000&&(!smokeIncident.fireSuppressed||!smokeIncident.medicalTreated);i++)updateIncidentResponse(1/60);
 for(let i=0;i<9000&&incidentResponseVehicles.length;i++)updateIncidentResponse(1/60);
 renderWorld();
@@ -70,6 +77,8 @@ this.incidentAudit.serviceCount=incidentUnits.length;
 this.incidentAudit.serviceTypes=incidentUnits.map(c=>c.model);
 this.incidentAudit.serviceStartDistances=serviceStartDistances;
 this.incidentAudit.serviceEndDistances=serviceEndDistances;
+this.incidentAudit.serviceStartRoutes=serviceStartRoutes;
+this.incidentAudit.serviceEndRoutes=serviceEndRoutes;
 this.incidentAudit.serviceFinal=incidentUnits.map(c=>({model:c.model,status:c.status,x:c.x,y:c.y,target:c.responseTarget,base:c.baseTarget,speed:c.speed,routeLength:c.route?.length,routeTimer:c.routeTimer,routeHead:c.route?.[0],distance:Math.hypot(c.x-c.responseTarget.x,c.y-c.responseTarget.y)}));
 this.incidentAudit.servicesRoadBound=incidentUnits.every(c=>c.route.length>0&&c.route.every(p=>onRoadSurface(p.x,p.y,roads,bridges,scenicRoads,roadEnds)));
 this.incidentAudit.fireSuppressed=smokeIncident.fireSuppressed;
@@ -79,7 +88,8 @@ this.incidentAudit.serviceUnitsReturned=incidentResponseVehicles.length===0&&inc
 assert.equal(depth,0,'Balanced canvas state in car, pedestrian and aircraft rendering');
 assert(draws>800);assert.equal(modeResult.mode,'helicopter');
 assert(Number.isFinite(modeResult.x));assert(modeResult.altitude>100);
-assert.equal(mapLabels.filter(label=>label==='ВПП').length,2,'Both runways must be clearly marked on the map');
+assert.equal(mapLabels.filter(label=>label==='ВПП').length,PLANE_RUNWAYS.length,'Every runway must be clearly marked on the map');
+assert(PLANE_RUNWAYS.every(r=>[[r.x,r.y],[r.x+r.w,r.y],[r.x,r.y+r.h],[r.x+r.w,r.y+r.h]].every(([x,y])=>isPositionOnIslandLand(x,y))),'runway corners must be dry land');
 assert(vehicleNames.every(name=>!mapLabels.includes(name)),'Fleet names must not cover map landmarks');
 assert(routeAudit.walkingRoutes>0,'pedestrians need generated footpaths');
 assert(routeAudit.transitRoutes.length>=2&&routeAudit.transitRoutes.every(r=>r.points>20&&r.stops>=10&&r.roadBound),'bus routes must connect city districts on the actual road graph');
@@ -90,7 +100,7 @@ assert(incidentAudit.responseEndDistance<incidentAudit.responseStartDistance,'di
 assert(incidentAudit.serviceCount===2,'a fire should dispatch an engine and an ambulance: '+JSON.stringify(incidentAudit));
 assert.deepEqual([...incidentAudit.serviceTypes].sort(),['ambulance','fireEngine']);
 assert(incidentAudit.servicesRoadBound,'emergency vehicle routes must stay on connected roads');
-assert(incidentAudit.serviceEndDistances.every((distance,index)=>distance<incidentAudit.serviceStartDistances[index]),'fire and medical crews should make road-route progress');
+assert(incidentAudit.serviceEndRoutes.every((distance,index)=>distance<incidentAudit.serviceStartRoutes[index]),'fire and medical crews should make progress along their actual road route: '+JSON.stringify(incidentAudit));
 assert.equal(incidentAudit.fireSuppressed,true,'the fire crew should contain the scene fire: '+JSON.stringify(incidentAudit));
 assert.equal(incidentAudit.medicalTreated,true,'the ambulance should stabilize injured scene actors: '+JSON.stringify(incidentAudit));
 assert(incidentAudit.treatedPatients>0,'medical crews should treat visible patients');
