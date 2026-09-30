@@ -330,6 +330,7 @@ const trafficCars = [];
 const policeCars = [];
 const incidentPoliceCars = [];
 const incidentResponseVehicles = [];
+const airMedicalVehicles = [];
 const serviceBases = [];
 const transitRoutes=[];
 const pedestrians = [];
@@ -548,6 +549,7 @@ function initTopology() {
   policeCars.length = 0;
   incidentPoliceCars.length = 0;
   incidentResponseVehicles.length = 0;
+  airMedicalVehicles.length = 0;
   serviceBases.length = 0;
   transitRoutes.length = 0;
   pedestrians.length = 0;
@@ -1564,15 +1566,97 @@ function dispatchIncidentResponse(incident){
   return dispatchedServices.length;
 }
 
-function applyMedicalResponse(incident){
+function applyMedicalResponse(incident,provider='ambulance'){
   if(!incident)return;
   incident.medicalTreated=true;
   incident.medicalOutcome='checked';
+  incident.medicalProvider??=provider;
   for(const actor of incident.actors||[]){
     if(actor.stance==='down'||['victim','injured','evacuee','defender'].includes(actor.role)){
       actor.medicalTreated=true;
       if(actor.stance==='down')actor.stance='assisted';
       actor.reaction='calm';
+    }
+  }
+}
+
+function airMedicalBases(){
+  return buildings.filter(b=>b.civicType==='airAmbulanceBase').map(building=>({
+    building,x:building.x+building.w/2,y:building.y+building.h/2,
+    altitude:(building.floors??2)*24+12
+  }));
+}
+
+function dispatchAirMedicalResponse(incident){
+  if(!incident||incident.airMedicalDispatched||incident.medicalTreated||
+    !incident.actors?.some(actor=>actor.stance==='down'))return false;
+  const ambulance=incidentResponseVehicles.find(unit=>unit.responseIncidentId===incident.id&&unit.model==='ambulance');
+  // Reserve the aircraft for injuries with a long or unavailable road response.
+  const roadDistance=ambulance?responseRouteLength([{x:ambulance.x,y:ambulance.y},...ambulance.route]):Infinity;
+  if(roadDistance<=2600)return false;
+  const bases=airMedicalBases().filter(base=>!airMedicalVehicles.some(unit=>unit.responseBase===base.building.sign));
+  bases.sort((a,b)=>Math.hypot(a.x-incident.x,a.y-incident.y)-Math.hypot(b.x-incident.x,b.y-incident.y));
+  const base=bases[0];
+  if(!base)return false;
+  const cruiseAltitude=Math.max(220,...buildings.map(b=>(b.floors??5)*24+72));
+  const hoverAltitude=Math.max(50,...buildings.filter(b=>Math.abs(b.x+b.w/2-incident.x)<b.w/2+90&&
+    Math.abs(b.y+b.h/2-incident.y)<b.h/2+90).map(b=>(b.floors??5)*24+50));
+  const flightSeconds=(cruiseAltitude-base.altitude)/70+Math.hypot(base.x-incident.x,base.y-incident.y)/480+
+    (cruiseAltitude-hoverAltitude)/50+6;
+  if(ambulance&&flightSeconds+5>=roadDistance/(ambulance.maxSpeed*60)+4.1)return false;
+  airMedicalVehicles.push({x:base.x,y:base.y,angle:0,speed:0,width:64,height:26,
+    type:'helicopter',kind:'air',color:'#e5e4d9',medical:true,altitude:base.altitude,
+    cruiseAltitude,hoverAltitude,baseTarget:{x:base.x,y:base.y,altitude:base.altitude},
+    responseTarget:{x:incident.x,y:incident.y},responseBase:base.building.sign,
+    responseIncidentId:incident.id,status:'takingOff',sceneTimer:5});
+  incident.airMedicalDispatched=true;incident.airMedicalResponse='enroute';
+  incident.timer=Math.max(incident.timer,flightSeconds+15);
+  return true;
+}
+
+function updateAirMedicalResponse(dt){
+  const step=Math.min(.05,Math.max(0,Number(dt)||0));
+  if(!step)return;
+  const active=cityIncidentDirector?.current();
+  for(let i=airMedicalVehicles.length-1;i>=0;i--){
+    const unit=airMedicalVehicles[i];
+    const incident=active?.id===unit.responseIncidentId?active:null;
+    if(['takingOff','enroute','descending','onscene'].includes(unit.status)&&(!incident||incident.medicalTreated)){
+      unit.status='climbingReturn';unit.speed=0;
+      if(incident)incident.airMedicalResponse='returning';
+    }
+    if(unit.status==='takingOff'||unit.status==='climbingReturn'){
+      unit.altitude=Math.min(unit.cruiseAltitude,unit.altitude+70*step);
+      if(unit.altitude===unit.cruiseAltitude)unit.status=unit.status==='takingOff'?'enroute':'returning';
+      continue;
+    }
+    if(unit.status==='descending'||unit.status==='landing'){
+      const targetAltitude=unit.status==='landing'?unit.baseTarget.altitude:unit.hoverAltitude;
+      unit.altitude=Math.max(targetAltitude,unit.altitude-50*step);
+      if(unit.altitude===targetAltitude){
+        if(unit.status==='landing'){unit.returnedToBase=true;airMedicalVehicles.splice(i,1);}
+        else{unit.status='onscene';incident.airMedicalResponse='onScene';}
+      }
+      continue;
+    }
+    if(unit.status==='onscene'){
+      unit.sceneTimer-=step;
+      if(unit.sceneTimer<=0){
+        applyMedicalResponse(incident,'helicopter');incident.medicalResponse='treated';incident.airMedicalResponse='treated';
+        unit.status='climbingReturn';unit.speed=0;
+      }
+      continue;
+    }
+    const target=unit.status==='returning'?unit.baseTarget:unit.responseTarget;
+    const dx=target.x-unit.x,dy=target.y-unit.y,distance=Math.hypot(dx,dy);
+    const desired=Math.atan2(dy,dx),turn=Math.atan2(Math.sin(desired-unit.angle),Math.cos(desired-unit.angle));
+    unit.angle+=Math.sign(turn)*Math.min(Math.abs(turn),1.5*step);
+    unit.speed=Math.min(8,unit.speed+6*step,distance/60);
+    const travel=Math.min(distance,unit.speed*60*step);
+    if(distance>0){unit.x+=dx/distance*travel;unit.y+=dy/distance*travel;}
+    if(distance-travel<1){
+      unit.x=target.x;unit.y=target.y;unit.speed=0;
+      unit.status=unit.status==='returning'?'landing':'descending';
     }
   }
 }
@@ -1897,6 +1981,9 @@ function updatePhysics(dt) {
   }
   updateIncidentPolice(dt);
   updateIncidentResponse(dt);
+  if(incident?.reported&&dispatchAirMedicalResponse(incident)&&Math.hypot(player.x-incident.x,player.y-incident.y)<1400)
+    showToast('🚁 Санитарный вертолёт направлен к пострадавшему');
+  updateAirMedicalResponse(dt);
   updatePedestrians(dt);
 
   updatePoliceAI(dt);
@@ -2851,6 +2938,13 @@ function drawStreetActors(w,h,center,zoom){
   policeCars.forEach(c=>addVehicle(c,()=>drawDetailedCar(ctx,c.x,c.y,c.angle,'#0f172a',c.width||48,c.height||24,true,c.model||'police',stuntHeightFor(c))));
   incidentPoliceCars.forEach(c=>addVehicle(c,()=>drawDetailedCar(ctx,c.x,c.y,c.angle,'#0f172a',48,24,true,'police',stuntHeightFor(c))));
   incidentResponseVehicles.forEach(c=>addVehicle(c,()=>drawDetailedCar(ctx,c.x,c.y,c.angle,c.color,c.width,c.height,false,c.model,stuntHeightFor(c))));
+  airMedicalVehicles.forEach(unit=>actors.push({depth:Infinity,draw:()=>{
+    if(unit.status==='onscene'){
+      ctx.strokeStyle='rgba(220,226,213,.7)';ctx.lineWidth=1.5;ctx.beginPath();
+      ctx.moveTo(unit.x-unit.altitude,unit.y-unit.altitude);ctx.lineTo(unit.x,unit.y);ctx.stroke();
+    }
+    drawTransport(ctx,unit,performance.now()/1000,unit.altitude);
+  }}));
   for(const wreck of activeIncident?.wrecks||[])addVehicle(wreck,()=>drawDetailedCar(ctx,wreck.x,wreck.y,wreck.angle,wreck.color,wreck.width,wreck.height,false,wreck.type));
   for(const vehicle of roam?.fleet||[])if(vehicle.kind!=='water')
     addVehicle(vehicle,()=>drawTransport(ctx,vehicle,performance.now()/1000,stuntHeightFor(vehicle)));
@@ -3164,6 +3258,14 @@ function renderFullMap() {
     fullMapCtx.fillStyle=base.kind==='hospital'?'#d7ded2':base.kind==='firestation'?'#ce6950':base.kind==='police'?'#88aabb':'#a2aa7b';
     fullMapCtx.fillRect(x-3,y-3,6,6);fullMapCtx.strokeStyle='#11171b';fullMapCtx.lineWidth=1;fullMapCtx.strokeRect(x-3,y-3,6,6);
   }
+  for(const base of airMedicalBases()){
+    const x=mapX+base.x*scale,y=mapY+base.y*scale;
+    fullMapCtx.fillStyle='#e5e4d9';fullMapCtx.fillText('H+',x,y);
+  }
+  for(const unit of airMedicalVehicles){
+    const x=mapX+unit.x*scale,y=mapY+unit.y*scale;
+    fullMapCtx.fillStyle='#e5e4d9';fullMapCtx.beginPath();fullMapCtx.arc(x,y,3,0,Math.PI*2);fullMapCtx.fill();
+  }
 
   CARPARTS.forEach(p => {
     if (!p.found) {
@@ -3430,6 +3532,11 @@ function boot() {
   if(['127.0.0.1','localhost'].includes(window.location?.hostname)&&window.location.search.includes('cityQA=1')){
     window.__lowtownCityQA={
       districts:()=>islands.map(i=>({id:i.id,name:i.name,x:i.x,y:i.y,w:i.w,h:i.h})),
+      startMedicalIncident(){
+        const incident=cityIncidentDirector.start('crash',safeSpawnPoints[13],{duration:600});
+        incident.reported=true;
+        return {id:incident.id,x:incident.x,y:incident.y};
+      },
       viewDistrict(id){
         const island=islands.find(i=>i.id===id);
         if(!island||roam.profile.kind!=='air'||roam.altitude<180)throw new Error('Survey requires an airborne aircraft');
@@ -3438,9 +3545,16 @@ function boot() {
         state.wanted=0;renderWorld();return {id,altitude:roam.altitude,mode:roam.mode};
       },
       snapshot:()=>({
+        incident:cityIncidentDirector.current()?{id:cityIncidentDirector.current().id,
+          medicalTreated:!!cityIncidentDirector.current().medicalTreated,
+          medicalProvider:cityIncidentDirector.current().medicalProvider,
+          airMedicalResponse:cityIncidentDirector.current().airMedicalResponse}:null,
         districts:islands.map(i=>({id:i.id,people:pedestrians.filter(p=>p.districtId===i.id).length,
           buildings:buildings.filter(b=>b.districtId===i.id).length,profile:districtProfiles[i.id]})),
         serviceBases:serviceBases.map(b=>({sign:b.building.sign,kind:b.kind,origin:b.origin,entry:b.entry})),
+        airMedicalBases:airMedicalBases().map(b=>({sign:b.building.sign,x:b.x,y:b.y,altitude:b.altitude})),
+        airMedicalVehicles:airMedicalVehicles.map(u=>({x:u.x,y:u.y,altitude:u.altitude,status:u.status,
+          responseIncidentId:u.responseIncidentId,responseBase:u.responseBase})),
         people:pedestrians.length,traffic:trafficCars.length,
         badPeople:pedestrians.filter(p=>isPedestrianSceneryBlocked(p.x,p.y)).length,
         trafficOffRoad:trafficCars.filter(c=>!onRoadSurface(c.x,c.y,roads,bridges,scenicRoads,roadEnds)).length
