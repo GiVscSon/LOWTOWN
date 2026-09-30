@@ -40,7 +40,7 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
   for(const vessel of fleet.filter(v=>v.kind==='water')){
     if(!vesselBlocked(vessel,vessel.x,vessel.y))continue;
     const origin={x:vessel.x,y:vessel.y};let placed=false;
-    for(let radius=16;radius<=224&&!placed;radius+=16){
+    for(let radius=16;radius<=1024&&!placed;radius+=16){
       for(let step=0;step<32;step++){
         const angle=step*Math.PI/16,x=origin.x+Math.cos(angle)*radius,y=origin.y+Math.sin(angle)*radius;
         if(vesselBlocked(vessel,x,y))continue;
@@ -147,13 +147,14 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
     player.speed=Math.max(-reverseLimit,Math.min(max,player.speed+((keys.up ? .10 : 0)-(keys.down ? .14 : 0))*frame));
     player.speed*=Math.pow(keys.handbrake ? .9 : .99,frame);
     const steer=Number(!!keys.right)-Number(!!keys.left);
+    const oldAngle=player.angle;
     const turnRate=mode==='plane'?.009*Math.min(1,Math.abs(player.speed)/profile.max):mode==='helicopter'?.019:.032;
     player.angle+=steer*turnRate*frame*(profile.kind==='water'?Math.min(1,Math.abs(player.speed)/2)*Math.sign(player.speed):1);
     const ox=player.x,oy=player.y;
     player.x+=Math.cos(player.angle)*player.speed*frame;player.y+=Math.sin(player.angle)*player.speed*frame;
     player.vx=player.x-ox;player.vy=player.y-oy;
     const body=chassis(player),fx=Math.cos(player.angle)*body.length/2,fy=Math.sin(player.angle)*body.length/2,rx=-Math.sin(player.angle)*body.breadth/2,ry=Math.cos(player.angle)*body.breadth/2;
-    if(profile.kind==='water'&&[[0,0],[fx+rx,fy+ry],[fx-rx,fy-ry],[-fx+rx,-fy+ry],[-fx-rx,-fy-ry]].some(([x,y])=>waterBlocked(player.x+x,player.y+y))){player.x=ox;player.y=oy;player.speed*=-.2;}
+    if(profile.kind==='water'&&[[0,0],[fx+rx,fy+ry],[fx-rx,fy-ry],[-fx+rx,-fy+ry],[-fx-rx,-fy-ry]].some(([x,y])=>waterBlocked(player.x+x,player.y+y))){player.x=ox;player.y=oy;player.angle=oldAngle;player.speed*=-.2;}
     if(profile.kind==='air'){
       const hitsRoof=buildings.some(b=>altitude<(b.floors??5)*24+12&&contact(chassis(player),{x:b.x+b.w/2,y:b.y+b.h/2,angle:0,length:b.w,breadth:b.h}));
       if(hitsRoof){player.x=ox;player.y=oy;player.speed=0;}

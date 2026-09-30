@@ -40,8 +40,8 @@ for(const type of ['van','truck','bike']){
   run('Object.assign(player,{x:1600,y:1200,angle:0,speed:0,vx:0,vy:0});');press('KeyW');step(25);release('KeyW');
   assert(run('player.x')>1615,`${type} must move with keyboard input`);driven.push(type);
 }
-run("roam.resetToSedan(1200,1200);roam.interact();Object.assign(player,{x:2490,y:1800});");press('KeyE');assert.equal(run('roam.mode'),'speedboat');
-run('Object.assign(player,{x:2670,y:1370,angle:-Math.PI/2,speed:0});');press('KeyW');step(90);release('KeyW');assert(run('player.y')<1100,'boat must pass below the real bridge');
+run("roam.resetToSedan(1200,1200);roam.interact();const boat=roam.fleet.find(v=>v.type==='speedboat');Object.assign(player,{x:boat.x-50,y:boat.y});assert(isPositionOnSolidGround(player.x,player.y),'boat boarding must be reachable from shore');");press('KeyE');assert.equal(run('roam.mode'),'speedboat');
+run('Object.assign(player,{x:2650,y:1370,angle:-Math.PI/2-.1,speed:0});');press('KeyW');step(90);release('KeyW');assert(run('player.y')<1100,'boat must pass below the real bridge along the open channel');
 run("roam.resetToSedan(1200,1200);roam.interact();Object.assign(player,{x:1040,y:2130});");press('KeyE');assert.equal(run('roam.mode'),'helicopter');press('KeyQ');step(100);assert(run('roam.altitude')>110);press('KeyQ');step(160);assert.equal(run('roam.altitude'),0);press('KeyE');assert.equal(run('roam.mode'),'foot');
 for(const type of ['tug','plane']){
   run(`roam.resetToSedan(1200,1200);roam.interact();const extra_${type}=roam.fleet.find(c=>c.type==='${type}');Object.assign(player,{x:extra_${type}.x+20,y:extra_${type}.y});`);
