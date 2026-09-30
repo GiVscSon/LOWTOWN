@@ -21,6 +21,10 @@ const report=JSON.parse(city.run(`JSON.stringify((()=>{
  const overlap=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
  const propsOnRoad=solidProps.filter(p=>roads.some(r=>overlap({x:p.x-(p.width||12)/2,y:p.y-(p.height||12)/2,w:p.width||12,h:p.height||12},r)));
  const blockingRails=bridgeRails.filter(rail=>roads.some(r=>overlap(rail,r)));
+ const streetSceneryOnRoad=[...trees,...breakableProps,...streetLights,...billboards,...cranes].filter(p=>{
+  const w=p.width||p.w||(streetLights.includes(p)?6:billboards.includes(p)?80:20),h=p.height||p.h||(streetLights.includes(p)?6:billboards.includes(p)?12:20);
+  return [[0,0],[-w/2,-h/2],[w/2,-h/2],[-w/2,h/2],[w/2,h/2]].some(([dx,dy])=>onRoadSurface(p.x+dx,p.y+dy,roads,bridges,scenicRoads,roadEnds));
+ });
  const duplicateRoads=roads.flatMap((a,i)=>roads.slice(i+1).filter(b=>a.dir===b.dir&&Math.abs(a.x-b.x)<.01&&Math.abs(a.y-b.y)<.01&&Math.abs(a.w-b.w)<.01&&Math.abs(a.h-b.h)<.01));
  const stackedLines=buildRoadPaintGeometry().lanes.flatMap((a,i,lines)=>lines.slice(i+1).filter(b=>
   (Math.abs(a.y1-b.y1)<.01&&a.y1===a.y2&&b.y1===b.y2&&Math.max(a.x1,b.x1)<Math.min(a.x2,b.x2)-.1)||
@@ -41,11 +45,11 @@ const report=JSON.parse(city.run(`JSON.stringify((()=>{
  return {width:WORLD_W,height:WORLD_H,islands:islands.length,islets:islets.length,bridges:bridges.length,
   roadBridges:bridges.filter(b=>!b.footway).length,footways:footways.length,
   disconnectedNodes:roadGraph.filter(n=>!roadPath(roadGraph,roadGraph[0],n).length).length,
-  propsOnRoad,blockingRails,duplicateRoads,stackedLines,blockedWalks,unsafeFleet,stunts:stuntZones.length,
+  propsOnRoad,blockingRails,streetSceneryOnRoad,duplicateRoads,stackedLines,blockedWalks,unsafeFleet,stunts:stuntZones.length,
   fleetCount:fleet.length,runways:PLANE_RUNWAYS.every(r=>[[0,0],[r.w,0],[0,r.h],[r.w,r.h]].every(([dx,dy])=>isPositionOnSolidGround(r.x+dx,r.y+dy)))};
 })())`));
 assert.equal(report.disconnectedNodes,0,'all road components must connect');
-for(const key of ['propsOnRoad','blockingRails','duplicateRoads','stackedLines','blockedWalks','unsafeFleet'])assert.equal(report[key].length,0,`${key}: ${JSON.stringify(report[key].slice(0,4))}`);
+for(const key of ['propsOnRoad','blockingRails','streetSceneryOnRoad','duplicateRoads','stackedLines','blockedWalks','unsafeFleet'])assert.equal(report[key].length,0,`${key}: ${JSON.stringify(report[key].slice(0,4))}`);
 assert.equal(report.stunts,0);assert.equal(report.roadBridges,24);assert.equal(report.footways,14);assert(report.runways);
 const landings=city.run(`bridges.filter(b=>b.footway).filter(b=>b.id.endsWith('-1')).map(b=>({x:b.x+b.w/2,y:b.y+b.h-8}))`);
 assert.equal(landings.length,AUTHORED_ISLETS.length);

@@ -1110,6 +1110,7 @@ function initTopology() {
     trees.push({x,y,size:17+n%4*3,shore:true});
   }
   buildServiceAccess();
+  relocateStreetObstacles();
   walkingRoutes=createWalkingRoutes(roads,parkZones,(x,y)=>!isPedestrianSceneryBlocked(x,y)&&
     !onRoadSurface(x,y,roads,bridges,[],roadEnds)&&!parkedCars.some(c=>pedestrianCarBlocked(x,y,c)));
   for(const route of walkingRoutes){const point=route.points[Math.floor(route.points.length/2)];route.districtId=districtAt(point.x,point.y)?.id;}
@@ -1158,14 +1159,22 @@ function initTopology() {
 
 function relocateStreetObstacles(){
   const asphalt=[...roads,...bridges];
+  const furniture=[...solidProps,...trees,...breakableProps,...streetLights,...billboards,...cranes];
+  const lamps=new Set(streetLights),boards=new Set(billboards);
+  const dimensions=new WeakMap(furniture.map(p=>[p,{w:p.width||p.w||(lamps.has(p)?6:boards.has(p)?80:20),
+    h:p.height||p.h||(lamps.has(p)?6:boards.has(p)?12:20)}]));
+  const widthOf=p=>dimensions.get(p).w,heightOf=p=>dimensions.get(p).h;
   const clear=(p,ignore)=>{
-    const w=p.width||20,h=p.height||20;
-    return [[0,0],[-w/2-8,-h/2-8],[w/2+8,-h/2-8],[-w/2-8,h/2+8],[w/2+8,h/2+8]]
-      .every(([dx,dy])=>isPositionOnIslandLand(p.x+dx,p.y+dy)&&!onRoadSurface(p.x+dx,p.y+dy,asphalt,[],scenicRoads,roadEnds))&&
+    const w=widthOf(ignore),h=heightOf(ignore);
+    const margin=lamps.has(ignore)?2:8;
+    return [[0,0],[-w/2,-h/2],[w/2,-h/2],[-w/2,h/2],[w/2,h/2]]
+      .every(([dx,dy])=>isPositionOnSolidGround(p.x+dx,p.y+dy))&&
+      [[0,0],[-w/2-margin,-h/2-margin],[w/2+margin,-h/2-margin],[-w/2-margin,h/2+margin],[w/2+margin,h/2+margin]]
+      .every(([dx,dy])=>!onRoadSurface(p.x+dx,p.y+dy,asphalt,[],scenicRoads,roadEnds))&&
       !buildings.some(b=>p.x+w/2+6>b.x&&p.x-w/2-6<b.x+b.w&&p.y+h/2+6>b.y&&p.y-h/2-6<b.y+b.h)&&
-      !solidProps.some(o=>o!==ignore&&Math.abs(o.x-p.x)<((o.width||12)+w)/2+4&&Math.abs(o.y-p.y)<((o.height||12)+h)/2+4);
+      !furniture.some(o=>o!==ignore&&Math.abs(o.x-p.x)<(widthOf(o)+w)/2+4&&Math.abs(o.y-p.y)<(heightOf(o)+h)/2+4);
   };
-  for(const prop of solidProps){
+  for(const prop of furniture){
     if(clear(prop,prop))continue;
     const home={x:prop.x,y:prop.y};let placed=false;
     for(let radius=16;radius<=320&&!placed;radius+=16)for(let n=0;n<16;n++){
