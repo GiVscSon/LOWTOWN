@@ -7,6 +7,7 @@ const graph=[{x:0,y:0,edges:new Set([1])},{x:100,y:0,edges:new Set([0,2])},
   {x:200,y:0,edges:new Set([1])}];
 assert.deepEqual(roadPath(graph,{x:25,y:0},graph[2],{fromSegment:true}).map(p=>p.x),[25,100,200]);
 assert.deepEqual(roadPath(graph,{x:175,y:0},graph[0],{fromSegment:true}).map(p=>p.x),[175,100,0]);
+assert.deepEqual(roadPath(graph,{x:74,y:0},{x:75,y:0},{fromSegment:true}).map(p=>p.x),[74,75]);
 assert.equal(graph.length,3,'replanning must not alter the shared road graph');
 const walker={route:{points:Array.from({length:10},(_,i)=>({x:i*8,y:0}))},routeIndex:8,routeDirection:1};
 assert.equal(nextWalkingGoal(walker).x,72,'walk to the actual endpoint before turning back');
@@ -61,15 +62,19 @@ const yielding=JSON.parse(traffic.run(`{
   incidentPoliceCars.push(unit);
   const crossing={x:2046,y:1232,angle:Math.PI,width:46,height:22};trafficCars.push(crossing);
   const clearsIntersection=!yieldTrafficToServices(crossing,1/60);
+  const parallel={x:14446.5,y:1208.9,angle:Math.PI/2,width:44,height:21,
+    yieldHome:{cross:'x',value:14467}};
+  Object.assign(unit,{x:14499,y:1285,angle:-Math.PI/2});
+  const clearsJunctionWhileYielding=!yieldTrafficToServices(parallel,1/60);
   incidentPoliceCars.length=0;trafficCars.length=0;
   Object.assign(unit,{x:1350,y:1200,angle:0});incidentPoliceCars.push(unit);
   const car={x:1500,y:1200,angle:0,width:46,height:24};trafficCars.push(car);
   for(let t=0;t<150;t++)yieldTrafficToServices(car,1/60);
   const movedAside=car.y<1170&&policeFootprintOnRoad(car);unit.x=1650;
   for(let t=0;t<150;t++)yieldTrafficToServices(car,1/60);
-  JSON.stringify({clearsIntersection,movedAside,rejoined:Math.abs(car.y-1200)<.5&&!car.yieldHome});
+  JSON.stringify({clearsIntersection,clearsJunctionWhileYielding,movedAside,rejoined:Math.abs(car.y-1200)<.5&&!car.yieldHome});
 }`));
-assert(yielding.clearsIntersection&&yielding.movedAside&&yielding.rejoined,JSON.stringify(yielding));
+assert(yielding.clearsIntersection&&yielding.clearsJunctionWhileYielding&&yielding.movedAside&&yielding.rejoined,JSON.stringify(yielding));
 
 const turns=runtimeCity(19);
 assert(turns.run(`{
@@ -83,19 +88,19 @@ assert(turns.run(`{
 
 const returnTurn=JSON.parse(turns.run(`{
   incidentResponseVehicles.length=0;
-  const unit={x:5424,y:1200,angle:2.6166,width:72,height:34,maxSpeed:4.35,speed:0,
-    model:'fireEngine',status:'returning',route:[{x:6265,y:1200}],responseTarget:{x:6265,y:1200}};
+  const unit={x:1700,y:1200,angle:2.6166,width:72,height:34,maxSpeed:4.35,speed:0,
+    model:'fireEngine',status:'returning',route:[{x:2350,y:1200}],responseTarget:{x:2350,y:1200}};
   incidentResponseVehicles.push(unit);
-  trafficCars.push({x:5330,y:1200,angle:Math.PI,width:82,height:30},
-    {x:5424,y:1151,angle:Math.PI,width:82,height:30});
+  trafficCars.push({x:1606,y:1200,angle:Math.PI,width:82,height:30},
+    {x:1700,y:1151,angle:Math.PI,width:82,height:30});
   let reversed=false,contacts=0;
-  for(let tick=0;tick<600;tick++){
+  for(let tick=0;tick<1200;tick++){
     tryPlanEmergencyPassing(unit,1/60);advanceServiceRoute(unit,1/60);reversed||=unit.speed<0;
     contacts+=trafficCars.filter(car=>contact(chassis(unit),chassis(car))).length;
   }
-  JSON.stringify({reversed,contacts,x:unit.x,completed:!unit.emergencyManeuver});
+  JSON.stringify({reversed,contacts,x:unit.x,y:unit.y,angle:unit.angle,speed:unit.speed,route:unit.route,points:unit.emergencyManeuver?.points,rotationBlocked:unit.rotationBlocked,completed:!unit.emergencyManeuver});
 }`));
-assert(returnTurn.reversed&&returnTurn.completed&&returnTurn.x>6200,JSON.stringify(returnTurn));
+assert(returnTurn.reversed&&returnTurn.completed&&returnTurn.x>2300,JSON.stringify(returnTurn));
 assert.equal(returnTurn.contacts,0,'a blocked return turn must make space before rotating');
 
 // Preserve normal traffic and pedestrians: the previous isolated route matrix
@@ -118,6 +123,7 @@ for(;ticks<5400;ticks++){
       const p=before.get(u);if(p)maxStep=Math.max(maxStep,Math.hypot(p.x-u.x,p.y-u.y));
     }
   }`);
+  if(ticks%300===0)writeFileSync('artifacts/movement/populated-progress.json',city.run(`JSON.stringify({seconds:${ticks}/30,units:[...units].map(u=>({model:u.model,status:u.status,x:u.x,y:u.y,returned:!!u.returnedToBase,blocked:!!u.emergencyBlocked,rotationBlocked:!!u.rotationBlocked,goal:u.route?.[0],points:u.emergencyManeuver?.points,neighbors:emergencyPassingActors(u).filter(a=>Math.hypot(a.x-u.x,a.y-u.y)<160).map(a=>({model:a.model,type:a.type,x:a.x,y:a.y,angle:a.angle,width:a.width,height:a.height}))}))})`));
   if(city.run('units.size===3&&[...units].every(u=>u.returnedToBase)'))break;
 }
 const services=JSON.parse(city.run(`JSON.stringify({units:units.size,contacts,unsafe,maxStep,

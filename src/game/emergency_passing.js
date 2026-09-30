@@ -44,6 +44,7 @@ export function emergencyPassingPathClear(unit,points,canOccupy,sampleStep=10){
 /** Plan a short passing path; the caller validates the entire chassis and corridor. */
 export function planEmergencyPassingManeuver(unit, actors, {
   canOccupy,
+  canRejoin = () => true,
   lookAhead = 260,
   lateralPadding = 12,
   passPadding = 40,
@@ -87,6 +88,7 @@ export function planEmergencyPassingManeuver(unit, actors, {
           y: unit.y + forwardY * (pass + Math.max(42, offset + 10)) }
       ];
       for(const points of [forwardPoints,[{x:unit.x-forwardX*48,y:unit.y-forwardY*48,reverse:true},...forwardPoints]]){
+       if(!canRejoin({...unit,...points.at(-1)}))continue;
        if (sampledPathIsClear(unit, points, blocker.actor, canOccupy, sampleStep)) {
         return { blocker: blocker.actor, points, side, offset, angle,
           remainingAdvance:maxForward-pass-Math.max(42,offset+10),

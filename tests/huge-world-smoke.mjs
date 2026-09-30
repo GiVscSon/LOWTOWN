@@ -1,3 +1,5 @@
+import * as authoredWorld from '../src/game/authored_archipelago.js';
+import { PLANE_RUNWAYS as LEGACY_RUNWAYS } from '../src/game/free_roam.js';
 import * as streetNetwork from '../src/game/street_network.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -9,7 +11,7 @@ import * as incidents from '../src/game/city_incidents.js';
 
 const noop=()=>{};
 const element={style:{},classList:{add:noop,remove:noop},appendChild:noop,addEventListener:noop,getContext:()=>({}),remove:noop};
-const sandbox={...streetNetwork,...ocean,...surfaces,...incidents,console,Math,performance:{now:()=>0},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,pointInCoast,pointInBeach,coastPoints,BEACH_WIDTH};
+const sandbox={...authoredWorld,LEGACY_RUNWAYS,...streetNetwork,...ocean,...surfaces,...incidents,console,Math,performance:{now:()=>0},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,pointInCoast,pointInBeach,coastPoints,BEACH_WIDTH};
 vm.createContext(sandbox);
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
 vm.runInContext(source+`
@@ -20,12 +22,12 @@ this.report={
   roads:roads.length,buildings:buildings.length,traffic:trafficCars.length,pedestrians:pedestrians.length,parks:parkZones.length,
   outOfBounds:[...roads,...buildings].filter(r=>r.x<0||r.y<0||r.x+r.w>WORLD_W||r.y+r.h>WORLD_H).length,
   roadBuildingConflicts:buildings.flatMap((b,buildingIndex)=>roads.map((r,roadIndex)=>({b,r,buildingIndex,roadIndex})).filter(hit=>overlap(hit.b,hit.r))).map(({b,r,buildingIndex,roadIndex})=>({buildingIndex,roadIndex,b,r})),
-  bridgeLandfalls:bridges.every(br=>{
+  bridgeLandfalls:bridges.filter(br=>!br.footway).every(br=>{
     const a=br.dir==='h'?{x:br.x-5,y:br.y+br.h/2}:{x:br.x+br.w/2,y:br.y-5};
     const b=br.dir==='h'?{x:br.x+br.w+5,y:br.y+br.h/2}:{x:br.x+br.w/2,y:br.y+br.h+5};
     return islands.some(i=>pointInCoast(a.x,a.y,i))&&islands.some(i=>pointInCoast(b.x,b.y,i));
   }),
-  failedLandfalls:bridges.filter(br=>{
+  failedLandfalls:bridges.filter(br=>!br.footway).filter(br=>{
     const a=br.dir==='h'?{x:br.x-5,y:br.y+br.h/2}:{x:br.x+br.w/2,y:br.y-5};
     const b=br.dir==='h'?{x:br.x+br.w+5,y:br.y+br.h/2}:{x:br.x+br.w/2,y:br.y+br.h+5};
     return !islands.some(i=>pointInCoast(a.x,a.y,i))||!islands.some(i=>pointInCoast(b.x,b.y,i));
@@ -34,7 +36,7 @@ this.report={
     const b=br.dir==='h'?{x:br.x+br.w+5,y:br.y+br.h/2}:{x:br.x+br.w/2,y:br.y+br.h+5};
     return {id:br.id,a,b,landA:islands.filter(i=>pointInCoast(a.x,a.y,i)).map(i=>i.id),landB:islands.filter(i=>pointInCoast(b.x,b.y,i)).map(i=>i.id)};
   }),
-  bridgeRoadLinks:bridges.every(br=>{
+  bridgeRoadLinks:bridges.filter(br=>!br.footway).every(br=>{
     const ends=br.dir==='h'?[{x:br.x-150,y:br.y,w:150,h:br.h},{x:br.x+br.w,y:br.y,w:150,h:br.h}]:[{x:br.x,y:br.y-150,w:br.w,h:150},{x:br.x,y:br.y+br.h,w:br.w,h:150}];
     return ends.every(end=>roads.some(r=>overlap(end,r)));
   }),
@@ -52,7 +54,7 @@ this.report={
   courtyards:parkZones.filter(p=>p.courtyard).length,
   clearParks:parkZones.every(p=>!buildings.some(b=>overlap(p,b))),
   scenicLanes:scenicRoads.length,
-  scenicLanesSafe:scenicRoads.every(r=>r.points.every(([x,y])=>[[-29,0],[29,0],[0,-29],[0,29]].every(([dx,dy])=>isPositionOnIslandLand(x+dx,y+dy))&&!buildings.some(b=>x>b.x-29&&x<b.x+b.w+29&&y>b.y-29&&y<b.y+b.h+29))),
+  scenicLanesSafe:scenicRoads.every(r=>r.points.every(([x,y])=>[[-r.width/2,0],[r.width/2,0],[0,-r.width/2],[0,r.width/2]].every(([dx,dy])=>isPositionOnIslandLand(x+dx,y+dy))&&!buildings.some(b=>x>b.x-r.width/2&&x<b.x+b.w+r.width/2&&y>b.y-r.width/2&&y<b.y+b.h+r.width/2))),
   naturalIslets:islets.length,
   connectedDistricts:safeSpawnPoints.every(sp=>roadPath(roadGraph,safeSpawnPoints[0],sp).length>0),
   terminals:roadEnds.length,
@@ -72,24 +74,17 @@ this.report={
       z.y>=r.y-z.length/2-10&&z.y<=r.y+r.h+z.length/2+10&&z.x>=r.x-60&&z.x<=r.x+r.w+60))),
   crosswalkApproaches:new Set(junctionCrosswalkStripes({x:0,y:0,w:520,h:100},{x:210,y:-200,w:100,h:500}).map(s=>s.approach)).size
 };
-const testRamp=stuntZones.find(z=>z.type==='ramp');
-const stuntTestVehicle={x:testRamp?.x||0,y:testRamp?.y||0,speed:7,width:40,height:20,mass:1250,type:'sports'};
-if(testRamp){
-  const offset=(axis,distance)=>{if(testRamp.axis==='h')stuntTestVehicle.x=testRamp.x+distance;else stuntTestVehicle.y=testRamp.y+distance;};
-  offset(testRamp.axis,-78);updateStuntVehicle(stuntTestVehicle,1/60);offset(testRamp.axis,-22);const airborne=updateStuntVehicle(stuntTestVehicle,1/60);
-  for(let i=0;i<80;i++)updateStuntVehicle(stuntTestVehicle,1/60);
-  this.stuntFlight={takeoff:airborne,landing:stuntHeightFor(stuntTestVehicle),score:stuntStates.get(stuntTestVehicle)?.score||0};
-}`,sandbox);
+`,sandbox);
 
 assert.equal(sandbox.report.connectedDistricts,true,'every district must have a road route');
 assert.equal(sandbox.report.routedPedestrians,sandbox.report.pedestrians,'every resident must have a walking route');
 assert(sandbox.report.terminals>0);
-assert.equal(sandbox.report.unfinishedRoadEnds,0);
 console.log('HUGE_WORLD_REPORT',JSON.stringify(sandbox.report));
-assert.equal(sandbox.report.width,10100);
-assert.equal(sandbox.report.height,11700);
+assert.equal(sandbox.report.unfinishedRoadEnds,0);
+assert.equal(sandbox.report.width,17400);
+assert.equal(sandbox.report.height,18100);
 assert.equal(sandbox.report.islands,16);
-assert.equal(sandbox.report.bridges,24);
+assert.equal(sandbox.report.bridges,38);
 assert.ok(sandbox.report.roads>=90);
 assert.ok(sandbox.report.buildings>=220);
 assert.ok(sandbox.report.traffic>=55);
@@ -111,12 +106,6 @@ assert.ok(sandbox.report.civicBuildings>=8,'emergency and community buildings ar
 assert.ok(sandbox.report.civicTypes>=4,'civic buildings need distinct types');
 assert.ok(sandbox.report.parkStyles>=8,'parks need more than the original four layouts');
 assert.ok(sandbox.report.pedestrianLooks>=8,'pedestrian clothing/accessories lack variety');
-assert.ok(sandbox.report.stuntZones>=6,'road stunt features are too sparse');
-assert.ok(sandbox.report.stuntStyles>=2,'both ramps and speed bumps should be present');
-assert.equal(sandbox.report.stuntZonesOnRoad,true,'a stunt feature was placed off road');
-assert.equal(sandbox.report.stuntZonesClear,true,'a stunt feature sits inside a junction');
-assert.equal(sandbox.report.crosswalkApproaches,4,'junction crossings do not cover all four approaches');
-assert.ok(sandbox.stuntFlight.takeoff>0,'a car did not leave the ground after a ramp');
-assert.equal(sandbox.stuntFlight.landing,0,'the car did not settle back onto the road');
-assert.ok(sandbox.stuntFlight.score>0,'the ramp should register trick points');
+assert.equal(sandbox.report.stuntZones,0,'public roads must contain no stunt installations');
+assert.equal(sandbox.report.crosswalkApproaches,4);
 console.log('HUGE_WORLD_OK',JSON.stringify(sandbox.report));

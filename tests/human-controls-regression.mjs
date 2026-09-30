@@ -1,3 +1,5 @@
+import * as authoredWorld from '../src/game/authored_archipelago.js';
+import { PLANE_RUNWAYS as LEGACY_RUNWAYS } from '../src/game/free_roam.js';
 import * as emergencyPassing from '../src/game/emergency_passing.js';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -13,7 +15,7 @@ import * as surfaces from '../src/game/surface_physics.js';
 import * as incidents from '../src/game/city_incidents.js';
 const noop=()=>{},events={},elements=new Map();let clock=0;
 const element=id=>{if(elements.has(id))return elements.get(id);const listeners={};const e={style:{},classList:{add:noop,remove:noop},remove:noop,append:noop,appendChild:noop,listeners,addEventListener:(name,fn)=>listeners[name]=fn,getContext:()=>({})};elements.set(id,e);return e;};
-const sandbox={...emergencyPassing,Math,console,assert,performance:{now:()=>clock},navigator:{vibrate:noop},document:{readyState:'loading',getElementById:element,createElement:()=>element(Symbol()),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:(name,fn)=>events[name]=fn},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,...core,...contacts,...coast,...roaming,...street,...traffic,...ocean,...surfaces,...incidents};
+const sandbox={...authoredWorld,LEGACY_RUNWAYS,...emergencyPassing,Math,console,assert,performance:{now:()=>clock},navigator:{vibrate:noop},document:{readyState:'loading',getElementById:element,createElement:()=>element(Symbol()),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:(name,fn)=>events[name]=fn},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,...core,...contacts,...coast,...roaming,...street,...traffic,...ocean,...surfaces,...incidents};
 vm.createContext(sandbox);
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
 vm.runInContext(source+`\ninitTopology();roam=createFreeRoam(player,parkedCars,buildings,trees,isPositionOnSolidGround,()=>{},solidProps,isPositionOnWaterObstacle);sound.init=()=>{};setupInputListeners();trafficCars.length=0;pedestrians.length=0;`,sandbox);

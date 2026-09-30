@@ -17,7 +17,10 @@ export const PLANE_RUNWAYS = [
 export function isPlaneRunway(x,y,margin=0){
   return PLANE_RUNWAYS.some(r=>x>=r.x-margin&&x<=r.x+r.w+margin&&y>=r.y-margin&&y<=r.y+r.h+margin);
 }
-export function createFreeRoam(player, parked, buildings, trees, solid, notify=()=>{}, obstacles=[], waterBlocked=solid, dynamicActors=()=>[]) {
+export function createFreeRoam(player, parked, buildings, trees, solid, notify=()=>{}, obstacles=[], waterBlocked=solid, dynamicActors=()=>[], layout={}) {
+  const mapPoint=layout.mapPoint||((point)=>point);
+  const runways=layout.runways||PLANE_RUNWAYS;
+  const onRunway=(x,y,margin)=>runways.some(r=>x>=r.x-margin&&x<=r.x+r.w+margin&&y>=r.y-margin&&y<=r.y+r.h+margin);
   const fleet=[
     // Keep the test-drive spawn and first junction clear. Land vehicles wait in
     // marked kerb bays instead of blocking the player on the first frame.
@@ -30,7 +33,7 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
     ['speedboat',2558,7680],['tug',4908,7740],['helicopter',6500,8080],
     ['speedboat',7080,4700],['tug',7080,7500],['speedboat',9720,8700],['tug',7100,10550]
     ,['helicopter',8188.4,7629.2],['plane',8020,8090]
-  ].map(([type,x,y])=>({type,x,y,angle:VEHICLES[type].kind==='water'?Math.PI/2:0,...VEHICLES[type],speed:0}));
+  ].map(([type,x,y])=>({type,...mapPoint({x,y}),angle:VEHICLES[type].kind==='water'?Math.PI/2:0,...VEHICLES[type],speed:0}));
   const vesselBlocked=(vehicle,x,y)=>{
     const body=chassis({...vehicle,x,y}),cs=Math.cos(body.angle),sn=Math.sin(body.angle);
     const fx=cs*body.length/2,fy=sn*body.length/2,rx=-sn*body.breadth/2,ry=cs*body.breadth/2;
@@ -95,7 +98,7 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
   };
   function toggleFlight(){
     if(VEHICLES[mode]?.kind!=='air')return;
-    if(mode==='plane'&&altitude<2&&(!isPlaneRunway(player.x,player.y,12)||Math.abs(player.speed)<4.5)){
+    if(mode==='plane'&&altitude<2&&(!onRunway(player.x,player.y,12)||Math.abs(player.speed)<4.5)){
       notify('Самолёту нужен разбег по полосе: разгонитесь и нажмите Q');return;
     }
     fly=altitude<2?true:!fly;landingWarned=false;
@@ -132,7 +135,7 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
       else if(altitude>0){
         const next=Math.max(0,altitude-.82*frame);
         const roofClearance=buildings.reduce((height,b)=>contact(chassis(player),{x:b.x+b.w/2,y:b.y+b.h/2,angle:0,length:b.w,breadth:b.h})?Math.max(height,(b.floors??5)*24+12):height,0);
-        const runwayClear=mode!=='plane'||isPlaneRunway(player.x,player.y,8);
+        const runwayClear=mode!=='plane'||onRunway(player.x,player.y,8);
         const minimum=Math.max(roofClearance,landingClear()&&runwayClear?0:mode==='plane'?18:8);
         if(next<minimum){
           // Hold the current altitude. Snapping up to a roof height looked like

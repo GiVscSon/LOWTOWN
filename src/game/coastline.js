@@ -1,5 +1,14 @@
 export const BEACH_WIDTH = 108;
 const cache = new WeakMap();
+const boundsCache = new WeakMap();
+function coastBounds(island){
+  if(!boundsCache.has(island)){
+    const points=coastPoints(island);
+    boundsCache.set(island,{left:Math.min(...points.map(p=>p[0])),right:Math.max(...points.map(p=>p[0])),
+      top:Math.min(...points.map(p=>p[1])),bottom:Math.max(...points.map(p=>p[1]))});
+  }
+  return boundsCache.get(island);
+}
 const CITY_SHAPES = {
   core:      { sx: 1.025, sy: 1.055, wave: .045, phase: .2, lobes: 3, coves: [4] },
   docks:     { sx: 1.085, sy: 1.025, wave: .035, phase: 1.1, lobes: 5, coves: [9, 14] },
@@ -29,6 +38,18 @@ const HEADLANDS={core:[35,15,20,55],docks:[10,65,35,10],lantern:[95,20,15,65],
 export function coastPoints(island) {
   if(cache.has(island))return cache.get(island);
   const { x, y, w, h } = island;
+  if(island.coast){
+    const anchors=island.coast.map(([u,v])=>[x+u*w,y+v*h]),points=[];
+    for(let i=0;i<anchors.length;i++){
+      const p0=anchors[(i-1+anchors.length)%anchors.length],p1=anchors[i],p2=anchors[(i+1)%anchors.length],p3=anchors[(i+2)%anchors.length];
+      for(let step=0;step<6;step++){
+        const t=step/6,t2=t*t,t3=t2*t;
+        points.push([0,1].map(a=>.5*(2*p1[a]+(-p0[a]+p2[a])*t+(2*p0[a]-5*p1[a]+4*p2[a]-p3[a])*t2+(-p0[a]+3*p1[a]-3*p2[a]+p3[a])*t3)));
+      }
+    }
+    cache.set(island,points);return points;
+  }
+
   // Every district gets its own stable shoreline silhouette. The coast always
   // bulges outwards near bridge landfalls, so roads remain connected while the
   // archipelago stops reading as a repeated rectangular grid.
@@ -87,6 +108,8 @@ export function coastPoints(island) {
   cache.set(island,points);return points;
 }
 export function pointInCoast(x,y,island) {
+  const bounds=coastBounds(island);
+  if(x<bounds.left||x>bounds.right||y<bounds.top||y>bounds.bottom)return false;
   const points=coastPoints(island); let inside=false;
   for(let i=0,j=points.length-1;i<points.length;j=i++) {
     const [ax,ay]=points[i], [bx,by]=points[j];
@@ -106,8 +129,8 @@ function distanceToCoastSquared(x,y,points) {
 }
 export function pointInBeach(x,y,island,width=island.natural?42:BEACH_WIDTH) {
   if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(width)||width<=0)return false;
-  const pad=width+180;
-  if(x<island.x-pad||x>island.x+island.w+pad||y<island.y-pad||y>island.y+island.h+pad)return false;
+  const bounds=coastBounds(island);
+  if(x<bounds.left-width||x>bounds.right+width||y<bounds.top-width||y>bounds.bottom+width)return false;
   if(pointInCoast(x,y,island))return false;
   return distanceToCoastSquared(x,y,coastPoints(island))<=width*width;
 }

@@ -44,5 +44,7 @@ jobs:
         run: node tests/free-roam-render-smoke.mjs
       - name: Pedestrian world
         run: node tests/pedestrian-world-smoke.mjs
+      - name: Authored islands, connected boardwalks and clear roads
+        run: npm run test:authored-world
       - name: Expanded city world
         run: node tests/huge-world-smoke.mjs

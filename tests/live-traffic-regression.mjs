@@ -1,3 +1,5 @@
+import * as authoredWorld from '../src/game/authored_archipelago.js';
+import { PLANE_RUNWAYS as LEGACY_RUNWAYS } from '../src/game/free_roam.js';
 import * as emergencyPassing from '../src/game/emergency_passing.js';
 import * as streetNetwork from '../src/game/street_network.js';
 import assert from 'node:assert/strict';
@@ -13,7 +15,7 @@ import { projectIso, velocityForHeading, routeInput } from '../src/game/test_dri
 const noop=()=>{};
 const element={style:{},classList:{add:noop,remove:noop},appendChild:noop,remove:noop,addEventListener:noop,getContext:()=>({})};
 let clock=0;
-const sandbox={...emergencyPassing,...streetNetwork,...ocean,...surfaces,...incidents,Math,console,advanceClock:()=>clock+=1000/60,performance:{now:()=>clock},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,resolveContact,resolveScenery,contact,chassis,advanceTrafficCar,resolveTrafficPair,coastPoints,pointInCoast,pointInBeach,BEACH_WIDTH,projectIso,velocityForHeading,routeInput};
+const sandbox={...authoredWorld,LEGACY_RUNWAYS,...emergencyPassing,...streetNetwork,...ocean,...surfaces,...incidents,Math,console,advanceClock:()=>clock+=1000/60,performance:{now:()=>clock},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,resolveContact,resolveScenery,contact,chassis,advanceTrafficCar,resolveTrafficPair,coastPoints,pointInCoast,pointInBeach,BEACH_WIDTH,projectIso,velocityForHeading,routeInput};
 vm.createContext(sandbox);
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
 vm.runInContext(source+`

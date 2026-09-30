@@ -51,10 +51,10 @@ assert(safeWait.blocked&&safeWait.safe&&!safeWait.collision&&safeWait.resumed,JS
 // responders are covered by the independent complete-route matrix.
 const loop=JSON.parse(city.run(`
  trafficCars.length=0;incidentResponseVehicles.length=0;
- var incident=cityIncidentDirector.start('fire',{x:9500,y:1200},{duration:600});dispatchIncidentResponse(incident);
+ var incident=cityIncidentDirector.start('fire',worldPoint({x:9500,y:1200}),{duration:600});dispatchIncidentResponse(incident);
  var engine=incidentResponseVehicles.find(u=>u.model==='fireEngine');
  incidentResponseVehicles.splice(0,incidentResponseVehicles.length,engine);
- var blocker={x:9100,y:1200,width:48,height:24,angle:0,speed:0};trafficCars.push(blocker);
+ var blocker={...worldPoint({x:9100,y:1200}),width:48,height:24,angle:0,speed:0};trafficCars.push(blocker);
  var collisions=0,unsafe=0,ticks=0;
  for(;ticks<10000&&incidentResponseVehicles.length;ticks++){
    if(trafficCars.includes(blocker))blocker.x+=blocker.speed;updateIncidentResponse(1/60);

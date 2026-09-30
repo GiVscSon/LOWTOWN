@@ -1,3 +1,5 @@
+import * as authoredWorld from '../src/game/authored_archipelago.js';
+import { PLANE_RUNWAYS as LEGACY_RUNWAYS } from '../src/game/free_roam.js';
 import * as streetNetwork from '../src/game/street_network.js';
 // Render the actual game's Canvas calls without a browser. This does not test DOM input.
 import { createRequire } from 'node:module';
@@ -24,7 +26,7 @@ const element=id=>{
 element('gameCanvas').getContext=()=>canvas.getContext('2d');
 let tick=900;
 const math=Object.create(Math);let seed=7;math.random=()=>((seed=Math.imul(seed,1664525)+1013904223>>>0)/4294967296);
-const sandbox={...streetNetwork,...ocean,...surfaces,...incidents,Math:math,console,performance:{now:()=>tick*1000/60},document:{readyState:'loading',getElementById:element,createElement:()=>element(Symbol()),querySelectorAll:()=>[],addEventListener:noop},window:{innerWidth:1440,innerHeight:960,addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,...core,...contacts,...coast,...roaming,...architecture,...traffic};
+const sandbox={...authoredWorld,LEGACY_RUNWAYS,...streetNetwork,...ocean,...surfaces,...incidents,Math:math,console,performance:{now:()=>tick*1000/60},document:{readyState:'loading',getElementById:element,createElement:()=>element(Symbol()),querySelectorAll:()=>[],addEventListener:noop},window:{innerWidth:1440,innerHeight:960,addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,...core,...contacts,...coast,...roaming,...architecture,...traffic};
 vm.createContext(sandbox);
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
 vm.runInContext(source+'\ninitTopology();roam=createFreeRoam(player,parkedCars,buildings,trees,isPositionOnSolidGround,()=>{},solidProps,isPositionOnWaterObstacle);',sandbox);
