@@ -1856,7 +1856,10 @@ function updatePhysics(dt) {
     c.collisionHold=Math.max(0,(c.collisionHold||0)-dt);
     const emergencyYield=[...policeCars,...incidentPoliceCars,...incidentResponseVehicles]
       .some(unit=>unit.status==='enroute'&&Math.hypot(unit.x-c.x,unit.y-c.y)<200&&
-        Math.abs((c.x-unit.x)*-Math.sin(unit.angle)+(c.y-unit.y)*Math.cos(unit.angle))<60);
+        Math.abs((c.x-unit.x)*-Math.sin(unit.angle)+(c.y-unit.y)*Math.cos(unit.angle))<60&&
+        // A same-direction car ahead must clear the route, not brake across it.
+        ((c.x-unit.x)*Math.cos(unit.angle)+(c.y-unit.y)*Math.sin(unit.angle)<=0||
+          Math.cos(c.angle-unit.angle)<.5));
     const obstacle = occupied || approachingRed || emergencyYield || c.collisionHold>0;
     if(c.routeManaged){
       const pose={x:c.x,y:c.y,angle:c.angle};

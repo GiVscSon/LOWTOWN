@@ -51,6 +51,16 @@ assert.equal(run('state.cash'),650);
 assert.equal(run('state.deathFlash'),0,'detention must not display a death');
 assert.equal(run('state.detainProgress'),0);
 
+// Cars in front of a responding unit must not freeze its approach.
+const yielding=runtimeCity(37);
+yielding.run(`trafficCars.splice(1);parkedCars.length=0;pedestrians.length=0;
+  Object.assign(player,{x:1000,y:1000,speed:0});
+  Object.assign(trafficCars[0],{x:1460,y:1200,angle:0,speed:3,cruiseSpeed:3,routeManaged:false,turn:null,collisionHold:0});
+  incidentResponseVehicles.push({x:1360,y:1200,angle:0,width:48,height:24,speed:0,status:'enroute'});
+  updateIncidentResponse=()=>{};cityIncidentDirector={update:()=>null};`);
+for(let i=0;i<120;i++){yielding.tick(1/60);yielding.run('updatePhysics(1/60)');}
+assert(yielding.run('trafficCars[0].x')>1600,'car ahead of an emergency unit must clear its path instead of creating a permanent queue');
+
 // A beach is walkable ground and must also stop a vessel's entire hull.
 const shore=runtimeCity(37);
 shore.run(`roam=createFreeRoam(player,parkedCars,buildings,trees,isPositionOnSolidGround,()=>{},solidProps,isPositionOnWaterObstacle,()=>policeCars);
