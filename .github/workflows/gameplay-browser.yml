@@ -22,6 +22,10 @@ jobs:
       - run: npm run build
       - name: Human controls
         run: node tests/human-controls-regression.mjs
+      - name: Air medical response
+        run: npm run test:air-medical
+      - name: Street signals and resident behavior
+        run: npm run test:living-world
       - name: Live traffic
         run: node tests/live-traffic-regression.mjs
       - name: Pedestrian motion

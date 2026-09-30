@@ -221,6 +221,10 @@ export function drawTransport(ctx,car,time=0,altitude=0) {
     }else{
       extrude([[27,0],[12,-13],[-10,-14],[-24,-6],[-46,-4],[-51,0],[-46,4],[-24,6],[-10,14],[12,13]],car.color||'#7d8868','#303833',1.2);
       poly([[21+zx*1.45,-8+zy*1.45],[8+zx*1.45,-10+zy*1.45],[8+zx*1.45,10+zy*1.45],[21+zx*1.45,8+zy*1.45]],'rgba(75,119,132,.8)',true);
+      if(car.medical){
+        ctx.fillStyle='#c64b40';ctx.fillRect(-17+zx,-2+zy,14,4);ctx.fillRect(-12+zx,-7+zy,4,14);
+        ctx.fillStyle=Math.sin(time*12)>0?'#5ec5ed':'#f17b66';ctx.fillRect(-27+zx,-5+zy,4,4);
+      }
       ctx.strokeStyle='#303536';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-8+zx,-17+zy);ctx.lineTo(-15+zx,-23+zy);ctx.moveTo(9+zx,17+zy);ctx.lineTo(16+zx,23+zy);ctx.stroke();
       ctx.strokeStyle='#a5a79a';ctx.lineWidth=2.5;for(const side of [-1,1]){ctx.beginPath();ctx.moveTo(-20,side*20);ctx.lineTo(20,side*20);ctx.lineTo(25,side*17);ctx.stroke();}
       ctx.strokeStyle='#151e20';ctx.lineWidth=1.7;ctx.beginPath();ctx.moveTo(14+zx*1.45,-9+zy*1.45);ctx.lineTo(14+zx*1.45,9+zy*1.45);ctx.stroke();

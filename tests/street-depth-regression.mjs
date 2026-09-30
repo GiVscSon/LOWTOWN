@@ -5,7 +5,8 @@ import { projectIso } from '../src/game/test_drive_core.js';
 import { coastPoints, pointInBeach, BEACH_WIDTH } from '../src/game/coastline.js';
 const noop=()=>{};
 const order=[];
-const context={save:noop,restore:noop,translate:noop,transform:noop};
+const context={save:noop,restore:noop,translate:noop,transform:noop,
+  beginPath:noop,moveTo:noop,lineTo:noop,stroke:noop};
 const element={style:{},classList:{add:noop,remove:noop},addEventListener:noop,getContext:()=>context};
 const sandbox={Math,projectIso,coastPoints,pointInBeach,BEACH_WIDTH,performance:{now:()=>0},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop};
 vm.createContext(sandbox);
