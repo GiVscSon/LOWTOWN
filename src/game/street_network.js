@@ -276,3 +276,4 @@ export function drawRoadTerminals(ctx,terminals){
     ctx.stroke();
   }
 }
+export { streetSurfaceGeometry } from './street_surface.js';
