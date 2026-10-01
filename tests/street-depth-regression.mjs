@@ -1,3 +1,4 @@
+import { createWeather } from '../src/game/surface_physics.js';
 import * as authoredWorld from '../src/game/authored_archipelago.js';
 import { PLANE_RUNWAYS as LEGACY_RUNWAYS } from '../src/game/free_roam.js';
 import assert from 'node:assert/strict';
@@ -10,7 +11,7 @@ const order=[];
 const context={save:noop,restore:noop,translate:noop,transform:noop,
   beginPath:noop,moveTo:noop,lineTo:noop,stroke:noop};
 const element={style:{},classList:{add:noop,remove:noop},addEventListener:noop,getContext:()=>context};
-const sandbox={...authoredWorld,LEGACY_RUNWAYS,Math,projectIso,coastPoints,pointInBeach,BEACH_WIDTH,performance:{now:()=>0},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop};
+const sandbox={...authoredWorld,LEGACY_RUNWAYS,createWeather,Math,projectIso,coastPoints,pointInBeach,BEACH_WIDTH,performance:{now:()=>0},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop};
 vm.createContext(sandbox);
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
 sandbox.order=order;

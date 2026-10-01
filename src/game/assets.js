@@ -1,8 +1,9 @@
+import { SVG_TRANSPORT_TYPES, transportSVGUri } from './transport_svg.js';
 const svg=(body,w=96,h=48)=>`data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${body}</svg>`)}`;
 const shadow='<ellipse cx="48" cy="38" rx="40" ry="7" fill="#000" opacity=".55"/>';
 const glass='<path d="M27 14h31l12 10H19z" fill="#11161b" stroke="#697078" stroke-width="1"/><path d="M30 16h13v6H25zM46 16h10l8 6H46z" fill="#69737a" opacity=".65"/>';
 const wheels='<circle cx="25" cy="35" r="6" fill="#0a0b0d"/><circle cx="71" cy="35" r="6" fill="#0a0b0d"/><circle cx="25" cy="35" r="2" fill="#72777b"/><circle cx="71" cy="35" r="2" fill="#72777b"/>';
-export const VEHICLE_ASSETS={
+export const LEGACY_VEHICLE_ASSETS={
  sedan:svg(`${shadow}<path d="M9 29l9-9 9-11h39l15 11 6 9-4 7H13z" fill="#51575c" stroke="#171a1e" stroke-width="2"/>${glass}${wheels}<path d="M13 28h70" stroke="#8b9094" opacity=".35"/><rect x="14" y="27" width="6" height="4" rx="1" fill="#d4523a"/><rect x="76" y="27" width="6" height="4" rx="1" fill="#d4523a"/>`),
  coupe:svg(`${shadow}<path d="M8 30l14-12 20-6h19l25 11 3 8-6 5H14z" fill="#3f454a" stroke="#111418" stroke-width="2"/>${glass}${wheels}<path d="M22 27h53" stroke="#8f959a" opacity=".3"/><rect x="13" y="28" width="7" height="4" fill="#d4523a"/><rect x="77" y="28" width="7" height="4" fill="#d4523a"/>`),
  taxi:svg(`${shadow}<path d="M9 29l10-9 10-11h34l14 11 8 9-4 7H13z" fill="#e8b84a" stroke="#17181a" stroke-width="2"/>${glass}${wheels}<rect x="41" y="6" width="15" height="6" rx="1" fill="#e8b84a" stroke="#17181a"/><path d="M15 25h67" stroke="#9a7b31" opacity=".55"/><rect x="77" y="28" width="7" height="4" fill="#d4523a"/>`),
@@ -18,3 +19,5 @@ export const PED_ASSETS={
  civilian:svg('<ellipse cx="48" cy="43" rx="11" ry="3" fill="#000" opacity=".45"/><circle cx="48" cy="12" r="6" fill="#b98f72"/><path d="M40 20h16l5 16H35z" fill="#596068" stroke="#202327"/><path d="M42 35l-5 8M54 35l5 8" stroke="#202327" stroke-width="4" stroke-linecap="round"/>',64,48),
  runner:svg('<ellipse cx="48" cy="43" rx="11" ry="3" fill="#000" opacity=".45"/><circle cx="48" cy="12" r="6" fill="#b98f72"/><path d="M40 20h16l7 14H35z" fill="#d4523a"/><path d="M42 34l-9 8M54 34l10 3" stroke="#202327" stroke-width="4" stroke-linecap="round"/>',64,48)
 };
+
+export const VEHICLE_ASSETS=Object.fromEntries(SVG_TRANSPORT_TYPES.map(type=>[type,transportSVGUri(type)]));

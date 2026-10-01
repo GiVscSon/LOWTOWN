@@ -32,7 +32,7 @@ export function stepLandVehicle(car, keys, dt, profile={}, surface={}) {
       car.reverseDelay=0;
       speed=speed<0?Math.min(0,speed+.095*frame):Math.min(max,speed+engine*(1-.3*speed/max)*frame);
     }else if(keys.down){
-      if(speed>0){speed=Math.max(0,speed-.095*frame);car.reverseDelay=0;}
+      if(speed>0){speed=Math.max(0,speed-.095*(surface.braking??1)*frame);car.reverseDelay=0;}
       else{car.reverseDelay=(car.reverseDelay||0)+step;if(car.reverseDelay>=.35)speed=Math.max(-Math.min(1.8,max*.25),speed-engine*.65*frame);}
     }else car.reverseDelay=0;
     const drag=(.002+speed*speed*.000045)*(surface.coast ? (1-surface.coast)/.035:1)+(keys.handbrake?.07:0);

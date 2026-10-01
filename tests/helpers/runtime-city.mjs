@@ -1,3 +1,4 @@
+import { VEHICLE_ASSETS } from '../../src/game/assets.js';
 import * as authoredWorld from '../../src/game/authored_archipelago.js';
 import { PLANE_RUNWAYS as LEGACY_RUNWAYS } from '../../src/game/free_roam.js';
 import { readFileSync } from 'node:fs';
@@ -20,7 +21,7 @@ export function runtimeCity(seed = 19) {
   const noop = () => {};
   const element = () => ({ style: {}, classList: { add: noop, remove: noop }, append: noop,
     appendChild: noop, remove: noop, addEventListener: noop, getContext: () => ({}) });
-  const context = vm.createContext({ ...authoredWorld,LEGACY_RUNWAYS, Math: math, console, performance: { now: () => clock },
+  const context = vm.createContext({ ...authoredWorld,LEGACY_RUNWAYS,VEHICLE_ASSETS, Math: math, console, performance: { now: () => clock },
     document: { readyState: 'loading', getElementById: element, createElement: element,
       querySelectorAll: () => [], addEventListener: noop }, window: { addEventListener: noop },
     localStorage: { getItem: () => null, setItem: noop }, setTimeout: noop, setInterval: noop,
