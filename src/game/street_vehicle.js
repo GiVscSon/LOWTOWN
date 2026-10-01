@@ -2,6 +2,17 @@
 // vertically in world space, so windows and equipment stay attached in turns.
 const GLASS='#426877',TRIM='#303b40',CHROME='#abb6b4';
 const cache=new Map();
+// The canvas camera looks along the isometric diagonal.  Keep this test in
+// one place so the body, glass overlays and service equipment agree about
+// which surface is facing the player while a vehicle rotates.
+function projectedNormal(normal,angle=0){
+  const cs=Math.cos(angle),sn=Math.sin(angle),[nx,ny,nz]=normal;
+  return [nx*cs-ny*sn,nx*sn+ny*cs,nz];
+}
+function projectedVisibility(normal,angle=0){
+  const [rx,ry,nz]=projectedNormal(normal,angle);
+  return rx+ry+nz;
+}
 const normal=points=>{
   const a=points[0],b=points[1],c=points[2],u=b.map((n,i)=>n-a[i]),v=c.map((n,i)=>n-a[i]);
   return [u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];
@@ -137,16 +148,22 @@ export function createVehicleMesh(type='sedan',length=48,breadth=24,color='#e09a
 }
 export function projectedVehicleFaces(mesh,angle=0,lift=0,time=0,vehicle={}){
   const cs=Math.cos(angle),sn=Math.sin(angle),flash=Math.sin(time*12)>0;
-  return mesh.faces.flatMap(face=>{
-    const [nx,ny,nz]=face.normal,rx=nx*cs-ny*sn,ry=nx*sn+ny*cs;
+  return mesh.faces.flatMap((face,order)=>{
+    const [rx,ry,nz]=projectedNormal(face.normal,angle);
     if(rx+ry+nz<=.000001)return [];
     const norm=Math.hypot(rx,ry,nz),light=.74+.25*Math.max(0,(-rx*.3-ry*.4+nz*.86)/norm);
     let fill=face.fill;
     if(fill==='tail')fill=vehicle.braking||vehicle.brake?'#ff7860':'#ba4a3b';
     if(fill.startsWith('siren'))fill=fill==='sirenRed'?(flash?'#ff785d':'#a23734'):fill==='sirenBlue'?(flash?'#38567b':'#6cbafa'):(flash?'#9a6c2a':'#ffd582');
     const world=face.points.map(([x,y,z])=>[x*cs-y*sn,y*cs+x*sn,z]);
-    return [{points:world.map(([x,y,z])=>[x-z-lift,y-z-lift]),fill:shade(fill,light),trim:face.trim,depth:world.reduce((sum,[x,y,z])=>sum+x+y+z,0)/world.length}];
-  }).sort((a,b)=>a.depth-b.depth);
+    return [{points:world.map(([x,y,z])=>[x-z-lift,y-z-lift]),fill:shade(fill,light),trim:face.trim,depth:world.reduce((sum,[x,y,z])=>sum+x+y+z,0)/world.length,order}];
+  }).sort((a,b)=>{
+    const delta=a.depth-b.depth;
+    // At diagonal headings several equipment faces share a depth.  A stable
+    // tie-break prevents one-frame painter-order flicker as floating point
+    // rounding changes sign around a 45° turn.
+    return Math.abs(delta)>1e-7?delta:a.order-b.order;
+  });
 }
 export function drawStreetVehicle(ctx,car,time=0,lift=0){
   const type=car.type||car.model||'sedan',w=car.width||48,h=car.height||24,color=car.color||'#e09a3e';
@@ -159,8 +176,8 @@ export function drawStreetVehicle(ctx,car,time=0,lift=0){
   for(const face of faces){
     ctx.beginPath();face.points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();ctx.fillStyle=face.fill;ctx.fill();if(face.trim)ctx.stroke();
   }
-  const glassNormal=mesh.windshield?.normal,cs=Math.cos(car.angle||0),sn=Math.sin(car.angle||0);
-  const glassVisible=glassNormal&&glassNormal[0]*(cs+sn)+glassNormal[1]*(cs-sn)+glassNormal[2]>0;
+  const glassNormal=mesh.windshield?.normal;
+  const glassVisible=glassNormal&&projectedVisibility(glassNormal,car.angle||0)>.000001;
   if(glassVisible&&(car.rain>.15||(car.hp??100)<65)){
     const glass=mesh.windshield.points,cs=Math.cos(car.angle||0),sn=Math.sin(car.angle||0);
     const point=(u,v)=>{
