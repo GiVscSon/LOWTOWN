@@ -49,6 +49,8 @@ for(const type of types){
   for(let step=0;step<72;step++){
     const angle=step*Math.PI/36,faces=projectedVehicleFaces(mesh,angle,7,step/12);
     assert(faces.length>10&&faces.length<mesh.faces.length,'only camera-facing surfaces should draw');
+    const repeated=projectedVehicleFaces(mesh,angle,7,step/12);
+    assert.deepEqual(faces.map(face=>face.order),repeated.map(face=>face.order),'turn render order must be deterministic at diagonal headings');
     for(const face of faces){assert(Number.isFinite(face.depth));for(const point of face.points)assert(point.every(Number.isFinite));}
     const raised=projectedVehicleFaces(mesh,angle,8,step/12);
     assert.equal(raised.length,faces.length);
