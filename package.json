@@ -44,7 +44,9 @@
     "test:city-incidents": "node tests/city-incidents-smoke.mjs",
     "test:pages-smoke": "node tests/pages-smoke.mjs",
     "test:mobile-streets-custody": "node tests/mobile-streets-custody-regression.mjs",
-    "test:authored-world": "node tests/authored-archipelago-regression.mjs"
+    "test:authored-world": "node tests/authored-archipelago-regression.mjs",
+    "test:vehicle-momentum": "node tests/vehicle-momentum-regression.mjs",
+    "test:world-driving-weather": "node tests/world-driving-weather-regression.mjs"
   },
   "dependencies": {
     "@sentry/browser": "^10.25.0",

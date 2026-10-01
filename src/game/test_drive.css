@@ -30,3 +30,6 @@
 
 #custodyOverlay{position:fixed;inset:0;z-index:1000;align-items:center;justify-content:center;flex-direction:column;white-space:pre-line;text-align:center;line-height:2;padding:24px;color:#ecd7a8;background:#10161bf5;font:600 18px/2 monospace;touch-action:none;}
 .btn-drive{touch-action:none;}
+
+.garage-vehicle{display:flex;align-items:center;gap:12px;padding:10px;background:#13191b;border:1px solid #364144;}
+.garage-vehicle img{object-fit:contain;max-width:45%;} .garage-vehicle strong{color:#e7be70;} .garage-vehicle p{font-size:11px;color:#aebabc;margin:5px 0;}

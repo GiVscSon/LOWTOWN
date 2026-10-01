@@ -108,3 +108,32 @@ export function sampleVehicleSurface(x,y,angle,width,height,world={}){
   }
   return [...counts].sort((a,b)=>b[1]-a[1])[0]?.[0]||SURFACE_TYPES.WATER;
 }
+
+export const WEATHER_PRESETS=Object.freeze({
+  clear:{label:'Ясно',rain:0,fog:0,wind:.16},
+  haze:{label:'Дымка',rain:0,fog:.25,wind:.28},
+  rain:{label:'Дождь',rain:.65,fog:.18,wind:.5},
+  storm:{label:'Гроза',rain:1,fog:.3,wind:1},
+  fog:{label:'Туман',rain:.08,fog:.7,wind:.12}
+});
+export function createWeather(){
+  const weather={kind:'clear',time:0,remaining:150,rain:0,fog:0,wind:.16,wetness:0,gust:0,flash:0};
+  weather.set=kind=>{if(!WEATHER_PRESETS[kind])throw new Error('Unknown weather');weather.kind=kind;weather.remaining=150;};
+  weather.next=()=>{const kinds=Object.keys(WEATHER_PRESETS);weather.set(kinds[(kinds.indexOf(weather.kind)+1)%kinds.length]);};
+  weather.step=dt=>{
+    dt=clamp(finite(dt),0,.1);weather.time+=dt;weather.remaining-=dt;if(weather.remaining<=0)weather.next();
+    const target=WEATHER_PRESETS[weather.kind],mix=1-Math.exp(-dt*.45);
+    for(const key of ['rain','fog','wind'])weather[key]+=(target[key]-weather[key])*mix;
+    weather.wetness+=(weather.rain-weather.wetness)*(1-Math.exp(-dt*(weather.rain>weather.wetness?.16:.025)));
+    weather.gust=weather.wind*(.65+.25*Math.sin(weather.time*.73)+.1*Math.sin(weather.time*2.1));
+    const lightning=weather.kind==='storm'&&Math.sin(weather.time*.23)> .9997;
+    weather.flash=lightning?Math.max(weather.flash,.28):Math.max(0,weather.flash-dt*1.4);
+    return weather;
+  };
+  return weather;
+}
+export function weatherMovement(response,weather){
+  const wet=clamp(weather.wetness||0,0,1);
+  return {...response,slipRetention:Math.min(.72,response.slipRetention+wet*.13),braking:1-wet*.23,
+    acceleration:response.acceleration*(1-wet*.04)};
+}

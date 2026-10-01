@@ -78,7 +78,7 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
       }
       if(!exit)return notify('Нет безопасного выхода: подъедьте к берегу или свободному месту');
       fleet.push({...VEHICLES[mode],type:mode,x:player.x,y:player.y,angle:player.angle,color:player.bodyColor||VEHICLES[mode].color,hp:player.hp,speed:0});
-      Object.assign(player,exit,{entityType:'pedestrian',width:9,height:9,speed:0,vx:0,vy:0,walkPhase:0,gait:0}); mode='foot'; notify('Пешком · E — сесть в ближайший транспорт'); return;
+      Object.assign(player,exit,{entityType:'pedestrian',width:9,height:9,speed:0,vx:0,vy:0,contactVx:0,contactVy:0,walkPhase:0,gait:0}); mode='foot'; notify('Пешком · E — сесть в ближайший транспорт'); return;
     }
     const candidates=[...fleet,...parked].filter(c=>Math.hypot(c.x-player.x,c.y-player.y)<115&&doorwayClear(player,c,c.kind==='water')).sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)-Math.hypot(b.x-player.x,b.y-player.y));
     const car=candidates[0]; if(!car)return notify('Подойдите к припаркованному транспорту');
@@ -107,12 +107,12 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
   function resetToSedan(x=player.x,y=player.y,angle=0){
     mode='sedan';altitude=0;fly=false;landingWarned=false;
     const profile=VEHICLES.sedan;
-    Object.assign(player,{entityType:'vehicle',x,y,angle,width:profile.width,height:profile.height,mass:profile.mass||1500,bodyColor:profile.color,speed:0,vx:0,vy:0,rpm:0,gear:'D1',steeringAngle:0,reverseDelay:0});
+    Object.assign(player,{entityType:'vehicle',x,y,angle,width:profile.width,height:profile.height,mass:profile.mass||1500,bodyColor:profile.color,speed:0,vx:0,vy:0,contactVx:0,contactVy:0,stance:null,knockdownTimer:0,rpm:0,gear:'D1',steeringAngle:0,reverseDelay:0});
   }
   function resetToFoot(x=player.x,y=player.y,angle=0){
     mode='foot';altitude=0;fly=false;landingWarned=false;
     Object.assign(player,{entityType:'pedestrian',x,y,angle,width:9,height:9,mass:70,
-      speed:0,vx:0,vy:0,rpm:0,gear:'ПЕШКОМ',walkPhase:0,steeringAngle:0,reverseDelay:0});
+      speed:0,vx:0,vy:0,contactVx:0,contactVy:0,stance:null,knockdownTimer:0,rpm:0,gear:'ПЕШКОМ',walkPhase:0,steeringAngle:0,reverseDelay:0});
   }
   function step(keys,dt) {
     const profile=VEHICLES[mode]; if(profile?.kind==='land') return false;
@@ -172,7 +172,7 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
     // travel past every edge of the authored city without hitting an invisible wall.
     player.rpm=Math.abs(player.speed)/max;player.gear=profile.kind==='air'?`${Math.round(altitude)} м`:'ВОДА';return true;
   }
-  function contacts(){if(mode==='foot'||altitude>12)return;for(const car of fleet)if(VEHICLES[car.type].kind===VEHICLES[mode].kind)resolveContact(player,car,true);}
+  function contacts(){if(mode==='foot'||altitude>12)return;for(const car of fleet)if(VEHICLES[car.type].kind===VEHICLES[mode].kind)resolveContact(player,car);}
   return {fleet,interact,toggleFlight,resetToSedan,resetToFoot,canWalkAt:footClear,step,contacts,get mode(){return mode;},get altitude(){return altitude;},get special(){return mode==='foot'||VEHICLES[mode].kind!=='land';},get profile(){return VEHICLES[mode];}};
 }
 
