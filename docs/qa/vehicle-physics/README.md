@@ -10,7 +10,7 @@ Validation uses the live source/controller and production browser. The in-game A
 
 - `test:vehicle-momentum`: 30/60/120 Hz pushing, momentum by mass, truck nose versus small props, high-speed thin-wall contact, glancing slides, a three-car pile-up at a wall, player-on-foot contact, actual city pushing and pedestrian knockdown/recovery.
 - `test:world-driving-weather`: 117 non-service motor street/bridge segments, 234 drives in both directions, 468,761 world units, all 16 islands; no stuck/drowning runs. All 24 motor bridges are covered. This isolates transient traffic to measure static route geometry; populated traffic and responders are checked separately.
-- `test:movement-stability`: populated emergency arrivals, work and base returns, including captured junction deadlocks, with full-body safety checks.
+- `test:movement-stability`: populated emergency arrivals, work and base returns, including captured junction deadlocks, an ambulance ahead of a fire engine, and a returning police car yielding at the curb, with full-body safety checks.
 - Production browser with real keyboard input: parked sedan moved about 55 units; movable bin moved about 198 units; pedestrian knocked down; five weather states; walk about 339 units away from the precinct. No page errors. This is a deterministic local scene, rather than proof that arbitrary gameplay has no collisions.
 
 The two new acceptance scripts run in both Build and Sandbox Gameplay Gates. Existing controls, live traffic, custody, authored-world geometry and rendering checks remain enabled.

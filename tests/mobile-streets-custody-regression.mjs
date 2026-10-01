@@ -99,6 +99,18 @@ const convoy=JSON.parse(run(`{
   JSON.stringify({clearedForward,contacts,unsafe,engine:engine.x,ambulance:ambulance.x,returned:[!!engine.returnedToBase,!!ambulance.returnedToBase]});
 }`));
 assert(convoy.clearedForward&&convoy.contacts===0&&convoy.unsafe===0&&convoy.returned.every(Boolean),JSON.stringify(convoy));
+const curbYield=JSON.parse(run(`{
+trafficCars.length=0;parkedCars.length=0;pedestrians.length=0;incidentPoliceCars.length=0;incidentResponseVehicles.length=0;roam=undefined;Object.assign(player,{x:1200,y:5000,speed:0});
+const police={x:8998.148993593644,y:1596.6018577280065,angle:1.035275934511709,width:48,height:24,model:'police',maxSpeed:5.6,status:'returning',speed:0,responseTarget:{x:8975,y:1200},baseTarget:{x:8975,y:1200},emergencyMotionStall:2,rotationBlocked:true};
+const engine={x:8971.770268142885,y:1614.2663236914764,angle:1.0860070859292457,width:72,height:34,model:'fireEngine',maxSpeed:4.35,status:'enroute',speed:0,responseTarget:{x:8999,y:1720.3981818181817,parkingAxis:'v'},baseTarget:{x:9200,y:1200},emergencyMotionStall:2,rotationBlocked:true};
+police.cooperativeYield=engine;police.route=serviceRoadPath(police,police.responseTarget).slice(1);engine.route=[engine.responseTarget];incidentPoliceCars.push(police);incidentResponseVehicles.push(engine);
+let contacts=0,unsafe=0;for(let i=0;i<7200&&(incidentPoliceCars.length||incidentResponseVehicles.length);i++){
+updateIncidentPolice(1/60);updateIncidentResponse(1/60);
+if(incidentPoliceCars.includes(police)&&incidentResponseVehicles.includes(engine))contacts+=!!contact(chassis(police),chassis(engine));
+unsafe+=[...incidentPoliceCars,...incidentResponseVehicles].some(u=>!emergencyPassingGroundClear(u));
+}JSON.stringify({returned:[!!police.returnedToBase,!!engine.returnedToBase],contacts,unsafe});
+}`));
+assert(curbYield.returned.every(Boolean)&&curbYield.contacts===0&&curbYield.unsafe===0,JSON.stringify(curbYield));
 const driving=[];
 for(const fps of [30,60,120]){
   const c=runtimeCity(19);

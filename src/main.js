@@ -1758,9 +1758,12 @@ function yieldBetweenResponders(unit){
   // Keep the space open after reversing; immediately rejoining was restoring
   // the very same three-vehicle blockage on every planning cycle.
   if(Math.hypot(leader.x-unit.x,leader.y-unit.y)<115){
-    for(const distance of [64,48,32]){
+    for(const distance of [64,48,32,24,16,8]){
       const stage={x:unit.x-Math.cos(unit.angle)*distance,y:unit.y-Math.sin(unit.angle)*distance,reverse:true};
-      if(Math.hypot(stage.x-leader.x,stage.y-leader.y)<110)continue;
+      // A diagonal chassis may only have room for a short first retreat.
+      // Increase separation in verified steps rather than requiring the full
+      // waiting gap before allowing either vehicle to move.
+      if(Math.hypot(stage.x-leader.x,stage.y-leader.y)<Math.hypot(unit.x-leader.x,unit.y-leader.y)+4)continue;
       if(!emergencyPassingPathClear(unit,[stage],pose=>policeFootprintOnRoad(pose)&&emergencyPassingPoseClear(pose,unit),4))continue;
       unit.emergencyManeuver={points:[stage],trail:[{x:unit.x,y:unit.y,angle:unit.angle}],reason:'RESPONDER_YIELD'};
       unit.emergencyBlocked=false;unit.emergencyMotionStall=0;

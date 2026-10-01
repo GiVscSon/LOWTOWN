@@ -82,11 +82,14 @@ export function solveVehicleMotion(bodies,starts,dt,{buildings=[],trees=[],props
     states.push({body,start,end,endVelocity:velocity(body),person,parked,vx,vy,engineX:parked?0:(end.x-start.x)/frame,engineY:parked?0:(end.y-start.y)/frame,angle,radius});
   }
   steps=Math.min(256,steps);const slice=frame/steps,maxRadius=Math.max(0,...states.map(s=>s.radius));
-  const scenery=sceneryBodies(buildings,trees,props).map(p=>({...p,width:p.width||p.w||12,height:p.height||p.h||12,source:p}));
+  const scenery=sceneryBodies(buildings,trees,props).map(p=>{
+    const width=p.width||p.w||12,height=p.height||p.h||12;
+    return {...p,width,height,radius:Math.hypot(width,height)/2,source:p};
+  });
   for(const s of states){
     Object.assign(s.body,s.start);
     const travel=Math.hypot(s.vx,s.vy)*frame+s.radius+4;
-    s.scenery=scenery.filter(p=>Math.abs(p.x-s.start.x)<travel+Math.hypot(p.width,p.height)/2&&Math.abs(p.y-s.start.y)<travel+Math.hypot(p.width,p.height)/2);
+    s.scenery=scenery.filter(p=>Math.abs(p.x-s.start.x)<travel+p.radius&&Math.abs(p.y-s.start.y)<travel+p.radius);
   }
   const reported=new Map();
   function collide(a,b,fixed=false){
@@ -136,7 +139,7 @@ export function solveVehicleMotion(bodies,starts,dt,{buildings=[],trees=[],props
         const reach=Math.max(1,Math.ceil((a.radius+maxRadius)/cellSize));
         for(let x=cx-reach;x<=cx+reach;x++)for(let y=cy-reach;y<=cy+reach;y++)
           for(const j of cells.get(`${x},${y}`)||[])if(j>i)touched=collide(a,states[j])||touched;
-        for(const p of a.scenery){const b={body:p,person:false,vx:0,vy:0,radius:Math.hypot(p.width,p.height)/2};touched=collide(a,b,true)||touched;}
+        for(const p of a.scenery){const b={body:p,person:false,vx:0,vy:0,radius:p.radius};touched=collide(a,b,true)||touched;}
       }
       if(!touched)break;
     }
