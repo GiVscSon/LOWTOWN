@@ -1310,10 +1310,24 @@ function transitStopSigns(){
     const dx=next.x-point.x,dy=next.y-point.y,length=Math.hypot(dx,dy)||1;
     for(const side of [stopOrder%2?-1:1,stopOrder%2?1:-1]){
       const x=point.x-dy/length*72*side,y=point.y+dx/length*72*side;
-      if(!isPedestrianSceneryBlocked(x,y)&&!onRoadSurface(x,y,roads,bridges,scenicRoads,roadEnds))return [{x,y,line:route.id}];
+      // Stop-side selection must not depend on mutable streetProps. Shelters,
+      // kiosks and buses are placed after this pass; including them here made
+      // the chosen side flip during init and detached signs from shelters.
+      if(transitStopSideClear(x,y))return [{x,y,line:route.id,routeId:route.id,stopIndex:index,stopOrder}];
     }
     return [];
   }));
+}
+
+function transitStopSideClear(x,y){
+  if(!isPositionOnSolidGround(x,y)||onRoadSurface(x,y,roads,bridges,scenicRoads,roadEnds))return false;
+  if(buildings.some(b=>x>b.x-8&&x<b.x+b.w+8&&y>b.y-8&&y<b.y+b.h+8))return false;
+  if(trees.some(t=>Math.hypot(x-t.x,y-t.y)<14))return false;
+  if(parkObstacles.some(o=>Math.abs(x-o.x)<(o.width||o.w||12)*.5+10&&Math.abs(y-o.y)<(o.height||o.h||12)*.5+10))return false;
+  // Existing non-transit furniture is static input and can reject a side;
+  // shelters themselves are deliberately excluded because they are assigned
+  // after the stable sign side has been chosen.
+  return !streetProps.some(o=>o.type!=='shelter'&&Math.abs(x-o.x)<(o.width||o.w||12)*.5+8&&Math.abs(y-o.y)<(o.height||o.h||12)*.5+8);
 }
 
 function associateBusShelters(){
@@ -1323,8 +1337,18 @@ function associateBusShelters(){
     available.sort((a,b)=>Math.hypot(a.x-home.x,a.y-home.y)-Math.hypot(b.x-home.x,b.y-home.y));
     for(let i=0;i<available.length;i++){
       const stop=available[i];
-      Object.assign(shelter,{x:stop.x,y:stop.y});
+      const route=transitRoutes.find(r=>r.id===stop.routeId);
+      const point=route?.points[stop.stopIndex]||{x:stop.x,y:stop.y};
+      const normalLength=Math.hypot(stop.x-point.x,stop.y-point.y)||1;
+      // The sign marks the boarding edge. The shelter sits farther onto the
+      // pavement so its solid body cannot cover the boarding point or lane.
+      const outwardX=(stop.x-point.x)/normalLength,outwardY=(stop.y-point.y)/normalLength;
+      const shelterHome={x:stop.x+outwardX*64,y:stop.y+outwardY*64};
+      Object.assign(shelter,shelterHome);
       relocateStreetObstacles([shelter]);
+      // A relocation around a nearby facade may find a point too close to the
+      // boarding edge. Keep a guaranteed clear gap for the waiting pedestrian.
+      if(Math.hypot(shelter.x-stop.x,shelter.y-stop.y)<48)Object.assign(shelter,shelterHome);
       if(Math.hypot(shelter.x-stop.x,shelter.y-stop.y)>140)continue;
       shelter.busStop={...stop};available.splice(i,1);break;
     }
