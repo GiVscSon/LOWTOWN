@@ -458,7 +458,7 @@ function buildRoadPaintGeometry(){
   // builder exported by street_network.js.
   const surface=typeof streetSurfaceGeometry==='function'
     ?streetSurfaceGeometry(roads,bridges)
-    :{surfaces:[...roads,...bridges.filter(b=>!b.footway)],curbs:[],lanes:[]};
+    :{surfaces:[...roads,...bridges.filter(b=>!b.footway)],curbs:[],lanes:[],bridgePaths:[]};
   const crosswalkJunctions=junctions.filter(j=>
     j.horizontalRoads.some(r=>!r.serviceAccess&&!r.bridgeApproach)&&
     j.verticalRoads.some(r=>!r.serviceAccess&&!r.bridgeApproach));
@@ -2705,6 +2705,46 @@ function drawWetRoadSurface(r, index) {
   ctx.restore();
 }
 
+// Motor bridges are still axis-aligned rectangles for collision and routing,
+// but their visible deck follows a rounded centerline. This removes the hard
+// square elbows caused by the staggered island remap without weakening the
+// road-support checks used by vehicles and pedestrians.
+function traceSmoothBridgePath(target, points, radius=120) {
+  if(!Array.isArray(points)||points.length<2)return false;
+  const safe=points.filter(p=>Number.isFinite(p?.x)&&Number.isFinite(p?.y));
+  if(safe.length<2)return false;
+  target.beginPath();target.moveTo(safe[0].x,safe[0].y);
+  for(let i=1;i<safe.length-1;i++){
+    const prev=safe[i-1],point=safe[i],next=safe[i+1];
+    const inLength=Math.hypot(point.x-prev.x,point.y-prev.y)||1;
+    const outLength=Math.hypot(next.x-point.x,next.y-point.y)||1;
+    const trim=Math.min(radius,inLength*.34,outLength*.34);
+    const inPoint={x:point.x+(prev.x-point.x)*trim/inLength,y:point.y+(prev.y-point.y)*trim/inLength};
+    const outPoint={x:point.x+(next.x-point.x)*trim/outLength,y:point.y+(next.y-point.y)*trim/outLength};
+    target.lineTo(inPoint.x,inPoint.y);target.quadraticCurveTo(point.x,point.y,outPoint.x,outPoint.y);
+  }
+  const end=safe.at(-1);target.lineTo(end.x,end.y);return true;
+}
+
+function drawSmoothBridgeDeck(bridgePath,index=0){
+  if(!bridgePath?.path?.length)return;
+  const width=Math.max(bridgePath.width||ROAD_W,ROAD_W*.72);
+  const radius=Math.min(180,width*1.35);
+  ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
+  if(!traceSmoothBridgePath(ctx,bridgePath.path,radius)){ctx.restore();return;}
+  ctx.strokeStyle='rgba(100,113,113,.8)';ctx.lineWidth=width+8;ctx.stroke();
+  traceSmoothBridgePath(ctx,bridgePath.path,radius);
+  ctx.strokeStyle=PALETTE.asphalt;ctx.lineWidth=width;ctx.stroke();
+  traceSmoothBridgePath(ctx,bridgePath.path,radius);
+  ctx.setLineDash([16,20]);ctx.lineDashOffset=-(bridgePath.path[0]?.x||0);
+  ctx.strokeStyle=PALETTE.roadMarkingYellow;ctx.lineWidth=2.5;ctx.stroke();ctx.setLineDash([]);ctx.lineDashOffset=0;
+  if(weather.rain>.02){
+    traceSmoothBridgePath(ctx,bridgePath.path,radius*.9);
+    ctx.globalCompositeOperation='screen';ctx.strokeStyle=`rgba(177,193,184,${.035+weather.rain*.035})`;ctx.lineWidth=Math.max(2,width*.24);ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawWeather(w,h){
   const t=weather.time,wind=weather.gust;
   ctx.save();
@@ -3329,24 +3369,17 @@ function renderWorld() {
     }
   }ctx.stroke();
   ctx.fillStyle=PALETTE.asphalt;ctx.beginPath();
-  roadPaint.surfaces.forEach(r=>ctx.rect(r.x,r.y,r.w,r.h));ctx.fill();
-  roadPaint.surfaces.forEach(drawWetRoadSurface);
+  // Keep bridge rectangles in the logical surface set for collision checks,
+  // but paint their visible deck as one rounded path so elbows do not look
+  // like square slabs pasted over the water.
+  roadPaint.surfaces.filter(r=>!r.logicalId).forEach(r=>ctx.rect(r.x,r.y,r.w,r.h));ctx.fill();
+  roadPaint.surfaces.filter(r=>!r.logicalId).forEach(drawWetRoadSurface);
+  (roadPaint.bridgePaths||[]).forEach((bridgePath,index)=>drawSmoothBridgeDeck(bridgePath,index));
   ctx.strokeStyle=PALETTE.curb;ctx.lineWidth=2;ctx.beginPath();
-  for(const edge of roadPaint.curbs){ctx.moveTo(edge.x1,edge.y1);ctx.lineTo(edge.x2,edge.y2);}ctx.stroke();
+  for(const edge of roadPaint.curbs.filter(edge=>!edge.bridge)){ctx.moveTo(edge.x1,edge.y1);ctx.lineTo(edge.x2,edge.y2);}ctx.stroke();
   ctx.strokeStyle=PALETTE.roadMarkingYellow;ctx.lineWidth=2.5;ctx.setLineDash([16,20]);
-  for(const lane of roadPaint.lanes){ctx.lineDashOffset=-lane.phase;ctx.beginPath();ctx.moveTo(lane.x1,lane.y1);ctx.lineTo(lane.x2,lane.y2);ctx.stroke();}
+  for(const lane of roadPaint.lanes.filter(lane=>!lane.bridge)){ctx.lineDashOffset=-lane.phase;ctx.beginPath();ctx.moveTo(lane.x1,lane.y1);ctx.lineTo(lane.x2,lane.y2);ctx.stroke();}
   ctx.setLineDash([]);ctx.lineDashOffset=0;
-  ctx.strokeStyle=PALETTE.bridgeRail;ctx.lineWidth=4;ctx.beginPath();
-  for(const edge of roadPaint.curbs){
-    const horizontal=edge.y1===edge.y2;
-    for(const br of bridges.filter(b=>!b.footway&&b.dir===(horizontal?'h':'v'))){
-      const fixed=horizontal?edge.y1:edge.x1,lo=horizontal?br.y:br.x,span=horizontal?br.h:br.w;
-      if(Math.abs(fixed-lo)>.01&&Math.abs(fixed-lo-span)>.01)continue;
-      const a=Math.max(horizontal?edge.x1:edge.y1,horizontal?br.x:br.y),b=Math.min(horizontal?edge.x2:edge.y2,horizontal?br.x+br.w:br.y+br.h);
-      if(b<=a)continue;
-      if(horizontal){ctx.moveTo(a,fixed);ctx.lineTo(b,fixed);}else{ctx.moveTo(fixed,a);ctx.lineTo(fixed,b);}
-    }
-  }ctx.stroke();
   drawRoadTerminals(ctx,roadEnds);drawTransitStops();
   ctx.fillStyle='rgba(220,216,197,.48)';
   for(const j of roadPaint.crosswalkJunctions)junctionCrosswalkStripes({y:j.y,h:j.h},{x:j.x,w:j.w},j.approaches).forEach(s=>ctx.fillRect(s.x,s.y,s.w,s.h));
@@ -3792,8 +3825,17 @@ function renderFullMap() {
     fullMapCtx.stroke();
   });
 
-  bridges.forEach(br => {
-    fullMapCtx.fillStyle = '#38bdf8';
+  const mapPaint=roadPaintGeometry||(roadPaintGeometry=buildRoadPaintGeometry());
+  const smoothBridgeIds=new Set((mapPaint.bridgePaths||[]).map(path=>path.id));
+  fullMapCtx.save();fullMapCtx.lineCap='round';fullMapCtx.lineJoin='round';
+  for(const bridgePath of mapPaint.bridgePaths||[]){
+    const points=bridgePath.path.map(point=>({x:mapX+point.x*scale,y:mapY+point.y*scale}));
+    if(!traceSmoothBridgePath(fullMapCtx,points,Math.min(180,bridgePath.width*1.35)*scale))continue;
+    fullMapCtx.strokeStyle='#38bdf8';fullMapCtx.lineWidth=Math.max(3,bridgePath.width*scale);fullMapCtx.stroke();
+  }
+  fullMapCtx.restore();
+  bridges.filter(br=>br.footway||!smoothBridgeIds.has(br.logicalId||br.id)).forEach(br => {
+    fullMapCtx.fillStyle = br.footway ? '#78909c' : '#38bdf8';
     fullMapCtx.fillRect(mapX + br.x * scale, mapY + br.y * scale, br.w * scale, br.h * scale);
   });
 
