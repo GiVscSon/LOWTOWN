@@ -1740,6 +1740,21 @@ function yieldBetweenResponders(unit){
     unit.cooperativeYield=leader;
   }
   if(unit.emergencyManeuver)return false;
+  const next=unit.route?.[0];
+  const ahead=(unit.x-leader.x)*Math.cos(leader.angle)+(unit.y-leader.y)*Math.sin(leader.angle);
+  const wanted=next?Math.atan2(next.y-unit.y,next.x-unit.x):null;
+  // A responder already ahead on the same road clears forward. Reversing
+  // would approach its follower; holding would permanently block the convoy.
+  if(ahead>20&&wanted!==null&&Math.cos(wanted-leader.angle)>.9&&Math.cos(unit.angle-leader.angle)>.8){
+    const turn=Math.atan2(Math.sin(wanted-unit.angle),Math.cos(wanted-unit.angle));
+    if(Math.abs(turn)>.12)for(const distance of [64,48,32]){
+      const stage={x:unit.x+Math.cos(unit.angle)*distance,y:unit.y+Math.sin(unit.angle)*distance};
+      if(!emergencyPassingPathClear(unit,[stage],pose=>policeFootprintOnRoad(pose)&&emergencyPassingPoseClear(pose,unit),4))continue;
+      unit.emergencyManeuver={points:[stage],finalHeading:wanted,trail:[{x:unit.x,y:unit.y,angle:unit.angle}],reason:'CLEAR_TURN'};
+      unit.cooperativeYield=null;unit.emergencyBlocked=false;unit.emergencyMotionStall=0;return false;
+    }
+    if(Math.abs(turn)<=.12){unit.cooperativeYield=null;return false;}
+  }
   // Keep the space open after reversing; immediately rejoining was restoring
   // the very same three-vehicle blockage on every planning cycle.
   if(Math.hypot(leader.x-unit.x,leader.y-unit.y)<115){

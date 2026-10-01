@@ -82,6 +82,23 @@ const returningCorner=JSON.parse(run(`{
   JSON.stringify({returned:!!unit.returnedToBase,contacts,unsafe,x:unit.x,y:unit.y,angle:unit.angle,goal:unit.route?.[0]});
 }`));
 assert(returningCorner.returned&&returningCorner.contacts===0&&returningCorner.unsafe===0,JSON.stringify(returningCorner));
+const convoy=JSON.parse(run(`{
+  trafficCars.length=0;parkedCars.length=0;pedestrians.length=0;incidentPoliceCars.length=0;incidentResponseVehicles.length=0;
+  roam=undefined;Object.assign(player,{x:1200,y:5000,speed:0});
+  const engine={x:13061.9203,y:1199.9969,angle:3.1414715,width:72,height:34,mass:8400,model:'fireEngine',maxSpeed:4.35,status:'enroute',speed:0,
+    responseTarget:{x:12000,y:1200},baseTarget:{x:14046,y:1200},emergencyMotionStall:2};
+  const ambulance={x:13009.9236,y:1174.6699,angle:-3.5097772,width:54,height:27,mass:3300,model:'ambulance',maxSpeed:5.9,status:'enroute',speed:0,
+    responseTarget:{x:11800,y:1200},baseTarget:{x:14046,y:1200},emergencyMotionStall:2,cooperativeYield:engine};
+  engine.route=serviceRoadPath(engine,engine.responseTarget).slice(1);ambulance.route=serviceRoadPath(ambulance,ambulance.responseTarget).slice(1);
+  incidentResponseVehicles.push(engine,ambulance);let contacts=0,unsafe=0,clearedForward=false;
+  for(let i=0;i<2400&&(!engine.returnedToBase||!ambulance.returnedToBase);i++){
+    updateIncidentResponse(1/60);clearedForward ||= ambulance.emergencyManeuver?.reason==='CLEAR_TURN'&&ambulance.emergencyManeuver.points[0].x<ambulance.x;
+    if(incidentResponseVehicles.includes(engine)&&incidentResponseVehicles.includes(ambulance))contacts+=!!contact(chassis(engine),chassis(ambulance));
+    unsafe+=incidentResponseVehicles.some(u=>!emergencyPassingGroundClear(u));
+  }
+  JSON.stringify({clearedForward,contacts,unsafe,engine:engine.x,ambulance:ambulance.x,returned:[!!engine.returnedToBase,!!ambulance.returnedToBase]});
+}`));
+assert(convoy.clearedForward&&convoy.contacts===0&&convoy.unsafe===0&&convoy.returned.every(Boolean),JSON.stringify(convoy));
 const driving=[];
 for(const fps of [30,60,120]){
   const c=runtimeCity(19);
