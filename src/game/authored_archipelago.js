@@ -196,13 +196,19 @@ export function remapBridges(legacy){
     if(Math.abs(a[cross]-b[cross])<.01)return [{...bridge,
       x:horizontal?a.x:a.x-bridge.w/2,y:horizontal?a.y-bridge.h/2:a.y,
       w:horizontal?b.x-a.x:bridge.w,h:horizontal?bridge.h:b.y-a.y,
-      logicalId:bridge.id,landfallStart:true,landfallEnd:true}];
+      logicalId:bridge.id,bridgePath:[{x:a.x,y:a.y},{x:b.x,y:b.y}],bridgePathIndex:0,
+      landfallStart:true,landfallEnd:true}];
     const mid=(a[axis]+b[axis])/2,width=horizontal?bridge.h:bridge.w;
+    // Keep the orthogonal rectangles for collision/navmesh compatibility, but
+    // also retain their shared centerline. The renderer can turn the hard
+    // square elbow into a continuous, rounded causeway without changing the
+    // authoritative road graph used by traffic and pedestrians.
     const points=[a,{...a,[axis]:mid},{...b,[axis]:mid},b];
     return points.slice(1).map((end,index)=>{
       const start=points[index],h=Math.abs(end.y-start.y)<.01;
       // Overlapping corner decks keep the complete vehicle footprint supported.
       return {...bridge,id:`${bridge.id}-${index}`,logicalId:bridge.id,dir:h?'h':'v',
+        bridgePath:points.map(point=>({x:point.x,y:point.y})),bridgePathIndex:index,
         x:Math.min(start.x,end.x)-(!h||index>0?width/2:0),
         y:Math.min(start.y,end.y)-(!h?index>0?width/2:0:width/2),
         w:h?Math.abs(end.x-start.x)+(index>0?width/2:0)+(index<2?width/2:0):width,
