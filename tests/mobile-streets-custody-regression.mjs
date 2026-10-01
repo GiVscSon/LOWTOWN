@@ -131,6 +131,17 @@ const roadRecovery=JSON.parse(run(`{
  JSON.stringify({started,unsafe,returned:!!unit.returnedToBase});
 }`));
 assert(roadRecovery.started&&roadRecovery.unsafe===0&&roadRecovery.returned,JSON.stringify(roadRecovery));
+const shoulderYield=JSON.parse(run(`{
+trafficCars.length=0;parkedCars.length=0;pedestrians.length=0;incidentPoliceCars.length=0;incidentResponseVehicles.length=0;roam=undefined;Object.assign(player,{x:1200,y:5000,speed:0});
+const unit={x:8815.449758083221,y:1200.8959252346153,angle:-3.110019146852433,width:48,height:24,model:'police',maxSpeed:5.6,status:'returning',speed:0,responseTarget:{x:8600,y:1200},baseTarget:{x:8600,y:1200}};
+const black={x:8844.277063355483,y:1147,angle:-Math.PI,width:46,height:22,type:'black',routeManaged:true,yieldHome:{cross:'y',value:1170,side:-1}};
+const truck={x:8923.578671187559,y:1172.62523796628,angle:-3.140062865962657,width:60,height:26,type:'truck',routeManaged:true,yieldHome:{cross:'y',value:1170,side:-1}};
+const bus={x:8808.736134035427,y:1173.1442590698446,angle:0,width:82,height:30,type:'bus',routeManaged:true,yieldHome:{cross:'y',value:1200,side:-1}};
+trafficCars.push(black,truck,bus);incidentPoliceCars.push(unit);unit.route=serviceRoadPath(unit,unit.responseTarget).slice(1);let contacts=0,unsafe=0,moved=false;
+for(let i=0;i<2400&&incidentPoliceCars.length;i++){for(const c of trafficCars)yieldTrafficToServices(c,1/60);moved ||= Math.abs(bus.x-8808.736134035427)>8;updateIncidentPolice(1/60);unsafe+=!serviceFootprintSupported(unit);contacts+=trafficCars.some(c=>!!contact(chassis(c),chassis(unit)));}
+JSON.stringify({returned:!!unit.returnedToBase,moved,contacts,unsafe});
+}`));
+assert(shoulderYield.returned&&shoulderYield.moved&&shoulderYield.contacts===0&&shoulderYield.unsafe===0,JSON.stringify(shoulderYield));
 const driving=[];
 for(const fps of [30,60,120]){
   const c=runtimeCity(19);

@@ -2354,6 +2354,16 @@ function yieldTrafficToServices(car,dt){
   const delta=Math.max(-.35*dt*60,Math.min(.35*dt*60,target-car[cross]));
   const pose={...car,[cross]:car[cross]+delta};
   if(policeFootprintOnRoad(pose)&&emergencyPassingPoseClear(pose,car))car[cross]=pose[cross];
+  else if(approaching&&Math.abs(delta)>.01){
+    // Another car may already occupy the shoulder. Clear its length on the
+    // verified lane before continuing to pull over, rather than holding both
+    // the adjacent responder and the yielding convoy indefinitely.
+    for(const sign of [1,-1]){
+      const step=sign*.8*dt*60,next={...car,x:car.x+cs*step,y:car.y+sn*step};
+      if(!policeFootprintOnRoad(next)||!emergencyPassingPoseClear(next,car))continue;
+      car.x=next.x;car.y=next.y;break;
+    }
+  }
   if(!approaching&&Math.abs(car[cross]-target)<.5){car.yieldHome=null;return false;}
   return true;
 }
