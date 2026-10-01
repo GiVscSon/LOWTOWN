@@ -76,7 +76,7 @@ export function classifySurface(x,y,world={}){
   const bridges=world.bridges||[],roads=world.roads||[],scenic=world.scenicRoads||[];
   if(bridges.some(r=>inside(x,y,r)))return SURFACE_TYPES.BRIDGE;
   if(roads.some(r=>inside(x,y,r)))return SURFACE_TYPES.ROAD;
-  if(scenic.some(r=>nearPath(x,y,r)))return SURFACE_TYPES.GRAVEL;
+  if(scenic.some(r=>!r.footway&&nearPath(x,y,r)))return SURFACE_TYPES.GRAVEL;
   if(roads.some(r=>inside(x,y,r,12)))return SURFACE_TYPES.CURB;
   if((world.piers||[]).some(r=>inside(x,y,r)))return SURFACE_TYPES.TIMBER;
   if(world.beachAt?.(x,y))return SURFACE_TYPES.SAND;

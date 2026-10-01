@@ -20,6 +20,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - name: Mobile driving, road clearance and police station release
+        run: npm run test:mobile-streets-custody
       - name: Human controls
         run: node tests/human-controls-regression.mjs
       - name: Air medical response

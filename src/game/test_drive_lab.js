@@ -1,10 +1,11 @@
+import {worldPoint} from './authored_archipelago.js';
 const route = [
   {x:1265,y:1200},{x:2065,y:1200},{x:2065,y:515},{x:1265,y:515},
   {x:1265,y:4135},{x:2065,y:4135},{x:2065,y:5015},{x:1265,y:5015},{x:1265,y:1200}
-];
+].map(worldPoint);
 const routeLegs = route.length - 1;
 
-export function createDriveLab({player,state,canvas,buildings,trafficCars,policeCars,routeInput,roam}) {
+export function createDriveLab({player,state,canvas,buildings,trafficCars,policeCars,routeInput,roam,responseActors=[]}) {
   const panel = document.createElement('section');
   panel.id = 'driveLab';
   panel.innerHTML = `<div class="lab-heading"><h1>LOWTOWN</h1><button id="labToggle" class="secondary" aria-label="Свернуть панель">−</button></div><small>PRIVATE TEST DRIVE · 1994</small>
@@ -19,7 +20,8 @@ export function createDriveLab({player,state,canvas,buildings,trafficCars,police
   const sampleCtx=sampleCanvas.getContext('2d',{willReadFrequently:true});
   const clear=()=>Object.keys(state.keys).forEach(k=>state.keys[k]=false);
   function reset() {
-    Object.assign(player,{x:1265,y:1200,angle:0,vx:0,vy:0,speed:0,hp:100});
+    roam?.resetToSedan(route[0].x,route[0].y,0);
+    Object.assign(player,{...route[0],angle:0,vx:0,vy:0,speed:0,hp:100,steeringAngle:0,reverseDelay:0});
     Object.assign(state,{isDrowning:false,drownProgress:0,wanted:0,invulnTimer:180,isMapOpen:false,isGarageOpen:false});
     for(const id of ['mapModal','garageModal']) document.getElementById(id).style.display='none';
     clear();
@@ -31,7 +33,7 @@ export function createDriveLab({player,state,canvas,buildings,trafficCars,police
   });
   function stop(label) {
     running=false; clear(); player.speed=player.vx=player.vy=0;
-    if(saved) {trafficCars.push(...saved.traffic); policeCars.push(...saved.police); if(roam?.fleet)roam.fleet.push(...saved.fleet); saved=null;}
+    if(saved) {trafficCars.push(...saved.traffic); policeCars.push(...saved.police); if(roam?.fleet)roam.fleet.push(...saved.fleet); saved.responses.forEach((units,index)=>responseActors[index].push(...units)); saved=null;}
     panel.querySelector('#labRun').textContent='Автотест';
     status.textContent=label;
     panel.dataset.result=issues.size ? 'fail' : (label.startsWith('Пройден') ? 'pass' : 'stopped');
@@ -43,7 +45,7 @@ export function createDriveLab({player,state,canvas,buildings,trafficCars,police
   function start() {
     if(running) {stop('Остановлен');return;}
     reset(); steps=frames=0;waypoint=1;maxSlip=distance=turns=0;issues=new Set();lastAngle=0;
-    saved={traffic:trafficCars.splice(0),police:policeCars.splice(0),fleet:roam?.fleet?.splice(0)||[]};
+    saved={traffic:trafficCars.splice(0),police:policeCars.splice(0),fleet:roam?.fleet?.splice(0)||[],responses:responseActors.map(units=>units.splice(0))};
     running=true;panel.dataset.result='running';panel.dataset.collapsed='false';status.textContent='Автотест: едем по маршруту';
     panel.querySelector('#labRun').textContent='Стоп';updateUi();
   }
@@ -82,7 +84,7 @@ export function createDriveLab({player,state,canvas,buildings,trafficCars,police
       }
       if(Math.abs(player.angle-lastAngle)>1.2){turns++;lastAngle=player.angle;}
       const da=player.angle-prev.angle;
-      if((state.keys.left&&da>0.001)||(state.keys.right&&da< -0.001))issues.add('Перепутан знак поворота');
+      if(player.speed>.12&&((player.steeringAngle<0&&da>0.001)||(player.steeringAngle>0&&da< -0.001)))issues.add('Перепутан знак поворота');
       if(moved>15)issues.add('Скачок положения');
       if(state.isDrowning)issues.add('Маршрут вышел в воду');
       if(buildings.some(b=>player.x>b.x-15&&player.x<b.x+b.w+15&&player.y>b.y-15&&player.y<b.y+b.h+15))issues.add('Маршрут задел здание');

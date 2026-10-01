@@ -20,6 +20,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - name: Mobile driving, road clearance and police station release
+        run: npm run test:mobile-streets-custody
       - name: Install Chromium for Pages smoke test
         run: npx playwright install --with-deps chromium
       - name: Run production Pages smoke test

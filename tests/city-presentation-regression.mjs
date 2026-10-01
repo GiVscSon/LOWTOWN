@@ -74,7 +74,8 @@ for(const mode of ['foot','tug','helicopter']){
     for(let i=0;i<61;i++){c.tick(1/60);c.run('updatePhysics(1/60)');}
     assert.equal(c.run('state.wanted'),0);
     assert.equal(c.run('state.cash'),650);
-    assert.equal(c.run('roam.mode'),'sedan');
+    assert.equal(c.run('roam.mode'),'foot');
+    assert(c.run("state.custodyStation&& !onRoadSurface(player.x,player.y,roads,bridges,scenicRoads,roadEnds)"),'detained pedestrian must be released at the station entrance');
   }else if(mode==='helicopter')assert.equal(c.run('state.detainProgress'),0,'aircraft at height must not be arrested from ground projection');
 }
 console.log('PASS: shared intersection paint, T approaches, wall depth, police containment, timed detention and pursuit on foot/water/air');
