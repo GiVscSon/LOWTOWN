@@ -255,7 +255,7 @@ const districtProfiles={
   campus:{types:['office','deco','townhouse','shop'],land:'#26372c',roof:'#3e4b40',trees:26,population:10},
   marina:{types:['townhouse','shop','deco','warehouse'],land:'#29332d',roof:'#424b40',trees:18,population:10}
 };
-function districtAt(x,y){return (constructingLegacyScene?legacyIslands:islands).find(i=>x>=i.x&&x<=i.x+i.w&&y>=i.y&&y<=i.y+i.h);}
+function districtAt(x,y){return constructingLegacyScene?legacyIslands.find(i=>x>=i.x&&x<=i.x+i.w&&y>=i.y&&y<=i.y+i.h):islands.find(i=>pointInCoast(x,y,i));}
 
 const legacyIslets=[
   {id:'reed-bank',x:600,y:2770,w:290,h:165},
@@ -2616,7 +2616,7 @@ function updatePhysics(dt) {
 
   const distEl = document.getElementById('hudDistrict');
   if (distEl) {
-    const district = islands.find(isl => player.x >= isl.x && player.x <= isl.x + isl.w && player.y >= isl.y && player.y <= isl.y + isl.h);
+    const district = districtAt(player.x,player.y)||islets.find(i=>pointInCoast(player.x,player.y,i));
     distEl.innerText = (district?.name || 'LOWTOWN CAUSEWAY').toUpperCase();
   }
 }
