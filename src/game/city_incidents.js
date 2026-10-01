@@ -23,7 +23,7 @@ function createSceneActors(kind,x,y){
   return [];
 }
 
-export function createCityIncidentDirector({ nodes = [], random = Math.random, initialDelay = 24, minDelay = 30, maxDelay = 54, activeDuration = 18, radius = 1500 } = {}) {
+export function createCityIncidentDirector({ nodes = [], chooseLocation = null, random = Math.random, initialDelay = 24, minDelay = 30, maxDelay = 54, activeDuration = 18, radius = 1500 } = {}) {
   const state = { active: null, cooldown: Math.max(0, initialDelay), completed: 0, started: 0, last: null };
   let sequence = 0;
 
@@ -35,6 +35,8 @@ export function createCityIncidentDirector({ nodes = [], random = Math.random, i
       kind,
       title: profile.title,
       mark: profile.mark,
+      site:anchor.site||null,
+      buildingSign:anchor.buildingSign||null,
       x: anchor.x,
       y: anchor.y,
       dangerRadius: profile.dangerRadius,
@@ -64,7 +66,7 @@ export function createCityIncidentDirector({ nodes = [], random = Math.random, i
     const step = Math.max(0, Math.min(0.25, Number(dt) || 0));
     if (state.active) {
       state.active.timer -= step;
-      if (state.active.timer <= 0) finish();
+      if (state.active.timer <= 0 && !state.active.responsePending) finish();
       return state.active;
     }
 
@@ -80,7 +82,9 @@ export function createCityIncidentDirector({ nodes = [], random = Math.random, i
     }
     const anchor = nearby[Math.floor(random() * nearby.length) % nearby.length];
     const kind = INCIDENT_IDS[Math.floor(random() * INCIDENT_IDS.length) % INCIDENT_IDS.length];
-    return start(kind, anchor);
+    const location=chooseLocation?chooseLocation(kind,anchor):anchor;
+    if(!location){state.cooldown=4;return null;}
+    return start(kind, location);
   }
 
   function current() { return state.active; }

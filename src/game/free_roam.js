@@ -1,9 +1,9 @@
 import { resolveScenery, resolveContact, contact, chassis } from './solid_contacts.js';
 export const VEHICLES = {
-  sedan: { name:'Седан', kind:'land', width:48,height:24,max:8.8,mass:1500,offroad:.78,color:'#e09a3e' },
-  van: { name:'Фургон',kind:'land',width:64,height:28,max:6,accel:.12,steer:.034,mass:2200,offroad:.96,color:'#9aa0a8' },
-  truck: { name:'Грузовик',kind:'land',width:84,height:32,max:5,accel:.075,steer:.024,mass:5200,offroad:1.28,color:'#807657' },
-  bike: { name:'Мотоцикл',kind:'land',width:30,height:12,max:11,accel:.22,steer:.052,mass:190,offroad:.9,color:'#d4523a' },
+  sedan: { name:'Седан', kind:'land', width:48,height:24,max:7.2,accel:.022,mass:1500,offroad:.78,color:'#e09a3e' },
+  van: { name:'Фургон',kind:'land',width:64,height:28,max:5.8,accel:.018,steer:.034,mass:2200,offroad:.96,color:'#9aa0a8' },
+  truck: { name:'Грузовик',kind:'land',width:84,height:32,max:4.8,accel:.012,steer:.024,mass:5200,offroad:1.28,color:'#807657' },
+  bike: { name:'Мотоцикл',kind:'land',width:30,height:12,max:9,accel:.03,steer:.052,mass:190,offroad:.9,color:'#d4523a' },
   speedboat: { name:'Катер',kind:'water',width:66,height:26,max:8,mass:1800,color:'#d7d2bd' },
   tug: { name:'Буксир',kind:'water',width:90,height:38,max:4,mass:12000,color:'#c18a42' },
   helicopter: { name:'Вертолёт',kind:'air',width:64,height:26,max:8,mass:1900,color:'#7d8868' },
@@ -83,7 +83,7 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
     const candidates=[...fleet,...parked].filter(c=>Math.hypot(c.x-player.x,c.y-player.y)<115&&doorwayClear(player,c,c.kind==='water')).sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)-Math.hypot(b.x-player.x,b.y-player.y));
     const car=candidates[0]; if(!car)return notify('Подойдите к припаркованному транспорту');
     mode=car.type in VEHICLES?car.type:'sedan'; const profile=VEHICLES[mode];
-    Object.assign(player,{entityType:'vehicle',x:car.x,y:car.y,angle:car.angle,width:profile.width,height:profile.height,mass:profile.mass||1500,bodyColor:car.color||profile.color,hp:car.hp??player.hp??100,speed:0,vx:0,vy:0});
+    Object.assign(player,{entityType:'vehicle',x:car.x,y:car.y,angle:car.angle,width:profile.width,height:profile.height,mass:profile.mass||1500,bodyColor:car.color||profile.color,hp:car.hp??player.hp??100,speed:0,vx:0,vy:0,steeringAngle:0,reverseDelay:0});
     const list=fleet.includes(car)?fleet:parked; list.splice(list.indexOf(car),1);
     notify(profile.name+(profile.kind==='air'?' · кнопка «Высота» / Q — взлёт и посадка':''));
   }
@@ -107,7 +107,12 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
   function resetToSedan(x=player.x,y=player.y,angle=0){
     mode='sedan';altitude=0;fly=false;landingWarned=false;
     const profile=VEHICLES.sedan;
-    Object.assign(player,{entityType:'vehicle',x,y,angle,width:profile.width,height:profile.height,mass:profile.mass||1500,bodyColor:profile.color,speed:0,vx:0,vy:0,rpm:0,gear:'D1'});
+    Object.assign(player,{entityType:'vehicle',x,y,angle,width:profile.width,height:profile.height,mass:profile.mass||1500,bodyColor:profile.color,speed:0,vx:0,vy:0,rpm:0,gear:'D1',steeringAngle:0,reverseDelay:0});
+  }
+  function resetToFoot(x=player.x,y=player.y,angle=0){
+    mode='foot';altitude=0;fly=false;landingWarned=false;
+    Object.assign(player,{entityType:'pedestrian',x,y,angle,width:9,height:9,mass:70,
+      speed:0,vx:0,vy:0,rpm:0,gear:'ПЕШКОМ',walkPhase:0,steeringAngle:0,reverseDelay:0});
   }
   function step(keys,dt) {
     const profile=VEHICLES[mode]; if(profile?.kind==='land') return false;
@@ -168,7 +173,7 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
     player.rpm=Math.abs(player.speed)/max;player.gear=profile.kind==='air'?`${Math.round(altitude)} м`:'ВОДА';return true;
   }
   function contacts(){if(mode==='foot'||altitude>12)return;for(const car of fleet)if(VEHICLES[car.type].kind===VEHICLES[mode].kind)resolveContact(player,car,true);}
-  return {fleet,interact,toggleFlight,resetToSedan,step,contacts,get mode(){return mode;},get altitude(){return altitude;},get special(){return mode==='foot'||VEHICLES[mode].kind!=='land';},get profile(){return VEHICLES[mode];}};
+  return {fleet,interact,toggleFlight,resetToSedan,resetToFoot,canWalkAt:footClear,step,contacts,get mode(){return mode;},get altitude(){return altitude;},get special(){return mode==='foot'||VEHICLES[mode].kind!=='land';},get profile(){return VEHICLES[mode];}};
 }
 
 export function drawTransport(ctx,car,time=0,altitude=0) {

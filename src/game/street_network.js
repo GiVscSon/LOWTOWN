@@ -142,19 +142,22 @@ export function roadTerminals(roads,bridges,solid){
       const edge={x:horizontal?road.x+(side>0?road.w:0):road.x+road.w/2,y:horizontal?road.y+road.h/2:road.y+(side>0?road.h:0)};
       const forward={x:edge.x+(horizontal?side*8:0),y:edge.y+(horizontal?0:side*8)};
       if([...roads,...bridges].some(r=>r!==road&&(inside(forward.x,forward.y,r,3)||(r.dir!==road.dir&&inside(edge.x,edge.y,r,3)))))continue;
-      const radius=width*.65+12;
-      const cap={x:edge.x-(horizontal?side*radius*.4:0),y:edge.y-(horizontal?0:side*radius*.4),radius,width,dir:road.dir,side};
-      if(ends.some(e=>Math.hypot(e.x-cap.x,e.y-cap.y)<radius))continue;
-      const clear=()=>Array.from({length:16},(_,i)=>i*Math.PI/8).every(a=>solid(cap.x+Math.cos(a)*(radius+12),cap.y+Math.sin(a)*(radius+12)));
+      // A street ends at its actual rectangular footprint. Circular caps used
+      // to spread across neighbouring junctions and over bridge approaches.
+      const supported=()=>Array.from({length:9},(_,i)=>i/8-.5).every(f=>
+        solid(edge.x+(horizontal?0:f*width)-(horizontal?side*2:0),
+          edge.y+(horizontal?f*width:0)-(horizontal?0:side*2)));
       let inset=0;
-      while(!clear()&&inset<192){if(horizontal)cap.x-=side*16;else cap.y-=side*16;inset+=16;}
-      if(clear()){
-        if(inset){
-          if(horizontal){if(side>0)road.w-=inset;else{road.x+=inset;road.w-=inset;}}
-          else if(side>0)road.h-=inset;else{road.y+=inset;road.h-=inset;}
-        }
-        ends.push(cap);
+      while(!supported()&&inset<512&&(horizontal?road.w:road.h)-inset>width*2){
+        if(horizontal)edge.x-=side*8;else edge.y-=side*8;inset+=8;
       }
+      if(!supported())continue;
+      if(inset){
+        if(horizontal){if(side>0)road.w-=inset;else{road.x+=inset;road.w-=inset;}}
+        else if(side>0)road.h-=inset;else{road.y+=inset;road.h-=inset;}
+      }
+      if([...roads,...bridges].some(r=>r!==road&&inside(edge.x,edge.y,r,3)))continue;
+      ends.push({...edge,radius:width/2,width,dir:road.dir,side,flat:true});
     }
   }
   return ends;
@@ -162,8 +165,8 @@ export function roadTerminals(roads,bridges,solid){
 
 export function onRoadSurface(x,y,roads,bridges,curves=[],terminals=[]){
   if([...roads,...bridges].some(r=>inside(x,y,r)))return true;
-  if(terminals.some(t=>Math.hypot(x-t.x,y-t.y)<=t.radius))return true;
-  for(const road of curves)for(let i=1;i<road.points.length;i++){
+
+  for(const road of curves.filter(r=>!r.footway))for(let i=1;i<road.points.length;i++){
     const a=road.points[i-1],b=road.points[i],dx=b[0]-a[0],dy=b[1]-a[1],length=dx*dx+dy*dy;
     const t=Math.max(0,Math.min(1,((x-a[0])*dx+(y-a[1])*dy)/(length||1)));
     if(Math.hypot(x-a[0]-dx*t,y-a[1]-dy*t)<road.width/2)return true;
@@ -233,14 +236,11 @@ export function nextWalkingGoal(p){
 }
 
 export function drawRoadTerminals(ctx,terminals){
+  ctx.strokeStyle='#898172';ctx.lineWidth=3;
   for(const t of terminals){
-    ctx.beginPath();ctx.arc(t.x,t.y,t.radius+12,0,Math.PI*2);ctx.fillStyle='#55564d';ctx.fill();
-    ctx.strokeStyle='#898172';ctx.lineWidth=2;ctx.stroke();
-    ctx.beginPath();ctx.arc(t.x,t.y,t.radius,0,Math.PI*2);ctx.fillStyle='#161b1f';ctx.fill();
-    const throat=t.radius+16;
-    if(t.dir==='h')ctx.fillRect(t.side>0?t.x-throat:t.x,t.y-t.width/2,throat,t.width);
-    else ctx.fillRect(t.x-t.width/2,t.side>0?t.y-throat:t.y,t.width,throat);
-    const angle=t.dir==='h'?(t.side>0?0:Math.PI):(t.side>0?Math.PI/2:-Math.PI/2);
-    ctx.strokeStyle='rgba(224,154,62,.5)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(t.x,t.y,t.radius-10,angle-1.15,angle+1.15);ctx.stroke();
+    ctx.beginPath();
+    if(t.dir==='h'){ctx.moveTo(t.x,t.y-t.width/2);ctx.lineTo(t.x,t.y+t.width/2);}
+    else{ctx.moveTo(t.x-t.width/2,t.y);ctx.lineTo(t.x+t.width/2,t.y);}
+    ctx.stroke();
   }
 }

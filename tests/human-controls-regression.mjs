@@ -29,17 +29,17 @@ run('Object.assign(player,{x:1140,y:1260});');
 const before=run('projectIso(player.x,player.y)');press('ArrowUp');step(10);release('ArrowUp');const after=run('projectIso(player.x,player.y)');
 assert(after.y<before.y-15,'up input must move up on screen');assert(Math.abs(after.x-before.x)<.01,'up input must not move sideways');
 press('KeyE');assert.equal(run('roam.mode'),'sedan');
-const start=run('player.x');press('KeyW');step(30);release('KeyW');assert(run('player.x')>start+60);
+const start=run('player.x');press('KeyW');step(90);release('KeyW');assert(run('player.x')>start+60);
 press('KeyD');step(10);release('KeyD');assert(run('player.angle')>0);
 run('roam.resetToSedan(1600,1200,0);');
-elements.get('btnGas').listeners.touchstart({cancelable:true,preventDefault:noop});step(12);elements.get('btnGas').listeners.touchend({cancelable:true,preventDefault:noop});
+elements.get('btnGas').listeners.touchstart({cancelable:true,preventDefault:noop});step(45);elements.get('btnGas').listeners.touchend({cancelable:true,preventDefault:noop});
 assert(run('player.x')>1610,'touch throttle must drive the car');assert.equal(run('state.keys.up'),false);
 press('KeyW');events.blur();assert.equal(run('state.keys.up'),false,'lost focus must release controls');
 const driven=[];
 for(const type of ['van','truck','bike']){
   run(`roam.resetToSedan(1200,1200);roam.interact();const target_${type}=roam.fleet.find(c=>c.type==='${type}');Object.assign(player,{x:target_${type}.x+20,y:target_${type}.y});`);
   press('KeyE');assert.equal(run('roam.mode'),type);
-  run('Object.assign(player,{x:1600,y:1200,angle:0,speed:0,vx:0,vy:0});');press('KeyW');step(25);release('KeyW');
+  run('Object.assign(player,{x:1600,y:1200,angle:0,speed:0,vx:0,vy:0});');press('KeyW');step(60);release('KeyW');
   assert(run('player.x')>1615,`${type} must move with keyboard input`);driven.push(type);
 }
 run("roam.resetToSedan(1200,1200);roam.interact();Object.assign(player,{x:2490,y:1800});");press('KeyE');assert.equal(run('roam.mode'),'speedboat');

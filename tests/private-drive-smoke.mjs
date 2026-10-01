@@ -10,7 +10,7 @@ import { coastPoints, pointInCoast, pointInBeach, BEACH_WIDTH } from '../src/gam
 import * as ocean from '../src/game/ocean_chunks.js';
 import * as surfaces from '../src/game/surface_physics.js';
 import * as incidents from '../src/game/city_incidents.js';
-import { velocityForHeading, projectIso, routeInput } from '../src/game/test_drive_core.js';
+import { velocityForHeading, stepLandVehicle, projectIso, routeInput } from '../src/game/test_drive_core.js';
 
 for(let angle=-Math.PI;angle<Math.PI;angle+=0.1){
   const v=velocityForHeading({angle,speed:4,vx:0,vy:0});
@@ -24,7 +24,7 @@ assert.equal(routeInput({x:0,y:0,angle:0,speed:1},{x:0,y:-100}).left,true);
 // Run the CURRENT game physics, not the legacy disconnected modules.
 const noop=()=>{};
 const element={style:{},classList:{add:noop,remove:noop},appendChild:noop,addEventListener:noop,getContext:()=>({}),remove:noop};
-const sandbox={...authoredWorld,LEGACY_RUNWAYS,...emergencyPassing,...streetNetwork,...ocean,...surfaces,...incidents,console,Math,performance:{now:()=>0},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,velocityForHeading,projectIso,routeInput,pointInCoast,pointInBeach,coastPoints,BEACH_WIDTH};
+const sandbox={...authoredWorld,LEGACY_RUNWAYS,...emergencyPassing,...streetNetwork,...ocean,...surfaces,...incidents,console,Math,performance:{now:()=>0},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,velocityForHeading, stepLandVehicle,projectIso,routeInput,pointInCoast,pointInBeach,coastPoints,BEACH_WIDTH};
 vm.createContext(sandbox);
 Object.assign(sandbox, { resolveContact, resolveScenery, contact, chassis });
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');

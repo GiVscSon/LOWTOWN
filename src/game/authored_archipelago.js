@@ -188,7 +188,7 @@ export function normalizeStreetGeometry(roads){
     for(const end of [false,true]){
       const value=road[axis]+(end?road[size]:0);
       const joining=roads.find(other=>other.dir!==road.dir&&center>=other[cross]&&
-        center<=other[cross]+other[h?'h':'w']&&value>=other[axis]-20&&value<=other[axis]+other[size]+20);
+        center<=other[cross]+other[h?'h':'w']&&value>=other[axis]-(road[h?'h':'w']/2+24)&&value<=other[axis]+other[size]+(road[h?'h':'w']/2+24));
       if(!joining)continue;
       const target=joining[axis]+(end?joining[size]:0);
       if(end)road[size]+=target-value;
