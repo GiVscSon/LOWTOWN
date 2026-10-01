@@ -111,6 +111,26 @@ unsafe+=[...incidentPoliceCars,...incidentResponseVehicles].some(u=>!emergencyPa
 }JSON.stringify({returned:[!!police.returnedToBase,!!engine.returnedToBase],contacts,unsafe});
 }`));
 assert(curbYield.returned.every(Boolean)&&curbYield.contacts===0&&curbYield.unsafe===0,JSON.stringify(curbYield));
+const returnClear=JSON.parse(run(`{
+trafficCars.length=0;parkedCars.length=0;pedestrians.length=0;incidentPoliceCars.length=0;incidentResponseVehicles.length=0;roam=undefined;Object.assign(player,{x:1200,y:5000,speed:0});
+const engine={x:8978.513740756676,y:1425.8436384104716,angle:1.5888548040380424,width:72,height:34,model:'fireEngine',maxSpeed:4.35,status:'enroute',speed:0,responseTarget:{x:8999,y:1620.398181818182,parkingAxis:'v'},baseTarget:{x:14046,y:1200},emergencyMotionStall:2,rotationBlocked:true};
+const ambulance={x:8941.728586070956,y:1475.341217558623,angle:-6.283185307179587,width:54,height:27,model:'ambulance',maxSpeed:5.9,status:'returning',speed:0,responseTarget:{x:14046,y:1200},baseTarget:{x:14046,y:1200},emergencyMotionStall:2,rotationBlocked:true,cooperativeYield:engine};
+engine.route=serviceRoadPath(engine,engine.responseTarget).slice(1);ambulance.route=serviceRoadPath(ambulance,ambulance.responseTarget).slice(1);incidentResponseVehicles.push(engine,ambulance);let contacts=0,unsafe=0,clear=false;
+for(let i=0;i<7200&&incidentResponseVehicles.length;i++){updateIncidentResponse(1/60);clear ||= ambulance.emergencyManeuver?.reason==='RESPONDER_RETURN_CLEAR';if(incidentResponseVehicles.length===2)contacts+=!!contact(chassis(engine),chassis(ambulance));unsafe+=incidentResponseVehicles.some(u=>!emergencyPassingGroundClear(u));}
+JSON.stringify({clear,contacts,unsafe,returned:[!!engine.returnedToBase,!!ambulance.returnedToBase]});
+}`));
+assert(returnClear.clear&&returnClear.contacts===0&&returnClear.unsafe===0&&returnClear.returned.every(Boolean),JSON.stringify(returnClear));
+const roadRecovery=JSON.parse(run(`{
+ trafficCars.length=0;parkedCars.length=0;pedestrians.length=0;incidentPoliceCars.length=0;incidentResponseVehicles.length=0;
+ roam=undefined;Object.assign(player,{x:1200,y:5000,speed:0});
+ const unit={x:13815.282992456945,y:1156.1752346433693,angle:-3.8118102892186085,width:54,height:27,model:'ambulance',maxSpeed:5.9,status:'returning',speed:0,
+   responseTarget:{x:14046,y:1200},baseTarget:{x:14046,y:1200}};
+ unit.route=serviceRoadPath(unit,unit.responseTarget).slice(1);incidentResponseVehicles.push(unit);
+ const started=recoverServiceRoad(unit);let unsafe=0;
+ for(let i=0;i<1800&&incidentResponseVehicles.length;i++){updateIncidentResponse(1/60);unsafe+=incidentResponseVehicles.some(u=>!serviceFootprintSupported(u)||!emergencyPassingGroundClear(u));}
+ JSON.stringify({started,unsafe,returned:!!unit.returnedToBase});
+}`));
+assert(roadRecovery.started&&roadRecovery.unsafe===0&&roadRecovery.returned,JSON.stringify(roadRecovery));
 const driving=[];
 for(const fps of [30,60,120]){
   const c=runtimeCity(19);
