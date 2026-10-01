@@ -18,7 +18,7 @@ const element=id=>{if(elements.has(id))return elements.get(id);const listeners={
 const sandbox={...authoredWorld,LEGACY_RUNWAYS,...emergencyPassing,Math,console,assert,performance:{now:()=>clock},navigator:{vibrate:noop},document:{readyState:'loading',getElementById:element,createElement:()=>element(Symbol()),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:(name,fn)=>events[name]=fn},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,...core,...contacts,...coast,...roaming,...street,...traffic,...ocean,...surfaces,...incidents};
 vm.createContext(sandbox);
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
-vm.runInContext(source+`\ninitTopology();roam=createFreeRoam(player,parkedCars,buildings,trees,isPositionOnSolidGround,()=>{},solidProps,isPositionOnWaterObstacle);sound.init=()=>{};setupInputListeners();trafficCars.length=0;pedestrians.length=0;`,sandbox);
+vm.runInContext(source+`\ninitTopology();roam=createFreeRoam(player,parkedCars,buildings,trees,isPositionOnSolidGround,()=>{},solidProps,isPositionOnWaterObstacle,()=>[],{mapPoint:worldPoint,runways:PLANE_RUNWAYS});sound.init=()=>{};setupInputListeners();trafficCars.length=0;pedestrians.length=0;`,sandbox);
 const run=s=>vm.runInContext(s,sandbox);
 const press=code=>events.keydown({code,repeat:false,preventDefault:noop});
 const release=code=>events.keyup({code,preventDefault:noop});
@@ -42,8 +42,12 @@ for(const type of ['van','truck','bike']){
   run('Object.assign(player,{x:1600,y:1200,angle:0,speed:0,vx:0,vy:0});');press('KeyW');step(60);release('KeyW');
   assert(run('player.x')>1615,`${type} must move with keyboard input`);driven.push(type);
 }
-run("roam.resetToSedan(1200,1200);roam.interact();Object.assign(player,{x:2490,y:1800});");press('KeyE');assert.equal(run('roam.mode'),'speedboat');
-run('Object.assign(player,{x:2670,y:1370,angle:-Math.PI/2,speed:0});');press('KeyW');step(90);release('KeyW');assert(run('player.y')<1100,'boat must pass below the real bridge');
+run("roam.resetToSedan(1200,1200);roam.interact();const currentBoat=roam.fleet.find(c=>c.type==='speedboat');Object.assign(player,{x:currentBoat.x+20,y:currentBoat.y});");press('KeyE');assert.equal(run('roam.mode'),'speedboat');
+const waterBridge=run("bridges.find(b=>b.logicalId==='b1')");
+const waterX=waterBridge.x+waterBridge.w/2,waterY=waterBridge.y+waterBridge.h/2;
+run(`Object.assign(player,{x:${waterX},y:${waterY+170},angle:-Math.PI/2,speed:0,vx:0,vy:0});`);
+assert(run(`!isPositionOnWaterObstacle(${waterX},${waterY})`),'the selected bridge channel must contain navigable water');
+press('KeyW');step(90);release('KeyW');assert(run('player.y')<waterY-100,'boat must pass below the real bridge');
 run("roam.resetToSedan(1200,1200);roam.interact();Object.assign(player,{x:1040,y:2130});");press('KeyE');assert.equal(run('roam.mode'),'helicopter');press('KeyQ');step(100);assert(run('roam.altitude')>110);press('KeyQ');step(160);assert.equal(run('roam.altitude'),0);press('KeyE');assert.equal(run('roam.mode'),'foot');
 for(const type of ['tug','plane']){
   run(`roam.resetToSedan(1200,1200);roam.interact();const extra_${type}=roam.fleet.find(c=>c.type==='${type}');Object.assign(player,{x:extra_${type}.x+20,y:extra_${type}.y});`);

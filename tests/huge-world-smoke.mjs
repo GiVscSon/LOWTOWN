@@ -17,38 +17,40 @@ const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').repl
 vm.runInContext(source+`
 initTopology();
 const overlap=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+const motor=bridges.filter(b=>!b.footway);
+const motorGroups=[...new Set(motor.map(b=>b.logicalId||b.id))].map(id=>motor.filter(b=>(b.logicalId||b.id)===id));
+const landfalls=motor.flatMap(br=>[
+ ...(br.landfallStart?[{br,point:br.dir==='h'?{x:br.x-5,y:br.y+br.h/2}:{x:br.x+br.w/2,y:br.y-5},start:true}]:[]),
+ ...(br.landfallEnd?[{br,point:br.dir==='h'?{x:br.x+br.w+5,y:br.y+br.h/2}:{x:br.x+br.w/2,y:br.y+br.h+5},start:false}]:[])
+]);
+const failedLandfalls=landfalls.filter(({point})=>!islands.some(i=>pointInCoast(point.x,point.y,i)));
+const failedTrafficSamples=trafficCars.flatMap(car=>{
+ const points=car.route?.points||[];
+ if(points.length<2)return [{type:car.type,missingRoute:true}];
+ return points.flatMap((a,index)=>{
+  if(!car.route.loop&&index===points.length-1)return [];
+  const b=points[(index+1)%points.length],angle=Math.atan2(b.y-a.y,b.x-a.x),steps=Math.max(1,Math.ceil(Math.hypot(b.x-a.x,b.y-a.y)/12)),bad=[];
+  for(let step=0;step<=steps;step++){
+   const t=step/steps,pose={...car,x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,angle};
+   if(!policeFootprintOnRoad(pose))bad.push({type:car.type,x:pose.x,y:pose.y,angle});
+  }return bad;
+ });
+});
 this.report={
   width:WORLD_W,height:WORLD_H,islands:islands.length,bridges:bridges.length,
   roads:roads.length,buildings:buildings.length,traffic:trafficCars.length,pedestrians:pedestrians.length,parks:parkZones.length,
   outOfBounds:[...roads,...buildings].filter(r=>r.x<0||r.y<0||r.x+r.w>WORLD_W||r.y+r.h>WORLD_H).length,
   roadBuildingConflicts:buildings.flatMap((b,buildingIndex)=>roads.map((r,roadIndex)=>({b,r,buildingIndex,roadIndex})).filter(hit=>overlap(hit.b,hit.r))).map(({b,r,buildingIndex,roadIndex})=>({buildingIndex,roadIndex,b,r})),
-  bridgeLandfalls:bridges.filter(br=>!br.footway).every(br=>{
-    const a=br.dir==='h'?{x:br.x-5,y:br.y+br.h/2}:{x:br.x+br.w/2,y:br.y-5};
-    const b=br.dir==='h'?{x:br.x+br.w+5,y:br.y+br.h/2}:{x:br.x+br.w/2,y:br.y+br.h+5};
-    return islands.some(i=>pointInCoast(a.x,a.y,i))&&islands.some(i=>pointInCoast(b.x,b.y,i));
+  bridgeLandfalls:failedLandfalls.length===0,
+  failedLandfalls:failedLandfalls.map(({br,point})=>({id:br.id,point})),
+  logicalMotorLinks:motorGroups.length,landfallCount:landfalls.length,
+  bridgeDeckJoints:motorGroups.every(group=>group.length===1||group.every((br,i)=>i===0||overlap(group[i-1],br))),
+  bridgeRoadLinks:landfalls.every(({br,start})=>{
+    const end=br.dir==='h'?{x:start?br.x-150:br.x+br.w,y:br.y,w:150,h:br.h}:
+      {x:br.x,y:start?br.y-150:br.y+br.h,w:br.w,h:150};
+    return roads.some(r=>overlap(end,r));
   }),
-  failedLandfalls:bridges.filter(br=>!br.footway).filter(br=>{
-    const a=br.dir==='h'?{x:br.x-5,y:br.y+br.h/2}:{x:br.x+br.w/2,y:br.y-5};
-    const b=br.dir==='h'?{x:br.x+br.w+5,y:br.y+br.h/2}:{x:br.x+br.w/2,y:br.y+br.h+5};
-    return !islands.some(i=>pointInCoast(a.x,a.y,i))||!islands.some(i=>pointInCoast(b.x,b.y,i));
-  }).map(br=>{
-    const a=br.dir==='h'?{x:br.x-5,y:br.y+br.h/2}:{x:br.x+br.w/2,y:br.y-5};
-    const b=br.dir==='h'?{x:br.x+br.w+5,y:br.y+br.h/2}:{x:br.x+br.w/2,y:br.y+br.h+5};
-    return {id:br.id,a,b,landA:islands.filter(i=>pointInCoast(a.x,a.y,i)).map(i=>i.id),landB:islands.filter(i=>pointInCoast(b.x,b.y,i)).map(i=>i.id)};
-  }),
-  bridgeRoadLinks:bridges.filter(br=>!br.footway).every(br=>{
-    const ends=br.dir==='h'?[{x:br.x-150,y:br.y,w:150,h:br.h},{x:br.x+br.w,y:br.y,w:150,h:br.h}]:[{x:br.x,y:br.y-150,w:br.w,h:150},{x:br.x,y:br.y+br.h,w:br.w,h:150}];
-    return ends.every(end=>roads.some(r=>overlap(end,r)));
-  }),
-  failedTrafficSamples:trafficCars.flatMap(c=>{
-    const lo=c.axis==='y'?c.minY:c.minX,hi=c.axis==='y'?c.maxY:c.maxX,bad=[];
-    for(let v=lo;v<=hi;v+=35){const x=c.axis==='y'?c.x:v,y=c.axis==='y'?v:c.y;if(!isPositionOnSolidGround(x,y))bad.push({x,y});}return bad;
-  }).slice(0,12),
-  safeTraffic:trafficCars.every(c=>{
-    const lo=c.axis==='y'?c.minY:c.minX,hi=c.axis==='y'?c.maxY:c.maxX;
-    for(let v=lo;v<=hi;v+=35)if(!isPositionOnSolidGround(c.axis==='y'?c.x:v,c.axis==='y'?v:c.y))return false;
-    return true;
-  }),
+  failedTrafficSamples:failedTrafficSamples.slice(0,12),safeTraffic:failedTrafficSamples.length===0,
   streetProps:streetProps.length,
   trafficModels:new Set(trafficCars.map(c=>c.type)).size,
   courtyards:parkZones.filter(p=>p.courtyard).length,
@@ -81,10 +83,10 @@ assert.equal(sandbox.report.routedPedestrians,sandbox.report.pedestrians,'every 
 assert(sandbox.report.terminals>0);
 console.log('HUGE_WORLD_REPORT',JSON.stringify(sandbox.report));
 assert.equal(sandbox.report.unfinishedRoadEnds,0);
-assert.equal(sandbox.report.width,17400);
-assert.equal(sandbox.report.height,18100);
+assert.equal(sandbox.report.width,18500);
+assert.equal(sandbox.report.height,19800);
 assert.equal(sandbox.report.islands,16);
-assert.equal(sandbox.report.bridges,38);
+assert.equal(sandbox.report.bridges,88);
 assert.ok(sandbox.report.roads>=90);
 assert.ok(sandbox.report.buildings>=220);
 assert.ok(sandbox.report.traffic>=55);
@@ -94,6 +96,9 @@ assert.ok(sandbox.report.courtyards>=8);
 assert.equal(sandbox.report.clearParks,true,'park or courtyard overlaps a building');
 assert.equal(sandbox.report.outOfBounds,0);
 assert.equal(sandbox.report.roadBuildingConflicts.length,0);
+assert.equal(sandbox.report.logicalMotorLinks,24);
+assert.equal(sandbox.report.landfallCount,48);
+assert.equal(sandbox.report.bridgeDeckJoints,true,'intermediate motor bridge decks must overlap');
 assert.equal(sandbox.report.bridgeLandfalls,true);
 assert.equal(sandbox.report.bridgeRoadLinks,true);
 assert.equal(sandbox.report.safeTraffic,true,'traffic corridor crosses open water');

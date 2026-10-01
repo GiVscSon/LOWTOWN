@@ -25,7 +25,7 @@ let maxJump=0,water=0,invalid=0,turns=0,offRoad=0,pedBlocked=0;
 const travel=trafficCars.map(()=>0),dwell=trafficCars.map(()=>0),carTurns=trafficCars.map(()=>0);
 for(let tick=0;tick<1800;tick++){
   advanceClock();
-  const before=trafficCars.map(c=>({x:c.x,y:c.y}));
+  const before=trafficCars.map(c=>({x:c.x,y:c.y,angle:c.angle}));
   updatePhysics(1/60);
   trafficCars.forEach((c,i)=>{
     const distance=Math.hypot(c.x-before[i].x,c.y-before[i].y);
@@ -33,7 +33,7 @@ for(let tick=0;tick<1800;tick++){
     if(c.routeWait>0)dwell[i]++;
     if(!isPositionOnSolidGround(c.x,c.y))water++;
     if(!Number.isFinite(c.x+c.y+c.speed+c.angle))invalid++;
-    if(c.turn){turns++;carTurns[i]++;}
+    if(Math.abs(Math.atan2(Math.sin(c.angle-before[i].angle),Math.cos(c.angle-before[i].angle)))>.001){turns++;carTurns[i]++;}
     if(!onRoadSurface(c.x,c.y,roads,bridges,scenicRoads,roadEnds))offRoad++;
   });
   pedestrians.forEach(p=>{if(isPedestrianSceneryBlocked(p.x,p.y))pedBlocked++;});
@@ -46,6 +46,7 @@ const impactDamage=100-player.hp;
 Object.assign(player,{x:target.x+65,y:target.y,angle:target.angle,speed:0,vx:0,vy:0,hp:100});
 state.wanted=0;state.invulnTimer=0;
 for(let tick=0;tick<90;tick++){advanceClock();updatePhysics(1/60);}
+
 const motionByType=Object.fromEntries([...new Set(trafficCars.map(c=>c.type))].map(type=>{
   const indices=trafficCars.flatMap((c,i)=>c.type===type?[i]:[]);
   return [type,{count:indices.length,moving:indices.filter(i=>travel[i]>20).length,

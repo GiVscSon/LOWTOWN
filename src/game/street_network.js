@@ -29,6 +29,36 @@ export function createRoadGraph(roads,bridges,accessPoints=[]){
   return nodes;
 }
 
+// Closed road circuits support civilian trips across staggered bridge landings.
+export function createRoadCircuits(graph){
+ const circuits=[],seen=new Set();
+ for(let from=0;from<graph.length;from++)for(const to of graph[from].edges){
+  if(to<=from)continue;
+  const queue=[from],parents=new Map([[from,null]]);
+  for(let index=0;index<queue.length&&!parents.has(to);index++){
+   const node=queue[index];
+   for(const next of graph[node].edges){
+    if((node===from&&next===to)||(node===to&&next===from)||parents.has(next))continue;
+    parents.set(next,node);queue.push(next);
+   }
+  }
+  if(!parents.has(to))continue;
+  const ids=[];for(let node=to;node!==null;node=parents.get(node))ids.push(node);
+  const key=[...ids].sort((a,b)=>a-b).join(':');if(seen.has(key))continue;seen.add(key);
+  const points=ids.map(id=>({x:graph[id].x,y:graph[id].y}));
+  // Collinear support nodes do not need separate steering targets.
+  let changed=true;
+  while(changed&&points.length>3){changed=false;
+   for(let n=0;n<points.length;n++){
+    const a=points[(n-1+points.length)%points.length],b=points[n],c=points[(n+1)%points.length];
+    if(Math.abs((b.x-a.x)*(c.y-b.y)-(b.y-a.y)*(c.x-b.x))<.01){points.splice(n,1);changed=true;break;}
+   }
+  }
+  if(points.length>=4)circuits.push(points);
+ }
+ return circuits;
+}
+
 export function roadPath(graph,start,finish,{fromSegment=false}={}){
   if(!graph.length)return [];
   const nearest=p=>graph.reduce((best,n,i)=>Math.hypot(n.x-p.x,n.y-p.y)<Math.hypot(graph[best].x-p.x,graph[best].y-p.y)?i:best,0);
@@ -128,6 +158,8 @@ export function advanceRouteActor(actor,route,dt,{speed=1.4,dwell=1.6,stopRadius
   const alignment=Math.max(.25,Math.cos(error));
   const targetSpeed=speed*(distance<90?.58:1)*alignment;
   actor.speed+=(targetSpeed-(actor.speed||0))*Math.min(1,.12*frame);
+  // Complete a tight junction turn before accelerating into the next lane.
+  if(Math.abs(error)>.32){actor.speed=0;return true;}
   actor.x+=Math.cos(actor.angle)*actor.speed*frame;
   actor.y+=Math.sin(actor.angle)*actor.speed*frame;
   actor.axis=Math.abs(Math.cos(actor.angle))>Math.abs(Math.sin(actor.angle))?'x':'y';

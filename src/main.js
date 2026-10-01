@@ -1,5 +1,5 @@
 import { VEHICLE_ASSETS } from './game/assets.js';
-import { ARCHIPELAGO_WIDTH, ARCHIPELAGO_HEIGHT, authoredDistricts, AUTHORED_ISLETS, worldPoint, districtPoint, sourceDistrict, remapLegacyScene, remapBridges, isletWalkways, normalizeStreetGeometry } from './game/authored_archipelago.js';
+import { AUTHORED_TERRAIN, migrateWorld2Point, ARCHIPELAGO_WIDTH, ARCHIPELAGO_HEIGHT, authoredDistricts, AUTHORED_ISLETS, worldPoint, districtPoint, sourceDistrict, remapLegacyScene, remapBridges, isletWalkways, normalizeStreetGeometry } from './game/authored_archipelago.js';
 import { drawArchitecture, drawRoundedJunction, drawStreetTree, drawStreetFurniture } from './game/architecture.js';
 import { velocityForHeading, stepLandVehicle, projectIso, routeInput } from './game/test_drive_core.js';
 import { createDriveLab } from './game/test_drive_lab.js';
@@ -11,7 +11,7 @@ import { visibleOceanChunks } from './game/ocean_chunks.js';
 import { classifySurface, surfaceMovement, createWeather, weatherMovement, WEATHER_PRESETS } from './game/surface_physics.js';
 import { createCityIncidentDirector, updateCrowdReactions } from './game/city_incidents.js';
 import { advanceTrafficCar, resolveTrafficPair } from './game/traffic_turns.js';
-import { createRoadGraph, roadPath, roadTerminals, onRoadSurface, createWalkingRoutes, assignWalkingRoutes, nextWalkingGoal, planStopRoute, advanceRouteActor, drawRoadTerminals } from './game/street_network.js';
+import { createRoadCircuits, createRoadGraph, roadPath, roadTerminals, onRoadSurface, createWalkingRoutes, assignWalkingRoutes, nextWalkingGoal, planStopRoute, advanceRouteActor, drawRoadTerminals } from './game/street_network.js';
 import './game/test_drive.css';
 // LOWTOWN // THREE ISLANDS VISUAL OVERHAUL // GTA 2 RETRO-NOIR ENGINE
 // High-detail procedural pedestrian sprites, isometric vehicle chassis, wet road reflections, neon glow & audio
@@ -255,7 +255,7 @@ const districtProfiles={
   campus:{types:['office','deco','townhouse','shop'],land:'#26372c',roof:'#3e4b40',trees:26,population:10},
   marina:{types:['townhouse','shop','deco','warehouse'],land:'#29332d',roof:'#424b40',trees:18,population:10}
 };
-function districtAt(x,y){return (constructingLegacyScene?legacyIslands:islands).find(i=>x>=i.x&&x<=i.x+i.w&&y>=i.y&&y<=i.y+i.h);}
+function districtAt(x,y){return constructingLegacyScene?legacyIslands.find(i=>x>=i.x&&x<=i.x+i.w&&y>=i.y&&y<=i.y+i.h):islands.find(i=>pointInCoast(x,y,i));}
 
 const legacyIslets=[
   {id:'reed-bank',x:600,y:2770,w:290,h:165},
@@ -1081,10 +1081,10 @@ function initTopology() {
   bridgeRails.length=0;
   for(const bridge of bridges){
     if(!bridge.footway){
-      const a=340;
-      if(bridge.dir==='h')roads.push({x:bridge.x-a,y:bridge.y,w:a,h:bridge.h,dir:'h',bridgeApproach:true},
-        {x:bridge.x+bridge.w,y:bridge.y,w:a,h:bridge.h,dir:'h',bridgeApproach:true});
-      else roads.push({x:bridge.x,y:bridge.y-a,w:bridge.w,h:a,dir:'v',bridgeApproach:true},
+      const a=340,h=bridge.dir==='h';
+      if(bridge.landfallStart)roads.push(h?{x:bridge.x-a,y:bridge.y,w:a,h:bridge.h,dir:'h',bridgeApproach:true}:
+        {x:bridge.x,y:bridge.y-a,w:bridge.w,h:a,dir:'v',bridgeApproach:true});
+      if(bridge.landfallEnd)roads.push(h?{x:bridge.x+bridge.w,y:bridge.y,w:a,h:bridge.h,dir:'h',bridgeApproach:true}:
         {x:bridge.x,y:bridge.y+bridge.h,w:bridge.w,h:a,dir:'v',bridgeApproach:true});
     }
     if(bridge.dir==='v')bridgeRails.push({x:bridge.x-12,y:bridge.y,w:14,h:bridge.h,axis:'x'},
@@ -1097,7 +1097,7 @@ function initTopology() {
   for(const rail of bridgeRails){
     const vertical=rail.axis==='x',start=vertical?rail.y:rail.x,length=vertical?rail.h:rail.w;
     const fixed=vertical?rail.x+rail.w/2:rail.y+rail.h/2;
-    const masks=[...roads,...bridges.filter(b=>b.footway&&b.dir!==(vertical?'v':'h'))].filter(r=>
+    const masks=[...roads,...bridges.filter(b=>b.dir!==(vertical?'v':'h'))].filter(r=>
       fixed>=(vertical?r.x:r.y)-12&&fixed<=(vertical?r.x+r.w:r.y+r.h)+12)
       .map(r=>vertical?[r.y-12,r.y+r.h+12]:[r.x-12,r.x+r.w+12]);
     for(const [a,b] of subtractRoadIntervals(start,start+length,masks))openRails.push(vertical?
@@ -1115,6 +1115,17 @@ function initTopology() {
     if([[0,0],[38,0],[-38,0],[0,38],[0,-38]].some(([dx,dy])=>onRoadSurface(x+dx,y+dy,roads,bridges,scenicRoads,roadEnds)))continue;
     trees.push({x,y,size:17+n%4*3,shore:true});
   }
+  for(const terrain of AUTHORED_TERRAIN){
+    if(!['woodland','bluff'].includes(terrain.kind))continue;
+    for(let n=0;n<22;n++){
+      const angle=n*2.3999632297,radius=terrain.radius*Math.sqrt((n+.5)/22)*.8;
+      const x=terrain.x+Math.cos(angle)*radius,y=terrain.y+Math.sin(angle)*radius;
+      if(!isPositionOnIslandLand(x,y)||buildings.some(b=>x>b.x-40&&x<b.x+b.w+40&&y>b.y-40&&y<b.y+b.h+40))continue;
+      if(trees.some(t=>Math.hypot(t.x-x,t.y-y)<43))continue;
+      if([[0,0],[42,0],[-42,0],[0,42],[0,-42]].some(([dx,dy])=>onRoadSurface(x+dx,y+dy,roads,bridges,scenicRoads,roadEnds)))continue;
+      trees.push({x,y,size:18+n%4*3,shore:true});
+    }
+  }
   buildServiceAccess();
   relocateStreetObstacles();
   // Reserve the complete visible footprint, including bridge decks and kerbs.
@@ -1123,6 +1134,41 @@ function initTopology() {
       !onRoadSurface(detail.x+dx,detail.y+dy,roads,bridges,scenicRoads.map(r=>({...r,footway:false})),roadEnds)));
 
   roadGraph=createRoadGraph(roads,bridges.filter(b=>!b.footway),serviceBases.map(base=>base.origin));
+  const circuits=createRoadCircuits(roadGraph);
+  for(const car of trafficCars){
+    let choice=null;
+    for(const circuit of circuits)for(let i=0;i<circuit.length;i++){
+      const a=circuit[i],b=circuit[(i+1)%circuit.length],dx=b.x-a.x,dy=b.y-a.y;
+      const t=Math.max(0,Math.min(1,((car.x-a.x)*dx+(car.y-a.y)*dy)/(dx*dx+dy*dy||1)));
+      const point={x:a.x+t*dx,y:a.y+t*dy},distance=Math.hypot(car.x-point.x,car.y-point.y);
+      if(!choice||distance<choice.distance)choice={circuit,i,point,distance};
+    }
+    if(!choice)continue;
+    let points=choice.circuit.map(p=>({...p}));
+    const next=points[(choice.i+1)%points.length];
+    const heading=Math.atan2(next.y-choice.point.y,next.x-choice.point.x);
+    if(Math.cos(heading-car.angle)<0){points.reverse();choice.i=points.length-2-choice.i;}
+    const start=(choice.i+1+points.length)%points.length;
+    points=[choice.point,...points.slice(start),...points.slice(0,start)];
+    const lanePoints=[];
+    for(let i=0;i<points.length;i++){
+      const p=points[i],before=points[(i-1+points.length)%points.length],after=points[(i+1)%points.length];
+      const a=Math.atan2(p.y-before.y,p.x-before.x),b=Math.atan2(after.y-p.y,after.x-p.x);
+      const turn=Math.atan2(Math.sin(b-a),Math.cos(b-a));
+      if(Math.abs(turn)<.01)lanePoints.push({x:p.x-Math.sin(b)*30,y:p.y+Math.cos(b)*30});
+      else{
+        const entry=Math.min(45,Math.hypot(p.x-before.x,p.y-before.y)/3);
+        const exit=Math.min(45,Math.hypot(after.x-p.x,after.y-p.y)/3);
+        lanePoints.push({x:p.x-Math.cos(a)*entry-Math.sin(a)*30,y:p.y-Math.sin(a)*entry+Math.cos(a)*30},
+          {x:p.x-(Math.sin(a)+Math.sin(b))*15,y:p.y+(Math.cos(a)+Math.cos(b))*15},
+          {x:p.x+Math.cos(b)*exit-Math.sin(b)*30,y:p.y+Math.sin(b)*exit+Math.cos(b)*30});
+      }
+    }
+    points=lanePoints;
+    car.x=points[0].x;car.y=points[0].y;car.angle=Math.atan2(points[1].y-car.y,points[1].x-car.x);
+    car.cruiseSpeed=Math.abs(car.cruiseSpeed||car.speed||1.1);car.speed=0;
+    car.routeManaged=true;car.route={points,loop:true,stopIndices:[]};car.routeIndex=1;
+  }
   cityIncidentDirector=createCityIncidentDirector({nodes:roadGraph,chooseLocation:incidentLocation});
   incidentNoticeId=0;
   const busLines=[
@@ -1755,6 +1801,18 @@ function yieldBetweenResponders(unit){
     }
     if(Math.abs(turn)<=.12){unit.cooperativeYield=null;return false;}
   }
+  // A responder ahead of the leader may need to return in the opposite
+  // direction. Clear its current nose into the other lane, then travel beyond
+  // the leader before merging; reversing here would enter the follower.
+  if(ahead>20&&wanted!==null&&Math.cos(wanted-leader.angle)<-.8){
+    for(const distance of [68,64,72,48,32,80,96]){
+      const stage={x:unit.x+Math.cos(unit.angle)*distance,y:unit.y+Math.sin(unit.angle)*distance};
+      const exit={x:stage.x-Math.cos(leader.angle)*160,y:stage.y-Math.sin(leader.angle)*160};
+      if(!emergencyPassingPathClear(unit,[stage,exit],pose=>policeFootprintOnRoad(pose)&&emergencyPassingPoseClear(pose,unit),4))continue;
+      unit.emergencyManeuver={points:[stage,exit],trail:[{x:unit.x,y:unit.y,angle:unit.angle}],reason:'RESPONDER_RETURN_CLEAR'};
+      unit.cooperativeYield=null;unit.emergencyBlocked=false;unit.emergencyMotionStall=0;return false;
+    }
+  }
   // Keep the space open after reversing; immediately rejoining was restoring
   // the very same three-vehicle blockage on every planning cycle.
   if(Math.hypot(leader.x-unit.x,leader.y-unit.y)<115){
@@ -1773,7 +1831,27 @@ function yieldBetweenResponders(unit){
   unit.speed=0;return true;
 }
 
+function recoverServiceRoad(unit){
+  if(unit.emergencyManeuver||policeFootprintOnRoad(unit)||!emergencyPassingGroundClear(unit))return false;
+  const candidates=[...roads,...bridges.filter(b=>!b.footway)].map(r=>{
+    const h=r.dir==='h',margin=Math.hypot(unit.width||48,unit.height||24)/2+4;
+    const along=h?Math.max(r.x+margin,Math.min(r.x+r.w-margin,unit.x)):
+      Math.max(r.y+margin,Math.min(r.y+r.h-margin,unit.y));
+    return {x:h?along:r.x+r.w/2,y:h?r.y+r.h/2:along};
+  }).filter(p=>Math.hypot(p.x-unit.x,p.y-unit.y)<180).sort((a,b)=>Math.hypot(a.x-unit.x,a.y-unit.y)-Math.hypot(b.x-unit.x,b.y-unit.y));
+  for(const point of candidates){
+    const goal=unit.route?.[0],finalHeading=goal?Math.atan2(goal.y-point.y,goal.x-point.x):unit.angle;
+    if(!policeFootprintOnRoad({...unit,...point,angle:finalHeading}))continue;
+    const end={x:point.x+Math.cos(finalHeading),y:point.y+Math.sin(finalHeading)};
+    if(!emergencyPassingPathClear(unit,[point,end],pose=>emergencyPassingGroundClear(pose)&&emergencyPassingPoseClear(pose,unit),4))continue;
+    unit.emergencyManeuver={points:[point],finalHeading,trail:[{x:unit.x,y:unit.y,angle:unit.angle}],reason:'ROAD_RECOVERY'};
+    unit.emergencyBlocked=false;unit.cooperativeYield=null;unit.emergencyMotionStall=0;return true;
+  }
+  return false;
+}
+
 function tryPlanEmergencyPassing(unit,dt){
+  if(recoverServiceRoad(unit))return;
   unit.emergencyReverseWait=Math.max(0,(unit.emergencyReverseWait||0)-dt);
   if(!['enroute','returning'].includes(unit.status)||unit.priorityPassing===false){
     unit.emergencyBlocked=false;
@@ -2245,10 +2323,12 @@ function yieldTrafficToServices(car,dt){
     return along>0&&along<Math.max(72,(car.width||46)+34)&&
       Math.abs(-dx*sn+dy*cs)<((car.height||24)+(unit.height||24))/2+12;
   });
-  if(inJunction&&!(car.routeManaged&&car.yieldHome)&&!heldByResponder&&!trafficTouchesResponder({...car,x:car.x+cs*8,y:car.y+sn*8}))return false;
+  const turningResponder=units.some(unit=>unit.rotationBlocked&&Math.hypot(unit.x-car.x,unit.y-car.y)<160);
+  if(inJunction&&!(car.routeManaged&&car.yieldHome)&&!heldByResponder&&!turningResponder&&!trafficTouchesResponder({...car,x:car.x+cs*8,y:car.y+sn*8}))return false;
   const approaching=units.some(unit=>{
     if(!['enroute','returning'].includes(unit.status))return false;
     const uc=Math.cos(unit.angle),us=Math.sin(unit.angle),dx=car.x-unit.x,dy=car.y-unit.y;
+    if(car.yieldHome&&Math.abs(cs*uc+sn*us)<.85&&Math.hypot(dx,dy)<160)return true;
     // Let crossing traffic clear the junction. Stopping it across the route
     // would build a permanent barrier in front of the responder.
     if(Math.abs(cs*uc+sn*us)<.85&&!unit.rotationBlocked)return false;
@@ -2260,8 +2340,12 @@ function yieldTrafficToServices(car,dt){
     car.x>=r.x&&car.x<=r.x+r.w&&car.y>=r.y&&car.y<=r.y+r.h);
   if(!road)return approaching;
   const center=horizontal?road.y+road.h/2:road.x+road.w/2;
-  if(approaching&&!car.yieldHome)car.yieldHome={cross,value:car[cross],side:
-    Math.sign(car[cross]-center)||-Math.sign(horizontal?cs:sn)};
+  if(approaching&&!car.yieldHome){
+    const turning=units.find(unit=>unit.rotationBlocked&&Math.hypot(unit.x-car.x,unit.y-car.y)<160&&
+      Math.abs(cs*Math.cos(unit.angle)+sn*Math.sin(unit.angle))<.85);
+    car.yieldHome={cross,value:car[cross],side:turning?Math.sign(car[cross]-turning[cross])||1:
+      Math.sign(car[cross]-center)||-Math.sign(horizontal?cs:sn)};
+  }
   const side=car.yieldHome.side??(Math.sign(car[cross]-center)||Math.sign(car.yieldHome.value-center)||-Math.sign(horizontal?cs:sn));
   car.yieldHome.side=side;
   if(approaching&&car.routeManaged){
@@ -2276,11 +2360,26 @@ function yieldTrafficToServices(car,dt){
   const delta=Math.max(-.35*dt*60,Math.min(.35*dt*60,target-car[cross]));
   const pose={...car,[cross]:car[cross]+delta};
   if(policeFootprintOnRoad(pose)&&emergencyPassingPoseClear(pose,car))car[cross]=pose[cross];
+  else if(approaching&&Math.abs(delta)>.01){
+    // Another car may already occupy the shoulder. Clear its length on the
+    // verified lane before continuing to pull over, rather than holding both
+    // the adjacent responder and the yielding convoy indefinitely.
+    for(const sign of [1,-1]){
+      const step=sign*.8*dt*60,next={...car,x:car.x+cs*step,y:car.y+sn*step};
+      if(!policeFootprintOnRoad(next)||!emergencyPassingPoseClear(next,car))continue;
+      car.x=next.x;car.y=next.y;break;
+    }
+  }
   if(!approaching&&Math.abs(car[cross]-target)<.5){car.yieldHome=null;return false;}
   return true;
 }
 
 function trafficTouchesResponder(car){
+  if((roam?.altitude||0)<12){
+    const width=roam?.mode==='foot'?9:player.width||48,height=roam?.mode==='foot'?9:player.height||24;
+    if(Math.hypot(car.x-player.x,car.y-player.y)<Math.hypot(car.width||46,car.height||24)/2+Math.hypot(width,height)/2&&
+      contact(chassis(car),chassis({...player,width,height})))return true;
+  }
   for(const list of [policeCars,incidentPoliceCars,incidentResponseVehicles])for(const unit of list){
     if(Math.hypot(car.x-unit.x,car.y-unit.y)>
       Math.hypot(car.width||46,car.height||24)/2+Math.hypot(unit.width||48,unit.height||24)/2)continue;
@@ -2340,6 +2439,7 @@ function resolveCityMotion(starts,dt){
       return isPositionOnSolidGround(pose.x,pose.y);
     }});
   const vessels=bodies.filter(water);
+  for(const unit of services)if(['enroute','returning'].includes(unit.status))recoverServiceRoad(unit);
   if(vessels.length)solveVehicleMotion(vessels,starts,dt,{passive,player,onImpact:impact,
     canOccupy:(body,pose)=>{
       const c=chassis(pose),cs=Math.cos(c.angle),sn=Math.sin(c.angle);
@@ -2447,7 +2547,12 @@ function updatePhysics(dt) {
     const cs=Math.cos(c.angle),sn=Math.sin(c.angle);
     const ahead=(other,gap,margin)=>{
       const dx=other.x-c.x,dy=other.y-c.y,along=dx*cs+dy*sn;
-      return along>0&&along<gap&&Math.abs(-dx*sn+dy*cs)<margin;
+      // Opposing lanes need chassis clearance, rather than the much wider
+      // following buffer used for a vehicle travelling in the same direction.
+      // Otherwise a bus on the centre route and a car in its own lane stop
+      // one another despite having a clear physical passing gap.
+      const opposing=Number.isFinite(other.angle)&&Math.cos(other.angle-c.angle)<-.8;
+      return along>0&&along<gap&&Math.abs(-dx*sn+dy*cs)<(opposing?Math.max(0,margin-10):margin);
     };
     const occupied = [...(roam?.mode!=='foot'&&(roam?.altitude||0)<12?[player]:[]), ...trafficCars, ...parkedCars,
       ...policeCars,...incidentPoliceCars,...incidentResponseVehicles,...(roam?.fleet||[]).filter(v=>v.kind!=='water')]
@@ -2517,7 +2622,7 @@ function updatePhysics(dt) {
 
   const distEl = document.getElementById('hudDistrict');
   if (distEl) {
-    const district = islands.find(isl => player.x >= isl.x && player.x <= isl.x + isl.w && player.y >= isl.y && player.y <= isl.y + isl.h);
+    const district = districtAt(player.x,player.y)||islets.find(i=>pointInCoast(player.x,player.y,i));
     distEl.innerText = (district?.name || 'LOWTOWN CAUSEWAY').toUpperCase();
   }
 }
@@ -3148,10 +3253,20 @@ function renderWorld() {
     ctx.strokeStyle='rgba(64,104,96,.98)';ctx.lineWidth=255*coastalScale;ctx.stroke();
     ctx.strokeStyle='rgba(174,151,103,.98)';ctx.lineWidth=188*coastalScale;ctx.stroke();
     ctx.fillStyle = districtProfiles[isl.id]?.land||'#202721';ctx.fill();
-    ctx.strokeStyle = '#686556';ctx.lineWidth = 7;ctx.stroke();
-    ctx.setLineDash([38*coastalScale,29*coastalScale]);
-    ctx.strokeStyle='rgba(213,222,197,.68)';ctx.lineWidth=3.5*coastalScale;ctx.stroke();ctx.setLineDash([]);
+    ctx.strokeStyle='rgba(213,203,165,.38)';ctx.lineWidth=3*coastalScale;ctx.stroke();
   });
+  for(const terrain of AUTHORED_TERRAIN){
+    if(Math.abs(terrain.x-player.x)>3200||Math.abs(terrain.y-player.y)>3200)continue;
+    const island=islands.find(i=>i.id===terrain.islandId);ctx.save();coastPath(ctx,island);ctx.clip();
+    const colors={woodland:['#2b4331','#304c36'],marsh:['#3d4c39','#4d5942'],bluff:['#485044','#626355'],rock:['#414944','#616258']};
+    const palette=colors[terrain.kind];
+    for(let layer=0;layer<4;layer++){
+      const r=terrain.radius*(1-layer*.20);ctx.fillStyle=palette[layer%2];ctx.globalAlpha=.35;
+      ctx.beginPath();ctx.ellipse(terrain.x+layer*8,terrain.y-layer*10,r,r*.58,-.4,0,Math.PI*2);ctx.fill();
+      if(['bluff','rock'].includes(terrain.kind)){ctx.strokeStyle='rgba(148,151,129,.28)';ctx.lineWidth=3;ctx.stroke();}
+    }
+    ctx.restore();
+  }
   for(const detail of beachDetails){
     if(Math.abs(detail.x-player.x)>3200||Math.abs(detail.y-player.y)>3200)continue;
     if(!pointInBeach(detail.x,detail.y,detail.island,detail.natural?42:BEACH_WIDTH))continue;
@@ -3947,7 +4062,7 @@ function renderFullMap() {
 function autoSaveProgress() {
   if (driveLab?.running) return;
   const saveData = {
-    worldVersion:2,
+    worldVersion:3,
     mode:roam?.mode==='foot'?'foot':'sedan',
     cash: state.cash,
     x: player.x,
@@ -3962,7 +4077,10 @@ function loadProgress() {
     const saved = localStorage.getItem('lowtown_integrity_save');
     if (saved) {
       const data = JSON.parse(saved);
-      if(data.worldVersion!==2&&Number.isFinite(data.x)&&Number.isFinite(data.y))Object.assign(data,worldPoint(data));
+      if(Number.isFinite(data.x)&&Number.isFinite(data.y)){
+        if(data.worldVersion===2)Object.assign(data,migrateWorld2Point(data));
+        else if(data.worldVersion!==3)Object.assign(data,worldPoint(data));
+      }
       state.cash = Number.isFinite(data.cash)?Math.max(0,data.cash):750;
       player.x = Number.isFinite(data.x) && data.x > 0 && data.x < WORLD_W ? data.x : 1200;
       player.y = Number.isFinite(data.y) && data.y > 0 && data.y < WORLD_H ? data.y : 1200;
