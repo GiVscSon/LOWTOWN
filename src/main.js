@@ -453,7 +453,12 @@ function buildRoadPaintGeometry(){
       for(const face of Object.keys(approaches))existing.approaches[face]||=approaches[face];
     }else junctions.push({x,y,w,h,horizontalRoads:[horizontal],verticalRoads:[vertical],approaches});
   }
-  const surface=streetSurfaceGeometry(roads,bridges);
+  // A few isolated VM depth fixtures load main.js without its module imports.
+  // Keep those renderer-only contexts safe while the real game uses the union
+  // builder exported by street_network.js.
+  const surface=typeof streetSurfaceGeometry==='function'
+    ?streetSurfaceGeometry(roads,bridges)
+    :{surfaces:[...roads,...bridges.filter(b=>!b.footway)],curbs:[],lanes:[]};
   const crosswalkJunctions=junctions.filter(j=>
     j.horizontalRoads.some(r=>!r.serviceAccess&&!r.bridgeApproach)&&
     j.verticalRoads.some(r=>!r.serviceAccess&&!r.bridgeApproach));
