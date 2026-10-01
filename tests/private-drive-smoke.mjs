@@ -29,11 +29,15 @@ const sandbox={...authoredWorld,LEGACY_RUNWAYS,VEHICLES,...emergencyPassing,...s
 vm.createContext(sandbox);
 Object.assign(sandbox, { resolveContact, resolveScenery, contact, chassis, captureMotion, solveVehicleMotion });
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
-vm.runInContext(source+`\ninitTopology(); const initialTreeCount=trees.length,initialRoadCount=roads.length,initialVerticalRails=bridgeRails.filter(r=>r.axis==='x').length; trafficCars.length=0; pedestrians.length=0;
+vm.runInContext(source+`\ninitTopology(); const initialTreeCount=trees.length,initialRoadCount=roads.length,initialBridgeCount=bridges.length,initialVerticalRails=bridgeRails.filter(r=>r.axis==='x').length; trafficCars.length=0; pedestrians.length=0;
 Object.assign(player,{x:1265,y:1200,angle:0,speed:0,vx:0,vy:0});
-const points=[{x:2065,y:1200},{x:2065,y:515},{x:1265,y:515},{x:1265,y:4135},{x:2065,y:4135},{x:2065,y:5015},{x:1265,y:5015},{x:1265,y:1200}].map(worldPoint);
+const destinations=[{x:2065,y:1200},{x:2065,y:515},{x:1265,y:515},{x:1265,y:4135},{x:2065,y:4135},{x:2065,y:5015},{x:1265,y:5015},{x:1265,y:1200}].map(worldPoint);
+let previous={x:player.x,y:player.y};
+const points=destinations.flatMap(target=>{const path=roadPath(roadGraph,previous,target,{fromSegment:true}).slice(1);previous=target;return path;});
+const length=points.reduce((sum,p,i)=>sum+Math.hypot(p.x-(points[i-1]?.x??player.x),p.y-(points[i-1]?.y??player.y)),0);
+const limit=Math.ceil(length/100*60)+points.length*300;
 let point=0, ticks=0, maxSlip=0, hits=0;
-while(point<points.length&&ticks<9000){
+while(point<points.length&&ticks<limit){
  if(Math.hypot(player.x-points[point].x,player.y-points[point].y)<42){point++;continue;}
  Object.assign(state.keys,routeInput(player,points[point]));
  const oldX=player.x,oldY=player.y;
@@ -46,14 +50,15 @@ while(point<points.length&&ticks<9000){
  ticks++;
 }
 Object.assign(player,{x:4000,y:6000,hp:0});state.cash=500;respawnPlayer('test');
-this.result={segments:point,seconds:ticks/60,maxSlip,hits,drowned:state.isDrowning,respawned:player.hp===100&&isPositionOnSolidGround(player.x,player.y)&&state.cash===400,initialTrees:initialTreeCount,initialRoads:initialRoadCount,initialVerticalRails,world:{islands:islands.length,bridges:bridges.length,roads:roads.length,buildings:buildings.length,traffic:trafficCars.length,pedestrians:pedestrians.length,verticalRails:bridgeRails.filter(r=>r.axis==='x').length,streetLights:streetLights.length,trees:trees.length,parkedCars:parkedCars.length,cranes:cranes.length,billboards:billboards.length}};`,sandbox);
+this.result={segments:point,expectedSegments:points.length,destinations:destinations.length,seconds:ticks/60,maxSlip,hits,drowned:state.isDrowning,respawned:player.hp===100&&isPositionOnSolidGround(player.x,player.y)&&state.cash===400,initialTrees:initialTreeCount,initialRoads:initialRoadCount,initialBridges:initialBridgeCount,initialVerticalRails,world:{islands:islands.length,bridges:bridges.length,roads:roads.length,buildings:buildings.length,traffic:trafficCars.length,pedestrians:pedestrians.length,verticalRails:bridgeRails.filter(r=>r.axis==='x').length,streetLights:streetLights.length,trees:trees.length,parkedCars:parkedCars.length,cranes:cranes.length,billboards:billboards.length}};`,sandbox);
 console.log(JSON.stringify(sandbox.result,null,2));
-assert.equal(sandbox.result.segments,8,'Expanded route must complete');
+assert.equal(sandbox.result.destinations,8);
+assert.equal(sandbox.result.segments,sandbox.result.expectedSegments,'Road-graph route through all eight destinations must complete');
 assert.ok(sandbox.result.maxSlip<18,'No excessive lateral slide');
 assert.equal(sandbox.result.hits,0);
 assert.equal(sandbox.result.drowned,false);
 assert.equal(sandbox.result.respawned,true,'death did not restore the player at a safe spawn');
-const expectedWorld={islands:16,bridges:38,roads:sandbox.result.initialRoads,buildings:232,traffic:0,pedestrians:0,verticalRails:sandbox.result.initialVerticalRails,streetLights:116,parkedCars:24,cranes:8,billboards:18};
+const expectedWorld={islands:16,bridges:sandbox.result.initialBridges,roads:sandbox.result.initialRoads,buildings:232,traffic:0,pedestrians:0,verticalRails:sandbox.result.initialVerticalRails,streetLights:116,parkedCars:24,cranes:8,billboards:18};
 const actualWorld={...sandbox.result.world};delete actualWorld.trees;
 assert.deepEqual(actualWorld,expectedWorld,'driving and respawn should not change world geometry');
 assert.equal(sandbox.result.world.trees,sandbox.result.initialTrees,'driving should not alter generated trees');

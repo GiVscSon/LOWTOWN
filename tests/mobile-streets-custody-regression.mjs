@@ -142,6 +142,16 @@ for(let i=0;i<2400&&incidentPoliceCars.length;i++){for(const c of trafficCars)yi
 JSON.stringify({returned:!!unit.returnedToBase,moved,contacts,unsafe});
 }`));
 assert(shoulderYield.returned&&shoulderYield.moved&&shoulderYield.contacts===0&&shoulderYield.unsafe===0,JSON.stringify(shoulderYield));
+const turningTraffic=JSON.parse(run(`{
+trafficCars.length=0;parkedCars.length=0;pedestrians.length=0;incidentPoliceCars.length=0;incidentResponseVehicles.length=0;roam=undefined;Object.assign(player,{x:1200,y:5000,speed:0});
+const unit={x:9926.244081368397,y:1246.244282947288,angle:-.20671139606728367,width:54,height:27,model:'ambulance',maxSpeed:5.9,status:'returning',speed:0,rotationBlocked:true,responseTarget:{x:11000,y:1200},baseTarget:{x:11000,y:1200}};
+const wagon={x:9964.40883469971,y:1215.9232480505543,angle:Math.PI/2,width:50,height:23,type:'wagon',routeManaged:true};
+const second={x:9970.002662692707,y:1141.3840959189806,angle:Math.PI/2,width:50,height:23,type:'wagon',routeManaged:true};
+trafficCars.push(wagon,second);incidentResponseVehicles.push(unit);unit.route=serviceRoadPath(unit,unit.responseTarget).slice(1);let contacts=0,unsafe=0,moved=false;
+for(let i=0;i<3600&&incidentResponseVehicles.length;i++){for(const c of trafficCars)yieldTrafficToServices(c,1/60);moved ||= Math.hypot(wagon.x-9964.40883469971,wagon.y-1215.9232480505543)>8;updateIncidentResponse(1/60);unsafe+=!serviceFootprintSupported(unit);contacts+=trafficCars.some(c=>!!contact(chassis(c),chassis(unit)));}
+JSON.stringify({returned:!!unit.returnedToBase,moved,contacts,unsafe,unit,wagon,second});
+}`));
+assert(turningTraffic.returned&&turningTraffic.moved&&turningTraffic.contacts===0&&turningTraffic.unsafe===0,JSON.stringify(turningTraffic));
 const driving=[];
 for(const fps of [30,60,120]){
   const c=runtimeCity(19);

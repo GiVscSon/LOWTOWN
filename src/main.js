@@ -2323,10 +2323,12 @@ function yieldTrafficToServices(car,dt){
     return along>0&&along<Math.max(72,(car.width||46)+34)&&
       Math.abs(-dx*sn+dy*cs)<((car.height||24)+(unit.height||24))/2+12;
   });
-  if(inJunction&&!(car.routeManaged&&car.yieldHome)&&!heldByResponder&&!trafficTouchesResponder({...car,x:car.x+cs*8,y:car.y+sn*8}))return false;
+  const turningResponder=units.some(unit=>unit.rotationBlocked&&Math.hypot(unit.x-car.x,unit.y-car.y)<160);
+  if(inJunction&&!(car.routeManaged&&car.yieldHome)&&!heldByResponder&&!turningResponder&&!trafficTouchesResponder({...car,x:car.x+cs*8,y:car.y+sn*8}))return false;
   const approaching=units.some(unit=>{
     if(!['enroute','returning'].includes(unit.status))return false;
     const uc=Math.cos(unit.angle),us=Math.sin(unit.angle),dx=car.x-unit.x,dy=car.y-unit.y;
+    if(car.yieldHome&&Math.abs(cs*uc+sn*us)<.85&&Math.hypot(dx,dy)<160)return true;
     // Let crossing traffic clear the junction. Stopping it across the route
     // would build a permanent barrier in front of the responder.
     if(Math.abs(cs*uc+sn*us)<.85&&!unit.rotationBlocked)return false;
@@ -2338,8 +2340,12 @@ function yieldTrafficToServices(car,dt){
     car.x>=r.x&&car.x<=r.x+r.w&&car.y>=r.y&&car.y<=r.y+r.h);
   if(!road)return approaching;
   const center=horizontal?road.y+road.h/2:road.x+road.w/2;
-  if(approaching&&!car.yieldHome)car.yieldHome={cross,value:car[cross],side:
-    Math.sign(car[cross]-center)||-Math.sign(horizontal?cs:sn)};
+  if(approaching&&!car.yieldHome){
+    const turning=units.find(unit=>unit.rotationBlocked&&Math.hypot(unit.x-car.x,unit.y-car.y)<160&&
+      Math.abs(cs*Math.cos(unit.angle)+sn*Math.sin(unit.angle))<.85);
+    car.yieldHome={cross,value:car[cross],side:turning?Math.sign(car[cross]-turning[cross])||1:
+      Math.sign(car[cross]-center)||-Math.sign(horizontal?cs:sn)};
+  }
   const side=car.yieldHome.side??(Math.sign(car[cross]-center)||Math.sign(car.yieldHome.value-center)||-Math.sign(horizontal?cs:sn));
   car.yieldHome.side=side;
   if(approaching&&car.routeManaged){
