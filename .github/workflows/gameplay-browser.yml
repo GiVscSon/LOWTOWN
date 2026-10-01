@@ -20,6 +20,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - name: Original SVG transport views
+        run: npm run test:transport-svg
       - name: Swept vehicle contacts, pushing and pedestrian reactions
         run: npm run test:vehicle-momentum
       - name: Drive all islands and bridges, weather and roofs

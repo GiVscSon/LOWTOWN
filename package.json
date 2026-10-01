@@ -46,7 +46,8 @@
     "test:mobile-streets-custody": "node tests/mobile-streets-custody-regression.mjs",
     "test:authored-world": "node tests/authored-archipelago-regression.mjs",
     "test:vehicle-momentum": "node tests/vehicle-momentum-regression.mjs",
-    "test:world-driving-weather": "node tests/world-driving-weather-regression.mjs"
+    "test:world-driving-weather": "node tests/world-driving-weather-regression.mjs",
+    "test:transport-svg": "node tests/transport-svg-regression.mjs"
   },
   "dependencies": {
     "@sentry/browser": "^10.25.0",

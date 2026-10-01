@@ -15,4 +15,4 @@ Validation uses the live source/controller and production browser. The in-game A
 
 The two new acceptance scripts run in both Build and Sandbox Gameplay Gates. Existing controls, live traffic, custody, authored-world geometry and rendering checks remain enabled.
 
-Vehicle source images: existing six single-profile SVGs are connected to the garage preview. The official Kenney eight-direction CC0 archive was inspected; using it on the road would require a calibrated rotation atlas and a deliberate change from smooth to stepped body headings. See `ASSET_SOURCES.md`.
+Vehicle source images: the original 19-model, 304-view SVG pack is connected to the garage preview; earlier six side-profile SVGs remain available as legacy sources. The official Kenney eight-direction CC0 archive was inspected; using it on the road would require a calibrated rotation atlas and a deliberate change from smooth to stepped body headings. See `ASSET_SOURCES.md`.
