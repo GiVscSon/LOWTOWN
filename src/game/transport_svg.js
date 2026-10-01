@@ -24,7 +24,7 @@ export function createTransportSVG(type='sedan',heading=0){
       if(nx+ny>0)svg+=polygon([bottom[i],bottom[(i+1)%base.length],top[(i+1)%base.length],top[i]],nx>ny?'#394344':'#263337');
     }
     svg+=polygon(top,paint);
-    parts.push({depth:base.reduce((sum,p)=>{const q=rotate(p);return sum+q[0]+q[1];},0)/base.length,z,svg:svg+detail});
+    parts.push({depth:base.reduce((sum,p)=>{const q=rotate(p);return sum+q[0]+q[1];},0)/base.length,z:z+height/2,svg:svg+detail});
     return z+height;
   }
   const paint=palettes[type],air=['plane','helicopter'].includes(type),water=['speedboat','tug'].includes(type);
@@ -74,6 +74,14 @@ export function createTransportSVG(type='sedan',heading=0){
     const roof=volume(cabin,9,heavy||van?9:type==='sports'?4:type==='coupe'?5:7,'#53727b');
     const [x,y]=cabin[0];volume(rect(x+3,y+2,cabin[1][0]-x-6,h*.7-4),roof,1,paint);
     details.push(line([cabin[1][0],-h*.29,roof-.8],[cabin[1][0],h*.29,roof-.8],'#a2c3c5',.9));
+    const frontX=cabin[1][0],backX=cabin[0][0];
+    const nearFront=cs+sn>0,windowX=nearFront?frontX:backX;
+    details.push(polygon([[windowX,-h*.3,10],[windowX,h*.3,10],[windowX,h*.3,roof-1],[windowX,-h*.3,roof-1]],nearFront?'#527b87':'#354f59','#21343b',.6));
+    details.push(line([windowX,0,10],[windowX,0,roof-1],'#aabbb8',.6));
+    for(const side of [-1,1])if(side*(cs-sn)>0){
+      details.push(polygon([[backX+2,side*h*.35,10],[frontX-2,side*h*.35,10],[frontX-2,side*h*.35,roof-1],[backX+2,side*h*.35,roof-1]],'#375963','#1a3037',.6));
+      details.push(line([(backX+frontX)/2,side*h*.35,10],[(backX+frontX)/2,side*h*.35,roof-1],'#91a29f',.8));
+    }
     if(type==='truck'||type==='fireEngine'){
       volume(rect(-w*.46,-h*.44,w*.58,h*.88),9,type==='truck'?15:10,type==='truck'?'#8c8977':paint);
       for(let i=0;i<4;i++)details.push(line([-w*.42+i*10,-h*.39,24],[-w*.42+i*10,h*.39,24],type==='truck'?'#b6b4a1':'#cbc9b6',.8));
@@ -103,7 +111,7 @@ export function createTransportSVG(type='sedan',heading=0){
     }
     details.push(line([w*.4,-h*.16,8],[w*.4,h*.16,8],'#17252b',2));
   }
-  parts.sort((a,b)=>a.depth-b.depth||a.z-b.z);
+  parts.sort((a,b)=>(a.depth+a.z*2)-(b.depth+b.z*2));
   return `<svg xmlns="http://www.w3.org/2000/svg" width="220" height="170" viewBox="0 0 220 170" role="img" aria-label="LOWTOWN ${xml(type)}"><title>LOWTOWN ${xml(type)}</title><metadata>Original LOWTOWN vector artwork; heading ${heading.toFixed(6)} radians</metadata>${shadow}${parts.map(p=>p.svg).join('')}<g>${details.join('')}</g></svg>`;
 }
 export const transportSVGUri=(type,heading=.1)=>'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(createTransportSVG(type,heading));
