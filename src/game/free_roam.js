@@ -1,4 +1,5 @@
 import { resolveScenery, resolveContact, contact, chassis } from './solid_contacts.js';
+import { drawStreetVehicle } from './street_vehicle.js';
 export const VEHICLES = {
   sedan: { name:'Седан', kind:'land', width:48,height:24,max:7.2,accel:.022,mass:1500,offroad:.78,color:'#e09a3e' },
   van: { name:'Фургон',kind:'land',width:64,height:28,max:5.8,accel:.018,steer:.034,mass:2200,offroad:.96,color:'#9aa0a8' },
@@ -177,6 +178,7 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
 }
 
 export function drawTransport(ctx,car,time=0,altitude=0) {
+  if(car.kind==='land')return drawStreetVehicle(ctx,car,time,altitude);
   ctx.save();ctx.translate(car.x,car.y);
   if(car.kind==='water'&&Math.abs(car.speed||0)>.15){
     ctx.save();ctx.rotate(car.angle);ctx.strokeStyle='rgba(191,221,223,.28)';ctx.lineWidth=3;
