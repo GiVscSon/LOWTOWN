@@ -15,6 +15,31 @@ import { streetSurfaceGeometry, createRoadCircuits, createRoadGraph, roadPath, r
 import './game/test_drive.css';
 // LOWTOWN // THREE ISLANDS VISUAL OVERHAUL // GTA 2 RETRO-NOIR ENGINE
 // High-detail procedural pedestrian sprites, isometric vehicle chassis, wet road reflections, neon glow & audio
+// Browser A/B controls used by the bridge-entry visual/performance regression.
+// Production defaults to flat bridge ends; ?bridgeCaps=round reproduces the previous rendering.
+const LOWTOWN_QUERY=String(window.location?.search||'');
+const localBridgeQA=['127.0.0.1','localhost'].includes(window.location?.hostname)&&/(?:\?|&)cityQA=1(?:&|$)/.test(LOWTOWN_QUERY);
+let bridgeEndCap=localBridgeQA&&/(?:\?|&)bridgeCaps=round(?:&|$)/.test(LOWTOWN_QUERY)?'round':'butt';
+const perfEnabled=localBridgeQA&&/(?:\?|&)perf=1(?:&|$)/.test(LOWTOWN_QUERY);
+const perfSamples={logic:[],render:[],frame:[]};
+const PERF_SAMPLE_LIMIT=600;
+function pushPerfSample(bucket,value){
+  if(!Number.isFinite(value))return;
+  bucket.push(value);if(bucket.length>PERF_SAMPLE_LIMIT)bucket.shift();
+}
+function perfStats(values){
+  if(!values.length)return {count:0,mean:0,p50:0,p95:0,max:0};
+  const sorted=[...values].sort((a,b)=>a-b),pick=p=>sorted[Math.min(sorted.length-1,Math.floor((sorted.length-1)*p))];
+  return {count:values.length,mean:values.reduce((sum,value)=>sum+value,0)/values.length,p50:pick(.5),p95:pick(.95),max:sorted.at(-1)};
+}
+function resetPerfSamples(){perfSamples.logic.length=0;perfSamples.render.length=0;perfSamples.frame.length=0;}
+function perfSummary(){return {bridgeCaps:bridgeEndCap,logic:perfStats(perfSamples.logic),render:perfStats(perfSamples.render),frame:perfStats(perfSamples.frame)};}
+if(perfEnabled)window.__LOWTOWN_PERF__={
+  get bridgeCaps(){return bridgeEndCap;},
+  setBridgeCaps(value){bridgeEndCap=value==='round'?'round':'butt';return bridgeEndCap;},
+  reset:resetPerfSamples,
+  summary:perfSummary
+};
 
 class SynthAudio {
   constructor() {
@@ -2730,7 +2755,7 @@ function drawSmoothBridgeDeck(bridgePath,index=0){
   if(!bridgePath?.path?.length)return;
   const width=Math.max(bridgePath.width||ROAD_W,ROAD_W*.72);
   const radius=Math.min(180,width*1.35);
-  ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
+  ctx.save();ctx.lineJoin='round';ctx.lineCap=bridgeEndCap;
   if(!traceSmoothBridgePath(ctx,bridgePath.path,radius)){ctx.restore();return;}
   ctx.strokeStyle='rgba(100,113,113,.8)';ctx.lineWidth=width+8;ctx.stroke();
   traceSmoothBridgePath(ctx,bridgePath.path,radius);
@@ -3982,19 +4007,29 @@ let accumulator = 0;
 let driveLab;
 function gameLoop(now) {
   if(qaManualSceneClock!==null){window.__lowtownLastFrame=performance.now();requestAnimationFrame(gameLoop);return;}
+  const framePerfStart=perfEnabled?performance.now():0;
   const dt = Math.max(0, Math.min(0.1, (now - state.lastFrameTime) / 1000));
   state.lastFrameTime = now;
   accumulator += dt;
   try {
+    const logicPerfStart=perfEnabled?performance.now():0;
     while (accumulator >= 1 / 60) {
       driveLab?.beforeStep();
       updatePhysics(1 / 60);
       driveLab?.afterStep();
       accumulator -= 1 / 60;
     }
+    const logicPerfEnd=perfEnabled?performance.now():0;
+    const renderPerfStart=perfEnabled?performance.now():0;
     renderWorld();
+    const renderPerfEnd=perfEnabled?performance.now():0;
     driveLab?.afterFrame();
     window.__lowtownLastFrame = performance.now();
+    if(perfEnabled){
+      pushPerfSample(perfSamples.logic,logicPerfEnd-logicPerfStart);
+      pushPerfSample(perfSamples.render,renderPerfEnd-renderPerfStart);
+      pushPerfSample(perfSamples.frame,performance.now()-framePerfStart);
+    }
   } catch (error) {
     window.__lowtownFail?.(error.message);
     driveLab?.fail(error.message);
@@ -4174,6 +4209,17 @@ function boot() {
         if(!isPositionOnSolidGround(x,y)||isPedestrianSceneryBlocked(x,y))throw new Error('Street view requires clear ground');
         roam.resetToSedan(x,y,0);Object.keys(state.keys).forEach(key=>state.keys[key]=false);
         state.wanted=0;state.invulnTimer=9999;renderWorld();return {x,y};
+      },
+      viewBridgeEntrance(index=0){
+        const paths=(roadPaintGeometry||(roadPaintGeometry=buildRoadPaintGeometry())).bridgePaths||[];
+        if(!paths.length)throw new Error('No smooth bridge paths');
+        const bridge=paths[((index%paths.length)+paths.length)%paths.length],a=bridge.path[0],b=bridge.path[1]||a;
+        const dx=b.x-a.x,dy=b.y-a.y,length=Math.hypot(dx,dy)||1,heading=Math.atan2(dy,dx);
+        let x=a.x-dx/length*150,y=a.y-dy/length*150;
+        if(!isPositionOnSolidGround(x,y)){x=a.x+dx/length*35;y=a.y+dy/length*35;}
+        roam.resetToSedan(x,y,heading);Object.keys(state.keys).forEach(key=>state.keys[key]=false);
+        state.wanted=0;state.invulnTimer=9999;renderWorld();
+        return {id:bridge.id,index,x,y,heading,start:{x:a.x,y:a.y},width:bridge.width};
       },
       startMedicalIncident(){
         const incident=cityIncidentDirector.start('crash',safeSpawnPoints[13],{duration:600});
