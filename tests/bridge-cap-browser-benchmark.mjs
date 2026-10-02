@@ -32,7 +32,7 @@ async function openVariant(mode,passIndex){
     let seed=0x1f2e3d4c;
     Math.random=()=>((seed=Math.imul(seed,1664525)+1013904223>>>0)/4294967296);
   });
-  await page.goto(`http://127.0.0.1:${PORT}/?cityQA=1&perf=1&bridgeCaps=${mode}`,{waitUntil:'domcontentloaded',timeout:10000});
+  await page.goto(`http://127.0.0.1:${PORT}/?renderer=canvas&cityQA=1&perf=1&bridgeCaps=${mode}`,{waitUntil:'domcontentloaded',timeout:10000});
   await page.waitForFunction(()=>Boolean(window.__LOWTOWN_PERF__&&window.__lowtownCityQA)&&
     Number.isFinite(window.__lowtownLastFrame)&&performance.now()-window.__lowtownLastFrame<1200,null,{timeout:10000});
   const scene=await page.evaluate(()=>{
