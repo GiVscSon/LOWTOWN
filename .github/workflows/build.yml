@@ -30,6 +30,19 @@ jobs:
         run: npm run test:mobile-streets-custody
       - name: Install Chromium for Pages smoke test
         run: npx playwright install --with-deps chromium
+      - name: Compare bridge entry cap logic and rendering cost
+        run: npm run test:bridge-caps
+      - name: Upload bridge cap A/B benchmark
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lowtown-bridge-cap-benchmark
+          path: |
+            test-results/bridge-cap-benchmark.json
+            test-results/bridge-caps-round.png
+            test-results/bridge-caps-butt.png
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Run production Pages smoke test
         run: |
           npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/lowtown-preview.log 2>&1 &
