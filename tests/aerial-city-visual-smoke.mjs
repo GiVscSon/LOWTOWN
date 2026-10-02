@@ -30,29 +30,22 @@ async function waitForPreview() {
 }
 
 async function screenshot(name) {
-  await page.waitForTimeout(150);
-  const canvas = await page.locator('#gameCanvas').evaluate(element => {
-    const ctx = element.getContext('2d');
-    if (!ctx) return { width: element.width, height: element.height, colors: 0, painted: 0 };
-    const { width, height } = element;
-    const data = ctx.getImageData(0, 0, width, height).data;
-    const colorSet = new Set();
-    let painted = 0;
-    const stepX = Math.max(1, Math.floor(width / 36));
-    const stepY = Math.max(1, Math.floor(height / 24));
-    for (let y = Math.floor(stepY / 2); y < height; y += stepY) {
-      for (let x = Math.floor(stepX / 2); x < width; x += stepX) {
-        const i = (y * width + x) * 4;
-        if (data[i + 3] > 0) {
-          painted += 1;
-          colorSet.add(`${data[i]},${data[i + 1]},${data[i + 2]}`);
-        }
-      }
-    }
-    return { width, height, colors: colorSet.size, painted };
+  await page.waitForTimeout(180);
+  const canvas = await page.evaluate(() => {
+    const renderer=window.__lowtownRenderer;
+    const element=document.getElementById(renderer==='three'?'threeCanvas':'gameCanvas');
+    return {
+      renderer,
+      width:element?.width||0,
+      height:element?.height||0,
+      visible:!!element&&getComputedStyle(element).display!=='none',
+      frames:window.__lowtownThreeStats?.frames||0,
+      camera:window.__lowtownThreeStats?.camera||null
+    };
   });
+  assert(canvas.visible, `active renderer canvas is hidden: ${JSON.stringify(canvas)}`);
   assert(canvas.width >= 640 && canvas.height >= 360, `game canvas size is too small: ${JSON.stringify(canvas)}`);
-  assert(canvas.colors >= 28 && canvas.painted >= 150, `game canvas looks blank or incomplete: ${JSON.stringify(canvas)}`);
+  if(canvas.renderer==='three')assert(canvas.frames>=2,`Three.js renderer is not advancing: ${JSON.stringify(canvas)}`);
   const path = `${artifactDir}/${name}.png`;
   await page.screenshot({ path });
   shots.push({ name, path, canvas });
@@ -94,29 +87,20 @@ try {
     // Spawn just north of the airport helicopter so the first safe exit leaves
     // it closer than the sedan we just exited.
     localStorage.setItem('lowtown_integrity_save', JSON.stringify({ cash: 750, x: 1040, y: 2010 }));
-    window.__lowtownCameraZooms = [];
-    let capturedFrameScale = false;
-    const originalScale = CanvasRenderingContext2D.prototype.scale;
-    const originalRequestAnimationFrame = window.requestAnimationFrame.bind(window);
-    window.requestAnimationFrame = callback => originalRequestAnimationFrame(time => {
-      capturedFrameScale = false;
-      callback(time);
-    });
-    CanvasRenderingContext2D.prototype.scale = function (x, y) {
-      if (this.canvas?.id === 'gameCanvas' && !capturedFrameScale) {
-        capturedFrameScale = true;
-        window.__lowtownCameraZooms.push({ x, y });
-      }
-      return originalScale.call(this, x, y);
-    };
   });
   const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
   assert(response?.ok(), `LOWTOWN preview returned HTTP ${response?.status()}`);
-  await page.locator('#gameCanvas').waitFor({ state: 'visible', timeout: 15000 });
+  await page.waitForFunction(() =>
+    window.__lowtownRenderer==='three' &&
+    window.__lowtownThreeStats?.frames>=3 &&
+    Number.isFinite(window.__lowtownLastFrame) &&
+    performance.now()-window.__lowtownLastFrame<1500,
+    null,{timeout:15000}
+  );
+  await page.locator('#threeCanvas').waitFor({ state: 'visible', timeout: 15000 });
   await page.locator('#hudDistrict').waitFor({ state: 'visible', timeout: 10000 });
-  await page.waitForFunction(() => Number.isFinite(window.__lowtownLastFrame), null, { timeout: 10000 });
-  await page.waitForFunction(() => window.__lowtownCameraZooms?.length >= 3, null, { timeout: 10000 });
-  const groundZoom = await page.evaluate(() => window.__lowtownCameraZooms.at(-1)?.x);
+  const groundCamera = await page.evaluate(() => window.__lowtownThreeStats?.camera);
+  assert(groundCamera&&Number.isFinite(groundCamera.y),'Three.js ground camera metrics are unavailable');
 
   await page.locator('#btnOpenMap').click();
   await page.locator('#mapModal').waitFor({ state: 'visible', timeout: 5000 });
@@ -130,7 +114,7 @@ try {
   await page.locator('#btnCloseMap').click();
   await page.locator('#mapModal').waitFor({ state: 'hidden', timeout: 5000 });
 
-  await page.locator('#gameCanvas').click({ position: { x: 500, y: 450 } });
+  await page.locator('#threeCanvas').click({ position: { x: 500, y: 450 } });
   await page.keyboard.press('e');
   await page.waitForFunction(() => document.querySelector('#toastMsg')?.textContent?.includes('Пешком'), null, { timeout: 5000 });
   await page.keyboard.press('e');
@@ -145,8 +129,11 @@ try {
   await release('w');
   const airHeight = await page.locator('#hudGear').textContent();
   assert(Number.parseInt(airHeight, 10) >= 180, `helicopter did not reach useful aerial height: ${airHeight}`);
-  const aerialZoom = await page.evaluate(() => window.__lowtownCameraZooms.at(-1)?.x);
-  assert(aerialZoom < groundZoom * .55, `helicopter altitude did not zoom the city camera out enough: ${groundZoom} -> ${aerialZoom}`);
+  const aerialCamera = await page.evaluate(() => window.__lowtownThreeStats?.camera);
+  assert(aerialCamera&&aerialCamera.y>groundCamera.y+140,
+    `helicopter altitude did not lift the Three.js camera enough: ${JSON.stringify(groundCamera)} -> ${JSON.stringify(aerialCamera)}`);
+  assert(aerialCamera.distance>groundCamera.distance+120,
+    `helicopter altitude did not widen the Three.js chase view enough: ${JSON.stringify(groundCamera)} -> ${JSON.stringify(aerialCamera)}`);
   await screenshot('aerial-takeoff');
 
   await flyStraight('aerial-east', 16000);
@@ -189,7 +176,7 @@ try {
     url,
     vehicle: 'helicopter',
     flightAltitude: airHeight.trim(),
-    cameraZoom: { ground: groundZoom, aerial: aerialZoom },
+    camera: { ground: groundCamera, aerial: aerialCamera },
     screenshots: shots,
     survey,
     citySnapshot,
