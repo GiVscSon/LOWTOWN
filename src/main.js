@@ -4209,6 +4209,17 @@ function boot() {
         roam.resetToSedan(x,y,0);Object.keys(state.keys).forEach(key=>state.keys[key]=false);
         state.wanted=0;state.invulnTimer=9999;renderWorld();return {x,y};
       },
+      viewBridgeEntrance(index=0){
+        const paths=(roadPaintGeometry||(roadPaintGeometry=buildRoadPaintGeometry())).bridgePaths||[];
+        if(!paths.length)throw new Error('No smooth bridge paths');
+        const bridge=paths[((index%paths.length)+paths.length)%paths.length],a=bridge.path[0],b=bridge.path[1]||a;
+        const dx=b.x-a.x,dy=b.y-a.y,length=Math.hypot(dx,dy)||1,heading=Math.atan2(dy,dx);
+        let x=a.x-dx/length*150,y=a.y-dy/length*150;
+        if(!isPositionOnSolidGround(x,y)){x=a.x+dx/length*35;y=a.y+dy/length*35;}
+        roam.resetToSedan(x,y,heading);Object.keys(state.keys).forEach(key=>state.keys[key]=false);
+        state.wanted=0;state.invulnTimer=9999;renderWorld();
+        return {id:bridge.id,index,x,y,heading,start:{x:a.x,y:a.y},width:bridge.width};
+      },
       startMedicalIncident(){
         const incident=cityIncidentDirector.start('crash',safeSpawnPoints[13],{duration:600});
         incident.reported=true;
