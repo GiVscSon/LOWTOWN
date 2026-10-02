@@ -129,7 +129,7 @@ export function createLowtownThreeRenderer({canvas,world}){
     return personPool[index];
   };
 
-  let frames=0;
+  let frames=0,cameraReady=false;
   function resize(){
     const width=Math.max(1,canvas.clientWidth||globalThis.innerWidth||1);
     const height=Math.max(1,canvas.clientHeight||globalThis.innerHeight||1);
@@ -168,7 +168,8 @@ export function createLowtownThreeRenderer({canvas,world}){
       820+altitude*1.35,
       p.y-Math.sin(heading)*distance+Math.cos(heading)*260
     );
-    camera.position.lerp(desired,.14);camera.lookAt(p.x,24+altitude*.35,p.y);
+    if(!cameraReady){camera.position.copy(desired);cameraReady=true;}else camera.position.lerp(desired,.14);
+    camera.lookAt(p.x,24+altitude*.35,p.y);
     scene.fog.density=frame.weather?.fog?.000175:.000095;
     scene.background.set(frame.weather?.rain?0x071117:COLORS.water);
     renderer.render(scene,camera);
