@@ -3358,6 +3358,32 @@ function initThreeRuntime(){
   }
 }
 
+function renderHud(){
+  renderRadar();
+  const speedEl = document.getElementById('hudSpeed');
+  if (speedEl) speedEl.innerText = roam?.mode === 'foot' ? 'ПЕШКОМ' : Math.round(Math.abs(player.speed) * 12);
+  const enterEl=document.getElementById('btnRoamEnter');if(enterEl)enterEl.textContent=roam?.mode==='foot'?'Сесть · E':'Выйти · E';
+  const flyEl=document.getElementById('btnRoamFly');if(flyEl)flyEl.style.display=roam?.profile?.kind==='air'?'':'none';
+  const gearEl = document.getElementById('hudGear');
+  if (gearEl) gearEl.innerText = player.gear;
+  const rpmEl = document.getElementById('hudRpm');
+  if (rpmEl) rpmEl.style.width = Math.round(player.rpm * 100) + '%';
+  const cashEl = document.getElementById('hudCash');
+  if (cashEl) cashEl.innerText = state.cash;
+  const hpBarEl = document.getElementById('hudHpBar');
+  if (hpBarEl) hpBarEl.style.width = Math.max(0, player.hp) + '%';
+  const hpValEl = document.getElementById('hudHpVal');
+  if (hpValEl) hpValEl.innerText = Math.round(player.hp) + '%';
+  for (let i = 1; i <= 5; i++) {
+    const star = document.getElementById(`star${i}`);
+    if (!star) continue;
+    if (i <= state.wanted) {
+      if (state.evading) {star.classList.remove('lit');star.classList.add('evade-lit');}
+      else {star.classList.remove('evade-lit');star.classList.add('lit');}
+    } else star.classList.remove('lit', 'evade-lit');
+  }
+}
+
 function renderWorld() {
   const w = window.innerWidth;
   const h = window.innerHeight;
@@ -3370,6 +3396,7 @@ function renderWorld() {
       pedestrians,
       weather:{kind:weather?.kind||'clear',rain:weather?.rain||0,fog:weather?.fog||0,wetness:weather?.wetness||0}
     });
+    renderHud();
     return;
   }
   if (canvas.width !== w || canvas.height !== h) {
@@ -3592,39 +3619,7 @@ function renderWorld() {
     ctx.fillStyle=`rgba(245,224,205,${Math.min(1,state.deathFlash*1.8)})`;ctx.font='900 34px Inter, sans-serif';ctx.textAlign='center';ctx.fillText('ВОЗРОЖДЕНИЕ',w*.5,h*.5);ctx.restore();
   }
 
-  // Radar & HUD
-  renderRadar();
-  const speedEl = document.getElementById('hudSpeed');
-  if (speedEl) speedEl.innerText = roam?.mode === 'foot' ? 'ПЕШКОМ' : Math.round(Math.abs(player.speed) * 12);
-  const enterEl=document.getElementById('btnRoamEnter');if(enterEl)enterEl.textContent=roam?.mode==='foot'?'Сесть · E':'Выйти · E';
-  const flyEl=document.getElementById('btnRoamFly');if(flyEl)flyEl.style.display=roam?.profile?.kind==='air'?'':'none';
-  const gearEl = document.getElementById('hudGear');
-  if (gearEl) gearEl.innerText = player.gear;
-  const rpmEl = document.getElementById('hudRpm');
-  if (rpmEl) rpmEl.style.width = Math.round(player.rpm * 100) + '%';
-  const cashEl = document.getElementById('hudCash');
-  if (cashEl) cashEl.innerText = state.cash;
-  const hpBarEl = document.getElementById('hudHpBar');
-  if (hpBarEl) hpBarEl.style.width = Math.max(0, player.hp) + '%';
-  const hpValEl = document.getElementById('hudHpVal');
-  if (hpValEl) hpValEl.innerText = Math.round(player.hp) + '%';
-
-  for (let i = 1; i <= 5; i++) {
-    const star = document.getElementById(`star${i}`);
-    if (star) {
-      if (i <= state.wanted) {
-        if (state.evading) {
-          star.classList.remove('lit');
-          star.classList.add('evade-lit');
-        } else {
-          star.classList.remove('evade-lit');
-          star.classList.add('lit');
-        }
-      } else {
-        star.classList.remove('lit', 'evade-lit');
-      }
-    }
-  }
+  renderHud();
 }
 
 function drawScreenPedestrian(ped,sx,sy,index,zoom=1){
