@@ -13,7 +13,7 @@ export const VEHICLES = {
 export const PLANE_RUNWAYS = [
   { x: 1400, y: 2140, w: 650, h: 100 },
   { x: 1400, y: 8040, w: 650, h: 100 }
-  ,{ x: 8700, y: 7900, w: 660, h: 100 }
+  ,{ x: 8700, y: 7900, w: 500, h: 100 }
 ];
 export function isPlaneRunway(x,y,margin=0){
   return PLANE_RUNWAYS.some(r=>x>=r.x-margin&&x<=r.x+r.w+margin&&y>=r.y-margin&&y<=r.y+r.h+margin);
