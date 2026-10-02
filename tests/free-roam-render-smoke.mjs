@@ -98,7 +98,8 @@ assert(kingswayTaxi?.plan,'Kingsway runway should have a safe parallel taxiway')
 assert(runwayTaxiAudit.filter(entry=>entry.plan).every(entry=>entry.plan.samples.every(p=>isPositionOnIslandLand(p.x,p.y)&&!onRoadSurface(p.x,p.y,roads,bridges,scenicRoads,roadEnds))),'taxiway samples must stay on dry non-road ground');
 const kingswayRunway=PLANE_RUNWAYS.at(-1);
 const kingswayRoadSamples=Array.from({length:11},(_,ix)=>Array.from({length:3},(_,iy)=>({x:kingswayRunway.x+kingswayRunway.w*ix/10,y:kingswayRunway.y+kingswayRunway.h*iy/2}))).flat();
-assert(kingswayRoadSamples.every(p=>!onRoadSurface(p.x,p.y,roads,bridges,scenicRoads,roadEnds)),'Kingsway runway must not cross an automobile road');
+const kingswayRoadHits=kingswayRoadSamples.filter(p=>onRoadSurface(p.x,p.y,roads,bridges,scenicRoads,roadEnds));
+assert.equal(kingswayRoadHits.length,0,'Kingsway runway must not cross an automobile road: '+JSON.stringify(kingswayRoadHits));
 assert(vehicleNames.every(name=>!mapLabels.includes(name)),'Fleet names must not cover map landmarks');
 assert(routeAudit.walkingRoutes>0,'pedestrians need generated footpaths');
 assert(routeAudit.transitRoutes.length>=2&&routeAudit.transitRoutes.every(r=>r.points>20&&r.stops>=10&&r.roadBound),'bus routes must connect city districts on the actual road graph');
