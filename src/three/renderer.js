@@ -174,7 +174,12 @@ export function createLowtownThreeRenderer({canvas,world}){
     renderer.render(scene,camera);
     frames++;
     globalThis.__lowtownLastFrame=performance.now();
-    globalThis.__lowtownThreeStats={frames,objects:scene.children.length,vehicles:vehicles.length,pedestrians:people.length};
+    globalThis.__lowtownThreeStats={
+      frames,objects:scene.children.length,vehicles:vehicles.length,pedestrians:people.length,
+      camera:{x:camera.position.x,y:camera.position.y,z:camera.position.z,
+        distance:Math.hypot(camera.position.x-p.x,camera.position.z-p.y),fov:camera.fov},
+      player:{x:p.x,y:p.y,altitude}
+    };
   }
   function dispose(){renderer.dispose();staticGroup.traverse(object=>object.geometry?.dispose?.());}
   return {render,dispose,scene,camera,renderer};
