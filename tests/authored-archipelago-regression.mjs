@@ -57,6 +57,10 @@ const report=JSON.parse(city.run(`JSON.stringify((()=>{
   const cs=Math.cos(v.angle),sn=Math.sin(v.angle),w=v.width/2,h=v.height/2;
   return [[0,0],[w,h],[w,-h],[-w,h],[-w,-h]].some(([a,b])=>v.kind==='water'?isPositionOnWaterObstacle(v.x+a*cs-b*sn,v.y+a*sn+b*cs):!isPositionOnSolidGround(v.x+a*cs-b*sn,v.y+a*sn+b*cs));
  });
+ const planes=fleet.filter(v=>v.type==='plane');
+ const planesOnRunways=planes.map(v=>PLANE_RUNWAYS.some(r=>v.x>=r.x&&v.x<=r.x+r.w&&v.y>=r.y&&v.y<=r.y+r.h));
+ const kingsway=PLANE_RUNWAYS.at(-1),runwayRoadSamples=[];
+ for(let ix=0;ix<=10;ix++)for(let iy=0;iy<=2;iy++){const x=kingsway.x+kingsway.w*ix/10,y=kingsway.y+kingsway.h*iy/2;if(onRoadSurface(x,y,roads,bridges,scenicRoads,roadEnds))runwayRoadSamples.push({x,y});}
  return {width:WORLD_W,height:WORLD_H,islands:islands.length,islets:islets.length,bridges:bridges.length,
   roadBridges:new Set(bridges.filter(b=>!b.footway).map(b=>b.logicalId||b.id)).size,bridgeDecks:bridges.filter(b=>!b.footway).length,footways:footways.length,
   disconnectedNodes:roadGraph.filter(n=>!roadPath(roadGraph,roadGraph[0],n).length).length,
@@ -66,6 +70,8 @@ const report=JSON.parse(city.run(`JSON.stringify((()=>{
 assert.equal(report.disconnectedNodes,0,'all road components must connect');
 for(const key of ['propsOnRoad','blockingRails','streetSceneryOnRoad','duplicateRoads','stackedLines','blockedWalks','unsafeFleet'])assert.equal(report[key].length,0,`${key}: ${JSON.stringify(report[key].slice(0,4))}`);
 assert.equal(report.stunts,0);assert.equal(report.roadBridges,24);assert.equal(report.footways,AUTHORED_ISLETS.length*2);assert(report.runways);
+assert(report.planesOnRunways.length>=2&&report.planesOnRunways.every(Boolean),'authored planes must spawn on a runway: '+JSON.stringify(report.planesOnRunways));
+assert.equal(report.runwayRoadSamples.length,0,'Kingsway runway must be separated from automobile roads: '+JSON.stringify(report.runwayRoadSamples));
 const landings=city.run(`bridges.filter(b=>b.footway).filter(b=>b.id.endsWith('-1')).map(b=>({x:b.x+b.w/2,y:b.y+b.h-8}))`);
 assert.equal(landings.length,AUTHORED_ISLETS.length);
 for(const islet of AUTHORED_ISLETS){
