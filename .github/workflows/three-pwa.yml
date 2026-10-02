@@ -13,6 +13,9 @@ on:
       - src/main.js
       - src/pwa.js
       - src/three/**
+      - scripts/pwa-icons.mjs
+      - vite.config.js
+      - tests/three-city-geometry.mjs
       - tests/three-pwa-*.mjs
       - .github/workflows/three-pwa.yml
   workflow_dispatch:
@@ -29,6 +32,7 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run test:three-pwa-contract
+      - run: node tests/three-city-geometry.mjs
       - run: npx playwright install --with-deps chromium
       - name: Three.js live rendering and PWA offline restart
         run: npm run test:three-pwa-browser

@@ -24,7 +24,9 @@ try {
   let lastError;
   for (let attempt = 1; attempt <= 15; attempt += 1) {
     try {
-      response = await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 3000 });
+      // Three.js compiles its first WebGL programs before DOMContentLoaded.
+      // Software WebGL on CI can take longer than the old Canvas boot budget.
+      response = await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 15000 });
       if (response?.ok()) break;
     } catch (error) {
       lastError = error;

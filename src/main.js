@@ -3,7 +3,7 @@ import { AUTHORED_TERRAIN, migrateWorld2Point, ARCHIPELAGO_WIDTH, ARCHIPELAGO_HE
 import { drawArchitecture, drawStreetTree, drawStreetFurniture } from './game/architecture.js';
 import { velocityForHeading, stepLandVehicle, projectIso, routeInput } from './game/test_drive_core.js';
 import { createDriveLab } from './game/test_drive_lab.js';
-import { resolveContact, resolveScenery, contact, chassis, captureMotion, solveVehicleMotion } from './game/solid_contacts.js';
+import { resolveContact, resolveScenery, contact, chassis, captureMotion, solveVehicleMotion, createSpatialIndex } from './game/solid_contacts.js';
 import { planEmergencyPassingManeuver, emergencyPassingPathClear } from './game/emergency_passing.js';
 import { coastPath, coastPoints, pointInCoast, pointInBeach, BEACH_WIDTH } from './game/coastline.js';
 import { createFreeRoam, drawTransport, VEHICLES, PLANE_RUNWAYS as LEGACY_RUNWAYS } from './game/free_roam.js';
@@ -1390,8 +1390,11 @@ function pedestrianCarBlocked(x,y,c){
   return Math.abs(dx*cs+dy*sn)<(c.width||48)/2+5&&Math.abs(-dx*sn+dy*cs)<(c.height||24)/2+5;
 }
 
+let pedestrianSceneryIndex=null;
 function isPedestrianSceneryBlocked(x,y){
   if(!isPositionOnSolidGround(x,y))return true;
+  if(pedestrianSceneryIndex)return pedestrianSceneryIndex.query(x,y,x,y).some(p=>
+    p.tree?Math.hypot(x-p.source.x,y-p.source.y)<11:x>p.left&&x<p.right&&y>p.top&&y<p.bottom);
   if(buildings.some(b=>x>b.x-7&&x<b.x+b.w+7&&y>b.y-7&&y<b.y+b.h+7))return true;
   if(solidProps.some(o=>Math.abs(x-o.x)<o.width*.5+5&&Math.abs(y-o.y)<o.height*.5+5))return true;
   if(trees.some(t=>Math.hypot(x-t.x,y-t.y)<11))return true;
@@ -1477,6 +1480,10 @@ function pedestrianEvacuation(person){
 
 function updatePedestrians(dt){
   const frame=Math.min(dt,.05)*60;
+  const scenery=[...buildings.map(b=>({left:b.x-7,top:b.y-7,right:b.x+b.w+7,bottom:b.y+b.h+7})),
+    ...solidProps.map(p=>({left:p.x-p.width*.5-5,top:p.y-p.height*.5-5,right:p.x+p.width*.5+5,bottom:p.y+p.height*.5+5})),
+    ...trees.map(t=>({left:t.x-11,top:t.y-11,right:t.x+11,bottom:t.y+11,tree:true,source:t}))];
+  pedestrianSceneryIndex=createSpatialIndex(scenery,p=>p);
   const cars=[...trafficCars,...policeCars,...incidentPoliceCars,...incidentResponseVehicles,...(roam?.mode!=='foot'&&!(roam?.altitude>12)?[player]:[])];
   pedestrians.forEach((p,index)=>{
     if(p.homeY===undefined){p.homeY=p.y;p.homeX=p.x;p.pause=index%7*.18;p.trip=0;}
@@ -1595,6 +1602,7 @@ function updatePedestrians(dt){
     if(p.gait===0)p.walkPhase=0;
 
   });
+  pedestrianSceneryIndex=null;
 }
 
 function buildServiceAccess(){
@@ -3338,9 +3346,10 @@ function initThreeRuntime(){
     const world={
       width:WORLD_W,height:WORLD_H,
       islands:allIslands.map(island=>({id:island.id,natural:!!island.natural,points:coastPoints(island)})),
-      roads:[...roads,...scenicRoads],
-      bridges:bridges.filter(bridge=>!bridge.footway),
-      buildings,trees,runways:PLANE_RUNWAYS
+      roads,scenicRoads,bridges,
+      paint:roadPaintGeometry||(roadPaintGeometry=buildRoadPaintGeometry()),
+      crosswalks:(roadPaintGeometry||(roadPaintGeometry=buildRoadPaintGeometry())).crosswalkJunctions.flatMap(j=>junctionCrosswalkStripes({y:j.y,h:j.h},{x:j.x,w:j.w},j.approaches)),
+      buildings,trees,runways:PLANE_RUNWAYS,parks:parkZones,piers,props:solidProps,lights:streetLights,stops:transitStopSigns(),billboards,cranes
     };
     threeRenderer=createLowtownThreeRenderer({canvas:threeCanvas,world});
     canvas.classList?.add('renderer-hidden');
@@ -3392,9 +3401,10 @@ function renderWorld() {
       player,
       mode:roam?.mode||'sedan',
       altitude:roam?.altitude||0,
-      vehicles:[...trafficCars,...parkedCars,...policeCars,...incidentPoliceCars,...incidentResponseVehicles,...(roam?.fleet||[]),...airMedicalVehicles],
-      pedestrians,
-      weather:{kind:weather?.kind||'clear',rain:weather?.rain||0,fog:weather?.fog||0,wetness:weather?.wetness||0}
+      vehicles:[...trafficCars,...parkedCars,...policeCars,...incidentPoliceCars,...incidentResponseVehicles,...(roam?.fleet||[]),...airMedicalVehicles,...(cityIncidentDirector?.current()?.wrecks||[])],
+      pedestrians:[...pedestrians,...(cityIncidentDirector?.current()?.actors||[])],
+      props:breakableProps,parts:CARPARTS,incident:cityIncidentDirector?.current(),
+      weather:{kind:weather?.kind||'clear',rain:weather?.rain||0,fog:weather?.fog||0,wetness:weather?.wetness||0,wind:weather?.gust||0,flash:weather?.flash||0}
     });
     renderHud();
     return;
@@ -4272,6 +4282,7 @@ function toggleGarage() {
 
 function boot() {
   initTopology();
+  window.addEventListener('lowtown-before-update',()=>autoSaveProgress());
   initThreeRuntime();
   roam = createFreeRoam(player, parkedCars, buildings, trees, isPositionOnSolidGround, showToast, solidProps, isPositionOnWaterObstacle,
     ()=>[...trafficCars,...policeCars,...incidentPoliceCars,...incidentResponseVehicles],{mapPoint:worldPoint,runways:PLANE_RUNWAYS});

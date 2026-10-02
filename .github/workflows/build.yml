@@ -26,6 +26,8 @@ jobs:
         run: npm run test:transport-svg
       - name: Swept vehicle contacts, pushing and pedestrian reactions
         run: npm run test:vehicle-momentum
+      - name: Nearby scenery and thin bridge collision barriers
+        run: node tests/spatial-collision-regression.mjs
       - name: Drive all islands and bridges, weather and roofs
         run: npm run test:world-driving-weather
       - name: Mobile driving, road clearance and police station release
