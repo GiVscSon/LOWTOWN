@@ -3,7 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <meta name="theme-color" content="#06090e" />
+  <meta name="theme-color" content="#14161a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="LOWTOWN" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="./pwa-icon.svg" />
   <title>LOWTOWN — приватный тест-драйв</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='5' fill='%2314161a'/%3E%3Cpath d='M9 7v18h15v-5H14V7z' fill='%23e8b84a'/%3E%3C/svg%3E">
   <script>
@@ -39,7 +45,10 @@
     }
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-deep); font-family: var(--font-ui); color: var(--text-main); }
-    #gameCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; touch-action: none; z-index: 1; }
+    #gameCanvas, #threeCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; touch-action: none; z-index: 1; }
+    #threeCanvas { display: none; }
+    #threeCanvas.active { display: block; }
+    #gameCanvas.renderer-hidden { display: none; }
     #hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; padding: max(env(safe-area-inset-top, 10px), 12px) max(env(safe-area-inset-right, 10px), 12px) max(env(safe-area-inset-bottom, 10px), 12px) max(env(safe-area-inset-left, 10px), 12px); }
     .hud-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; pointer-events: none; }
     .radar-wrapper { position: relative; width: 96px; height: 96px; border-radius: 50%; background: rgba(11, 15, 23, 0.94); border: 1.5px solid var(--glass-border); backdrop-filter: blur(14px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7); overflow: hidden; display: flex; align-items: center; justify-content: center; pointer-events: auto; cursor: pointer; }
@@ -130,6 +139,7 @@
   </style>
 </head>
 <body>
+  <canvas id="threeCanvas" aria-label="LOWTOWN Three.js scene"></canvas>
   <canvas id="gameCanvas"></canvas>
   <div id="hud">
     <div class="hud-header">
@@ -155,6 +165,7 @@
       <div class="header-right">
         <div class="wallet-badge"><span>$</span> <span id="hudCash">750</span></div>
         <div class="top-buttons-row">
+          <button class="btn-top" id="btnInstallPwa" title="Установить LOWTOWN" aria-label="Установить LOWTOWN" style="display:none">Установить</button>
           <button class="btn-top" id="btnWeather" title="Сменить погоду" aria-label="Сменить погоду">Ясно</button>
           <button class="btn-top" id="btnRadio">R</button>
           <button class="btn-top" id="btnOpenMap">M</button>
@@ -212,6 +223,7 @@
       <button class="btn-top" id="btnRepairCar" style="padding: 10px; justify-content: center; background: rgba(74, 222, 128, 0.15); border-color: var(--accent-green); color: var(--accent-green); font-weight:800;">ПОЛНЫЙ РЕМОНТ И СБРОС РОЗЫСКА ($80)</button>
     </div>
   </div>
+  <script type="module" src="./src/pwa.js"></script>
   <script type="module" src="./src/main.js"></script>
 <div id="custodyOverlay" role="status" aria-live="polite" style="display:none"></div>
 </body>
