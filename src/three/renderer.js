@@ -21,6 +21,9 @@ export function createLowtownThreeRenderer({canvas,world}){
   if(!canvas)throw new Error('Three.js canvas is missing');
   const renderer=new THREE.WebGLRenderer({canvas,alpha:false,powerPreference:'high-performance',antialias:(globalThis.devicePixelRatio||1)<2});
   renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;
+  const gl=renderer.getContext(),debug=gl.getExtension('WEBGL_debug_renderer_info');
+  const software=debug&&/swiftshader|llvmpipe|software/i.test(String(gl.getParameter(debug.UNMASKED_RENDERER_WEBGL)));
+  let renderQuality=software?.5:1,frameAverage=16,qualityFrames=0;
   const scene=new THREE.Scene();scene.background=new THREE.Color('#07151d');scene.fog=new THREE.FogExp2('#10202a',.000095);
   const camera=new THREE.PerspectiveCamera(46,1,2,18000);
   scene.add(new THREE.HemisphereLight('#bccdd6','#282a1f',1.8));
@@ -131,8 +134,11 @@ export function createLowtownThreeRenderer({canvas,world}){
   let frames=0,cameraReady=false,lastPlayerPosition=null,lastTime=performance.now(),contextLost=false;
   canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();contextLost=true;});canvas.addEventListener('webglcontextrestored',()=>{contextLost=false;cameraReady=false;});
   function render(frame){
-    const now=performance.now(),dt=Math.min(.1,Math.max(0,(now-lastTime)/1000)),time=now/1000;lastTime=now;
-    const width=Math.max(1,canvas.clientWidth||innerWidth),height=Math.max(1,canvas.clientHeight||innerHeight),ratio=Math.min(devicePixelRatio||1,1.5);
+    const now=performance.now(),elapsed=Math.max(0,now-lastTime),dt=Math.min(.1,elapsed/1000),time=now/1000;lastTime=now;
+    if(!document.hidden&&frames>4){frameAverage=frameAverage*.9+Math.min(300,elapsed)*.1;qualityFrames++;
+      if(qualityFrames>=20&&frameAverage>70){renderQuality=Math.max(.5,renderQuality-.1);qualityFrames=0;}
+      else if(!software&&qualityFrames>=120&&frameAverage<25){renderQuality=Math.min(1,renderQuality+.05);qualityFrames=0;}}
+    const width=Math.max(1,canvas.clientWidth||innerWidth),height=Math.max(1,canvas.clientHeight||innerHeight),ratio=Math.min(devicePixelRatio||1,1.5)*renderQuality;
     if(canvas.width!==Math.round(width*ratio)||canvas.height!==Math.round(height*ratio)){
       renderer.setPixelRatio(ratio);renderer.setSize(width,height,false);camera.aspect=width/height;camera.updateProjectionMatrix();
     }
@@ -161,7 +167,7 @@ export function createLowtownThreeRenderer({canvas,world}){
     props.instanceMatrix.needsUpdate=true;if(props.instanceColor)props.instanceColor.needsUpdate=true;
     const collectibles=(frame.parts||[]).filter(part=>!part.found);parts.count=Math.min(32,collectibles.length);rotation.setFromAxisAngle(axis,time);
     for(let i=0;i<parts.count;i++){const part=collectibles[i];matrix.compose(new THREE.Vector3(part.x,16+Math.sin(time*2+i)*3,part.y),rotation,scale);parts.setMatrixAt(i,matrix);}parts.instanceMatrix.needsUpdate=true;
-    const heading=p.angle||0,mobile=width<700,distance=(mobile?480:680)+altitude*1.5,desired=new THREE.Vector3(p.x-Math.cos(heading)*distance-Math.sin(heading)*260,(mobile?580:820)+altitude*1.35,p.y-Math.sin(heading)*distance+Math.cos(heading)*260);
+    const heading=p.angle||0,cameraHeading=foot?-Math.PI*.75:heading,sideOffset=foot?0:260,mobile=width<700,distance=(mobile?480:680)+altitude*1.5,desired=new THREE.Vector3(p.x-Math.cos(cameraHeading)*distance-Math.sin(cameraHeading)*sideOffset,(mobile?580:820)+altitude*1.35,p.y-Math.sin(cameraHeading)*distance+Math.cos(cameraHeading)*sideOffset);
     const teleported=lastPlayerPosition&&Math.hypot(p.x-lastPlayerPosition.x,p.y-lastPlayerPosition.y)>900;
     if(!cameraReady||teleported){camera.position.copy(desired);cameraReady=true;}else camera.position.lerp(desired,1-Math.exp(-9*dt));
     lastPlayerPosition={x:p.x,y:p.y};camera.lookAt(p.x,24+altitude*.35,p.y);
@@ -178,8 +184,8 @@ export function createLowtownThreeRenderer({canvas,world}){
       fireGroup.position.set(incident.x,4,incident.y);flames.forEach((flame,i)=>{flame.visible=!incident.fireSuppressed;flame.position.set(Math.sin(i*2.3)*20,12,Math.cos(i*2.3)*20);flame.scale.y=.7+Math.sin(time*9+i)*.25;});
       smoke.forEach((mesh,i)=>{const rise=(time*18+i*17)%180;mesh.position.set(Math.sin(i*2.3)*16+rise*.17,30+rise,Math.cos(i*2.3)*16);mesh.scale.setScalar(1+rise*.012);});
     }
-    if(!contextLost)renderer.render(scene,camera);frames++;globalThis.__lowtownLastFrame=now;
-    globalThis.__lowtownThreeStats={frames,vehicles:actors.size,pedestrians:people.length,objects:scene.children.length,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,contextLost,
+    if(!contextLost)renderer.render(scene,camera);frames++;globalThis.__lowtownLastFrame=performance.now();
+    globalThis.__lowtownThreeStats={frames,vehicles:actors.size,pedestrians:people.length,objects:scene.children.length,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,contextLost,renderQuality,software:!!software,
       camera:{x:camera.position.x,y:camera.position.y,z:camera.position.z,distance:Math.hypot(camera.position.x-p.x,camera.position.z-p.y),fov:camera.fov},player:{x:p.x,y:p.y,altitude}};
   }
   function dispose(){const geometries=new Set(),materials=new Set();scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});

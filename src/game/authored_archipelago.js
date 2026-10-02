@@ -227,9 +227,12 @@ export function isletWalkways(){
     return [[start,corner],[corner,end]].filter(([a,b])=>Math.hypot(a.x-b.x,a.y-b.y)>1).map(([a,b],index)=>{
       const horizontal=a.y===b.y;
       return {id:`walk-${islet.id}-${index}`,name:islet.name+' Boardwalk',footway:true,
-        dir:horizontal?'h':'v',x:horizontal?Math.min(a.x,b.x):a.x-width/2,
-        y:horizontal?a.y-width/2:Math.min(a.y,b.y),
-        w:horizontal?Math.abs(b.x-a.x):width,h:horizontal?width:Math.abs(b.y-a.y)};
+        // Extend both ends by half the deck width. Butt-ended perpendicular
+        // strips leave an unsupported quarter-square at their shared corner.
+        // The same rectangles are consumed by painting and ground support.
+        dir:horizontal?'h':'v',x:horizontal?Math.min(a.x,b.x)-width/2:a.x-width/2,
+        y:horizontal?a.y-width/2:Math.min(a.y,b.y)-width/2,
+        w:horizontal?Math.abs(b.x-a.x)+width:width,h:horizontal?width:Math.abs(b.y-a.y)+width};
     });
   });
 }

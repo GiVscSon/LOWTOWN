@@ -22,7 +22,8 @@ parts update from the live simulation. Rain, fog, wind in tree crowns,
 headlights, wetness, lightning and fire/smoke follow current weather/incidents.
 
 Static buildings, windows, trees, street furniture and markings are batched.
-Rendering resolution is capped at 1.5 device pixels per CSS pixel. Nearby
+Rendering resolution is capped at 1.5 device pixels per CSS pixel and can fall
+to half resolution under sustained load; software WebGL starts at that level. Nearby
 scenery queries also reduce the simulation's collision and walking search
 cost. This does not establish a frame-rate guarantee for every phone.
 

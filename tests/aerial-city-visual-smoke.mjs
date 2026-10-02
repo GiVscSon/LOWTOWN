@@ -44,7 +44,8 @@ async function screenshot(name) {
     };
   });
   assert(canvas.visible, `active renderer canvas is hidden: ${JSON.stringify(canvas)}`);
-  assert(canvas.width >= 640 && canvas.height >= 360, `game canvas size is too small: ${JSON.stringify(canvas)}`);
+  const viewport=page.viewportSize();
+  assert(canvas.width >= Math.min(640,viewport.width*.5) && canvas.height >= Math.min(360,viewport.height*.5), `adaptive game canvas size is too small: ${JSON.stringify(canvas)}`);
   if(canvas.renderer==='three')assert(canvas.frames>=2,`Three.js renderer is not advancing: ${JSON.stringify(canvas)}`);
   const path = `${artifactDir}/${name}.png`;
   await page.screenshot({ path });

@@ -4,6 +4,7 @@ import {landVehicleGeometry,createTransportVisual} from '../src/three/vehicles.j
 import {roundedBridgePoints,ribbonGeometry} from '../src/three/geometry.js';
 import {pwaIcon} from '../scripts/pwa-icons.mjs';
 import {runtimeCity} from './helpers/runtime-city.mjs';
+import {isletWalkways} from '../src/game/authored_archipelago.js';
 const models=['sedan','coupe','sports','wagon','taxi','van','bus','truck','bike','police','armoredPolice','nationalGuard','fireEngine','ambulance'];
 const shapes=new Set();
 for(const type of models){
@@ -27,6 +28,16 @@ for(let i=0;i<points.length;i++){
 }
 for(const size of [192,512]){const icon=pwaIcon(size);assert.equal(icon.subarray(1,4).toString(),'PNG');assert.equal(icon.readUInt32BE(16),size);assert.equal(icon.readUInt32BE(20),size);}
 const city=runtimeCity(73),paint=JSON.parse(city.run('JSON.stringify(buildRoadPaintGeometry())'));
+const walkways=isletWalkways();
+for(const deck of walkways){
+  const next=walkways.find(other=>other.id===deck.id.replace(/-0$/,'-1'));
+  if(!next||next===deck)continue;
+  const x=next.x+next.w/2,y=deck.y+deck.h/2;
+  for(let dx=-28;dx<=28;dx+=7)for(let dy=-28;dy<=28;dy+=7){
+    assert(walkways.some(rect=>x+dx>=rect.x&&x+dx<=rect.x+rect.w&&y+dy>=rect.y&&y+dy<=rect.y+rect.h),'missing boardwalk corner '+deck.id);
+    assert(city.run(`isPositionOnSolidGround(${x+dx},${y+dy})`),'painted boardwalk corner has no ground support '+deck.id);
+  }
+}
 for(const bridge of paint.bridgePaths){
   const geometry=ribbonGeometry(roundedBridgePoints(bridge.path,bridge.width),bridge.width),position=geometry.getAttribute('position');
   for(let i=0;i<position.count;i++){

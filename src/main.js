@@ -2766,7 +2766,7 @@ function traceSmoothBridgePath(target, points, radius=120) {
 function drawSmoothBridgeDeck(bridgePath,index=0){
   if(!bridgePath?.path?.length)return;
   const width=Math.max(bridgePath.width||ROAD_W,ROAD_W*.72);
-  const radius=Math.min(180,width*1.35);
+  const radius=width*.5;
   ctx.save();ctx.lineJoin='round';ctx.lineCap=bridgeEndCap;
   if(!traceSmoothBridgePath(ctx,bridgePath.path,radius)){ctx.restore();return;}
   ctx.strokeStyle='rgba(100,113,113,.8)';ctx.lineWidth=width+8;ctx.stroke();
@@ -3955,7 +3955,7 @@ function renderFullMap() {
   fullMapCtx.save();fullMapCtx.lineCap='round';fullMapCtx.lineJoin='round';
   for(const bridgePath of mapPaint.bridgePaths||[]){
     const points=bridgePath.path.map(point=>({x:mapX+point.x*scale,y:mapY+point.y*scale}));
-    if(!traceSmoothBridgePath(fullMapCtx,points,Math.min(180,bridgePath.width*1.35)*scale))continue;
+    if(!traceSmoothBridgePath(fullMapCtx,points,bridgePath.width*.5*scale))continue;
     fullMapCtx.strokeStyle='#38bdf8';fullMapCtx.lineWidth=Math.max(3,bridgePath.width*scale);fullMapCtx.stroke();
   }
   fullMapCtx.restore();
