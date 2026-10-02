@@ -32,3 +32,17 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Three.js live rendering and PWA offline restart
         run: npm run test:three-pwa-browser
+      - name: Three.js production Pages smoke
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/lowtown-three-preview.log 2>&1 &
+          npm run test:pages-smoke
+      - name: Three.js aerial city visual sweep
+        run: npm run test:aerial-visual
+      - name: Upload Three.js aerial screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lowtown-three-aerial
+          path: artifacts/aerial-city/
+          if-no-files-found: ignore
+          retention-days: 14
