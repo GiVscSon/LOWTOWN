@@ -3271,6 +3271,62 @@ function updatePoliceAI(dt) {
   }
 }
 
+function drawRunwaySurface(runway,index){
+  const shoulder=14,centerY=runway.y+runway.h/2;
+  ctx.save();
+
+  // A dark compacted shoulder makes the strip read as a built airfield surface,
+  // rather than a grey rectangle pasted onto district terrain.
+  ctx.fillStyle='#202626';
+  ctx.fillRect(runway.x-shoulder,runway.y-shoulder,runway.w+shoulder*2,runway.h+shoulder*2);
+
+  const asphalt=ctx.createLinearGradient(runway.x,runway.y,runway.x,runway.y+runway.h);
+  asphalt.addColorStop(0,'#343a3a');asphalt.addColorStop(.5,'#292f2f');asphalt.addColorStop(1,'#343a3a');
+  ctx.fillStyle=asphalt;ctx.fillRect(runway.x,runway.y,runway.w,runway.h);
+
+  // Narrow service aprons give parked aircraft a believable paved bay without
+  // changing the logical runway rectangle used by take-off and landing.
+  const apronW=Math.min(190,Math.max(120,runway.w*.22)),apronX=runway.x+runway.w*.33;
+  ctx.fillStyle='#2d3434';
+  ctx.fillRect(apronX,runway.y-30,apronW,30);
+  ctx.fillRect(apronX,runway.y+runway.h,apronW,30);
+  ctx.strokeStyle='rgba(171,169,147,.30)';ctx.lineWidth=1;
+  ctx.strokeRect(apronX,runway.y-30,apronW,30);ctx.strokeRect(apronX,runway.y+runway.h,apronW,30);
+
+  // Edge paint and threshold bars.
+  ctx.strokeStyle='rgba(226,224,203,.78)';ctx.lineWidth=2;ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(runway.x+8,runway.y+8);ctx.lineTo(runway.x+runway.w-8,runway.y+8);
+  ctx.moveTo(runway.x+8,runway.y+runway.h-8);ctx.lineTo(runway.x+runway.w-8,runway.y+runway.h-8);
+  ctx.stroke();
+  ctx.fillStyle='rgba(229,227,207,.82)';
+  for(const side of [0,1]){
+    const baseX=side?runway.x+runway.w-30:runway.x+14;
+    for(let row=0;row<5;row++){
+      const y=runway.y+14+row*(runway.h-28)/4;
+      const x=side?baseX:baseX;
+      ctx.fillRect(x,y-2,16,4);
+    }
+  }
+
+  // Centre line and runway numbers.
+  ctx.strokeStyle='rgba(235,232,209,.72)';ctx.lineWidth=3;ctx.setLineDash([24,22]);
+  ctx.beginPath();ctx.moveTo(runway.x+55,centerY);ctx.lineTo(runway.x+runway.w-55,centerY);ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='rgba(235,232,209,.70)';ctx.font='bold 15px monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+  const headings=['09','27'];
+  ctx.fillText(headings[0],runway.x+52,centerY);ctx.fillText(headings[1],runway.x+runway.w-52,centerY);
+
+  // Small amber/white edge lights keep the strip readable in LOWTOWN's night palette.
+  for(let x=runway.x+24;x<runway.x+runway.w-20;x+=72){
+    const pulse=.58+.08*Math.sin((x+index*31)*.07);
+    ctx.fillStyle=`rgba(231,205,142,${pulse})`;
+    for(const y of [runway.y-5,runway.y+runway.h+5]){ctx.beginPath();ctx.arc(x,y,2.4,0,Math.PI*2);ctx.fill();}
+  }
+
+  ctx.restore();
+}
+
 function renderWorld() {
   const w = window.innerWidth;
   const h = window.innerHeight;
@@ -3358,10 +3414,7 @@ function renderWorld() {
     ctx.strokeStyle='#b8a77e';ctx.lineWidth=2;
     for(let y=pier.y;y<pier.y+pier.h;y+=20){ctx.beginPath();ctx.moveTo(pier.x,y);ctx.lineTo(pier.x+pier.w,y);ctx.stroke();}
   }
-  for(const runway of PLANE_RUNWAYS){
-    ctx.fillStyle='#373b3b';ctx.fillRect(runway.x,runway.y,runway.w,runway.h);
-    ctx.strokeStyle='#c8c5ae';ctx.lineWidth=3;ctx.setLineDash([30,25]);ctx.beginPath();ctx.moveTo(runway.x+20,runway.y+runway.h/2);ctx.lineTo(runway.x+runway.w-20,runway.y+runway.h/2);ctx.stroke();ctx.setLineDash([]);
-  }
+  PLANE_RUNWAYS.forEach((runway,index)=>drawRunwaySurface(runway,index));
   for(const {x,y} of helipads){ctx.strokeStyle='#d3c58e';ctx.lineWidth=4;ctx.beginPath();ctx.arc(x,y,55,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#d3c58e';ctx.font='bold 42px sans-serif';ctx.textAlign='center';ctx.fillText('H',x,y+15);}
 
   // Watercraft are below bridge decks in the scene graph. They remain visible
