@@ -35,11 +35,12 @@ async function openVariant(mode,passIndex){
   await page.goto(`http://127.0.0.1:${PORT}/?cityQA=1&perf=1&bridgeCaps=${mode}`,{waitUntil:'domcontentloaded',timeout:10000});
   await page.waitForFunction(()=>Boolean(window.__LOWTOWN_PERF__&&window.__lowtownCityQA)&&
     Number.isFinite(window.__lowtownLastFrame)&&performance.now()-window.__lowtownLastFrame<1200,null,{timeout:10000});
-  await page.evaluate(()=>{
-    const qa=window.__lowtownCityQA,snapshot=qa.snapshot();
+  const scene=await page.evaluate(()=>{
+    const qa=window.__lowtownCityQA;
     qa.setWeather('clear');
-    qa.viewStreet(snapshot.player.x,snapshot.player.y);
+    const bridge=qa.viewBridgeEntrance(0);
     window.__LOWTOWN_PERF__.reset();
+    return bridge;
   });
   await page.waitForTimeout(WARMUP_MS);
   await page.evaluate(()=>window.__LOWTOWN_PERF__.reset());
@@ -48,7 +49,7 @@ async function openVariant(mode,passIndex){
     perf:window.__LOWTOWN_PERF__.summary(),
     error:String(window.__lowtownLastError||''),
     frameAge:performance.now()-window.__lowtownLastFrame,
-    viewport:{width:innerWidth,height:innerHeight}
+    viewport:{width:innerWidth,height:innerHeight},scene
   }));
   if(!passIndex||!ORDER.slice(0,passIndex).includes(mode))await page.screenshot({path:`test-results/bridge-caps-${mode}.png`,fullPage:true});
   assert.equal(result.error,'',`${mode}: runtime error: ${result.error}`);
@@ -57,7 +58,7 @@ async function openVariant(mode,passIndex){
   assert(result.perf.logic.count>=SAMPLE_FRAMES,`${mode}: too few logic samples: ${result.perf.logic.count}`);
   assert(result.perf.render.count>=SAMPLE_FRAMES,`${mode}: too few render samples: ${result.perf.render.count}`);
   await context.close();
-  return result.perf;
+  return {...result.perf,scene:result.scene};
 }
 
 const pct=(current,baseline)=>baseline?((current-baseline)/baseline)*100:0;
