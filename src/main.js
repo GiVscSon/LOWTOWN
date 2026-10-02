@@ -15,6 +15,30 @@ import { streetSurfaceGeometry, createRoadCircuits, createRoadGraph, roadPath, r
 import './game/test_drive.css';
 // LOWTOWN // THREE ISLANDS VISUAL OVERHAUL // GTA 2 RETRO-NOIR ENGINE
 // High-detail procedural pedestrian sprites, isometric vehicle chassis, wet road reflections, neon glow & audio
+// Browser A/B controls used by the bridge-entry visual/performance regression.
+// Production defaults to flat bridge ends; ?bridgeCaps=round reproduces the previous rendering.
+const LOWTOWN_QUERY=String(window.location?.search||'');
+let bridgeEndCap=/(?:\?|&)bridgeCaps=round(?:&|$)/.test(LOWTOWN_QUERY)?'round':'butt';
+const perfEnabled=/(?:\?|&)perf=1(?:&|$)/.test(LOWTOWN_QUERY);
+const perfSamples={logic:[],render:[],frame:[]};
+const PERF_SAMPLE_LIMIT=600;
+function pushPerfSample(bucket,value){
+  if(!Number.isFinite(value))return;
+  bucket.push(value);if(bucket.length>PERF_SAMPLE_LIMIT)bucket.shift();
+}
+function perfStats(values){
+  if(!values.length)return {count:0,mean:0,p50:0,p95:0,max:0};
+  const sorted=[...values].sort((a,b)=>a-b),pick=p=>sorted[Math.min(sorted.length-1,Math.floor((sorted.length-1)*p))];
+  return {count:values.length,mean:values.reduce((sum,value)=>sum+value,0)/values.length,p50:pick(.5),p95:pick(.95),max:sorted.at(-1)};
+}
+function resetPerfSamples(){perfSamples.logic.length=0;perfSamples.render.length=0;perfSamples.frame.length=0;}
+function perfSummary(){return {bridgeCaps:bridgeEndCap,logic:perfStats(perfSamples.logic),render:perfStats(perfSamples.render),frame:perfStats(perfSamples.frame)};}
+if(perfEnabled)window.__LOWTOWN_PERF__={
+  get bridgeCaps(){return bridgeEndCap;},
+  setBridgeCaps(value){bridgeEndCap=value==='round'?'round':'butt';return bridgeEndCap;},
+  reset:resetPerfSamples,
+  summary:perfSummary
+};
 
 class SynthAudio {
   constructor() {
@@ -2730,7 +2754,7 @@ function drawSmoothBridgeDeck(bridgePath,index=0){
   if(!bridgePath?.path?.length)return;
   const width=Math.max(bridgePath.width||ROAD_W,ROAD_W*.72);
   const radius=Math.min(180,width*1.35);
-  ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
+  ctx.save();ctx.lineJoin='round';ctx.lineCap=bridgeEndCap;
   if(!traceSmoothBridgePath(ctx,bridgePath.path,radius)){ctx.restore();return;}
   ctx.strokeStyle='rgba(100,113,113,.8)';ctx.lineWidth=width+8;ctx.stroke();
   traceSmoothBridgePath(ctx,bridgePath.path,radius);
@@ -3827,7 +3851,7 @@ function renderFullMap() {
 
   const mapPaint=roadPaintGeometry||(roadPaintGeometry=buildRoadPaintGeometry());
   const smoothBridgeIds=new Set((mapPaint.bridgePaths||[]).map(path=>path.id));
-  fullMapCtx.save();fullMapCtx.lineCap='round';fullMapCtx.lineJoin='round';
+  fullMapCtx.save();fullMapCtx.lineCap=bridgeEndCap;fullMapCtx.lineJoin='round';
   for(const bridgePath of mapPaint.bridgePaths||[]){
     const points=bridgePath.path.map(point=>({x:mapX+point.x*scale,y:mapY+point.y*scale}));
     if(!traceSmoothBridgePath(fullMapCtx,points,Math.min(180,bridgePath.width*1.35)*scale))continue;
@@ -3982,19 +4006,29 @@ let accumulator = 0;
 let driveLab;
 function gameLoop(now) {
   if(qaManualSceneClock!==null){window.__lowtownLastFrame=performance.now();requestAnimationFrame(gameLoop);return;}
+  const framePerfStart=perfEnabled?performance.now():0;
   const dt = Math.max(0, Math.min(0.1, (now - state.lastFrameTime) / 1000));
   state.lastFrameTime = now;
   accumulator += dt;
   try {
+    const logicPerfStart=perfEnabled?performance.now():0;
     while (accumulator >= 1 / 60) {
       driveLab?.beforeStep();
       updatePhysics(1 / 60);
       driveLab?.afterStep();
       accumulator -= 1 / 60;
     }
+    const logicPerfEnd=perfEnabled?performance.now():0;
+    const renderPerfStart=perfEnabled?performance.now():0;
     renderWorld();
+    const renderPerfEnd=perfEnabled?performance.now():0;
     driveLab?.afterFrame();
     window.__lowtownLastFrame = performance.now();
+    if(perfEnabled){
+      pushPerfSample(perfSamples.logic,logicPerfEnd-logicPerfStart);
+      pushPerfSample(perfSamples.render,renderPerfEnd-renderPerfStart);
+      pushPerfSample(perfSamples.frame,performance.now()-framePerfStart);
+    }
   } catch (error) {
     window.__lowtownFail?.(error.message);
     driveLab?.fail(error.message);
