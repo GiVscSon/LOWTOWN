@@ -1,0 +1,34 @@
+name: LOWTOWN Three PWA
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - index.html
+      - package.json
+      - package-lock.json
+      - public/manifest.webmanifest
+      - public/pwa-icon.svg
+      - public/sw.js
+      - src/main.js
+      - src/pwa.js
+      - src/three/**
+      - tests/three-pwa-*.mjs
+      - .github/workflows/three-pwa.yml
+  workflow_dispatch:
+
+jobs:
+  three-pwa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run test:three-pwa-contract
+      - run: npx playwright install --with-deps chromium
+      - name: Three.js live rendering and PWA offline restart
+        run: npm run test:three-pwa-browser
