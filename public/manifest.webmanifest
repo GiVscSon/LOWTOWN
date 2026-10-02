@@ -1,0 +1,30 @@
+{
+  "id": "./",
+  "name": "LOWTOWN",
+  "short_name": "LOWTOWN",
+  "description": "Изометрический ночной город: транспорт, трафик, службы и свободное исследование.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#06090e",
+  "theme_color": "#14161a",
+  "categories": [
+    "games",
+    "entertainment"
+  ],
+  "icons": [
+    {
+      "src": "./pwa-icon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./pwa-icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
