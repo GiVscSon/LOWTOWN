@@ -3314,7 +3314,7 @@ function drawRunwaySurface(runway,index){
   ctx.beginPath();ctx.moveTo(runway.x+55,centerY);ctx.lineTo(runway.x+runway.w-55,centerY);ctx.stroke();
   ctx.setLineDash([]);
   ctx.fillStyle='rgba(235,232,209,.70)';ctx.font='bold 15px monospace';ctx.textAlign='center';ctx.textBaseline='middle';
-  const headings=index===2?['09','27']:['09','27'];
+  const headings=['09','27'];
   ctx.fillText(headings[0],runway.x+52,centerY);ctx.fillText(headings[1],runway.x+runway.w-52,centerY);
 
   // Small amber/white edge lights keep the strip readable in LOWTOWN's night palette.
