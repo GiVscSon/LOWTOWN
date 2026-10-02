@@ -65,7 +65,7 @@ const report=JSON.parse(city.run(`JSON.stringify((()=>{
   roadBridges:new Set(bridges.filter(b=>!b.footway).map(b=>b.logicalId||b.id)).size,bridgeDecks:bridges.filter(b=>!b.footway).length,footways:footways.length,
   disconnectedNodes:roadGraph.filter(n=>!roadPath(roadGraph,roadGraph[0],n).length).length,
   propsOnRoad,blockingRails,streetSceneryOnRoad,duplicateRoads,stackedLines,blockedWalks,unsafeFleet,stunts:stuntZones.length,
-  fleetCount:fleet.length,runways:PLANE_RUNWAYS.every(r=>[[0,0],[r.w,0],[0,r.h],[r.w,r.h]].every(([dx,dy])=>isPositionOnSolidGround(r.x+dx,r.y+dy)))};
+  fleetCount:fleet.length,planesOnRunways,runwayRoadSamples,runways:PLANE_RUNWAYS.every(r=>[[0,0],[r.w,0],[0,r.h],[r.w,r.h]].every(([dx,dy])=>isPositionOnSolidGround(r.x+dx,r.y+dy)))};
 })())`));
 assert.equal(report.disconnectedNodes,0,'all road components must connect');
 for(const key of ['propsOnRoad','blockingRails','streetSceneryOnRoad','duplicateRoads','stackedLines','blockedWalks','unsafeFleet'])assert.equal(report[key].length,0,`${key}: ${JSON.stringify(report[key].slice(0,4))}`);
