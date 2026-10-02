@@ -12,6 +12,7 @@ import { classifySurface, surfaceMovement, createWeather, weatherMovement, WEATH
 import { createCityIncidentDirector, updateCrowdReactions } from './game/city_incidents.js';
 import { advanceTrafficCar, resolveTrafficPair } from './game/traffic_turns.js';
 import { streetSurfaceGeometry, createRoadCircuits, createRoadGraph, roadPath, roadTerminals, onRoadSurface, createWalkingRoutes, assignWalkingRoutes, nextWalkingGoal, planStopRoute, advanceRouteActor, drawRoadTerminals } from './game/street_network.js';
+import { createLowtownThreeRenderer } from './three/renderer.js';
 import './game/test_drive.css';
 // LOWTOWN // THREE ISLANDS VISUAL OVERHAUL // GTA 2 RETRO-NOIR ENGINE
 // High-detail procedural pedestrian sprites, isometric vehicle chassis, wet road reflections, neon glow & audio
@@ -168,6 +169,9 @@ const sound = new SynthAudio();
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+const threeCanvas = document.getElementById('threeCanvas');
+let threeRenderer = null;
+window.__lowtownRenderer = 'canvas';
 const radarCanvas = document.getElementById('radarCanvas');
 const radarCtx = radarCanvas.getContext('2d');
 const fullMapCanvas = document.getElementById('fullMapCanvas');
@@ -3327,9 +3331,47 @@ function drawRunwaySurface(runway,index){
   ctx.restore();
 }
 
+function initThreeRuntime(){
+  if(typeof createLowtownThreeRenderer!=='function'||!threeCanvas)return false;
+  if(/(?:\?|&)renderer=canvas(?:&|$)/.test(LOWTOWN_QUERY))return false;
+  try{
+    const world={
+      width:WORLD_W,height:WORLD_H,
+      islands:allIslands.map(island=>({id:island.id,natural:!!island.natural,points:coastPoints(island)})),
+      roads:[...roads,...scenicRoads],
+      bridges:bridges.filter(bridge=>!bridge.footway),
+      buildings,trees,runways:PLANE_RUNWAYS
+    };
+    threeRenderer=createLowtownThreeRenderer({canvas:threeCanvas,world});
+    canvas.classList?.add('renderer-hidden');
+    threeCanvas.classList?.add('active');
+    window.__lowtownRenderer='three';
+    return true;
+  }catch(error){
+    threeRenderer=null;
+    window.__lowtownRenderer='canvas';
+    window.__lowtownRendererError=String(error?.message||error);
+    canvas.classList?.remove('renderer-hidden');
+    threeCanvas.classList?.remove('active');
+    console.warn('LOWTOWN Three.js fallback:',error);
+    return false;
+  }
+}
+
 function renderWorld() {
   const w = window.innerWidth;
   const h = window.innerHeight;
+  if(threeRenderer){
+    threeRenderer.render({
+      player,
+      mode:roam?.mode||'sedan',
+      altitude:roam?.altitude||0,
+      vehicles:[...trafficCars,...parkedCars,...policeCars,...incidentPoliceCars,...incidentResponseVehicles,...(roam?.fleet||[]),...airMedicalVehicles],
+      pedestrians,
+      weather:{kind:weather?.kind||'clear',rain:weather?.rain||0,fog:weather?.fog||0,wetness:weather?.wetness||0}
+    });
+    return;
+  }
   if (canvas.width !== w || canvas.height !== h) {
     canvas.width = w;
     canvas.height = h;
@@ -4235,6 +4277,7 @@ function toggleGarage() {
 
 function boot() {
   initTopology();
+  initThreeRuntime();
   roam = createFreeRoam(player, parkedCars, buildings, trees, isPositionOnSolidGround, showToast, solidProps, isPositionOnWaterObstacle,
     ()=>[...trafficCars,...policeCars,...incidentPoliceCars,...incidentResponseVehicles],{mapPoint:worldPoint,runways:PLANE_RUNWAYS});
   const roamControls = document.createElement('div');
