@@ -18,8 +18,9 @@ import './game/test_drive.css';
 // Browser A/B controls used by the bridge-entry visual/performance regression.
 // Production defaults to flat bridge ends; ?bridgeCaps=round reproduces the previous rendering.
 const LOWTOWN_QUERY=String(window.location?.search||'');
-let bridgeEndCap=/(?:\?|&)bridgeCaps=round(?:&|$)/.test(LOWTOWN_QUERY)?'round':'butt';
-const perfEnabled=/(?:\?|&)perf=1(?:&|$)/.test(LOWTOWN_QUERY);
+const localBridgeQA=['127.0.0.1','localhost'].includes(window.location?.hostname)&&/(?:\?|&)cityQA=1(?:&|$)/.test(LOWTOWN_QUERY);
+let bridgeEndCap=localBridgeQA&&/(?:\?|&)bridgeCaps=round(?:&|$)/.test(LOWTOWN_QUERY)?'round':'butt';
+const perfEnabled=localBridgeQA&&/(?:\?|&)perf=1(?:&|$)/.test(LOWTOWN_QUERY);
 const perfSamples={logic:[],render:[],frame:[]};
 const PERF_SAMPLE_LIMIT=600;
 function pushPerfSample(bucket,value){
@@ -3851,7 +3852,7 @@ function renderFullMap() {
 
   const mapPaint=roadPaintGeometry||(roadPaintGeometry=buildRoadPaintGeometry());
   const smoothBridgeIds=new Set((mapPaint.bridgePaths||[]).map(path=>path.id));
-  fullMapCtx.save();fullMapCtx.lineCap=bridgeEndCap;fullMapCtx.lineJoin='round';
+  fullMapCtx.save();fullMapCtx.lineCap='round';fullMapCtx.lineJoin='round';
   for(const bridgePath of mapPaint.bridgePaths||[]){
     const points=bridgePath.path.map(point=>({x:mapX+point.x*scale,y:mapY+point.y*scale}));
     if(!traceSmoothBridgePath(fullMapCtx,points,Math.min(180,bridgePath.width*1.35)*scale))continue;
