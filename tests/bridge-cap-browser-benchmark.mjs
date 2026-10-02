@@ -49,8 +49,9 @@ async function openVariant(mode,passIndex){
     perf:window.__LOWTOWN_PERF__.summary(),
     error:String(window.__lowtownLastError||''),
     frameAge:performance.now()-window.__lowtownLastFrame,
-    viewport:{width:innerWidth,height:innerHeight},scene
+    viewport:{width:innerWidth,height:innerHeight}
   }));
+  result.scene=scene;
   if(!passIndex||!ORDER.slice(0,passIndex).includes(mode))await page.screenshot({path:`test-results/bridge-caps-${mode}.png`,fullPage:true});
   assert.equal(result.error,'',`${mode}: runtime error: ${result.error}`);
   assert(result.frameAge<1200,`${mode}: frame loop stalled for ${result.frameAge.toFixed(1)} ms`);
