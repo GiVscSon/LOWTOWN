@@ -48,11 +48,14 @@
     "test:vehicle-momentum": "node tests/vehicle-momentum-regression.mjs",
     "test:world-driving-weather": "node tests/world-driving-weather-regression.mjs",
     "test:transport-svg": "node tests/transport-svg-regression.mjs",
-    "test:bridge-caps": "node tests/bridge-cap-browser-benchmark.mjs"
+    "test:bridge-caps": "node tests/bridge-cap-browser-benchmark.mjs",
+    "test:three-pwa-contract": "node tests/three-pwa-contract.mjs",
+    "test:three-pwa-browser": "node tests/three-pwa-browser-smoke.mjs"
   },
   "dependencies": {
     "@sentry/browser": "^10.25.0",
-    "posthog-js": "^1.290.0"
+    "posthog-js": "^1.290.0",
+    "three": "0.185.1"
   },
   "devDependencies": {
     "@sentry/vite-plugin": "^4.6.0",
