@@ -3271,9 +3271,76 @@ function updatePoliceAI(dt) {
   }
 }
 
+function runwayTaxiwayPlan(runway){
+  const centerY=runway.y+runway.h/2,taxiHalf=18;
+  const pointClear=(x,y,padding=taxiHalf)=>{
+    if(!isPositionOnIslandLand(x,y))return false;
+    if(onRoadSurface(x,y,roads,bridges,scenicRoads,roadEnds))return false;
+    return !buildings.some(b=>x+padding>b.x&&x-padding<b.x+b.w&&y+padding>b.y&&y-padding<b.y+b.h);
+  };
+  const x1=runway.x+runway.w*.16,x2=runway.x+runway.w*.84;
+  const spurXs=[runway.x+runway.w*.30,runway.x+runway.w*.70];
+  const candidates=[
+    {side:-1,y:runway.y-62},
+    {side:1,y:runway.y+runway.h+62}
+  ];
+  for(const candidate of candidates){
+    const samples=[.16,.28,.40,.52,.64,.76,.84].map(t=>({x:runway.x+runway.w*t,y:candidate.y}));
+    if(!samples.every(p=>pointClear(p.x,p.y)))continue;
+    let connectorsSafe=true;
+    for(const x of spurXs){
+      for(let step=1;step<=5;step++){
+        const t=step/6,y=centerY+(candidate.y-centerY)*t;
+        if(!pointClear(x,y,14)){connectorsSafe=false;break;}
+      }
+      if(!connectorsSafe)break;
+    }
+    if(!connectorsSafe)continue;
+    const apronW=Math.min(260,Math.max(150,runway.w*.20)),apronH=74;
+    const apronX=runway.x+runway.w*.40-apronW/2;
+    const apronCenterY=candidate.y+candidate.side*(taxiHalf+apronH/2+10);
+    const apronSamples=[
+      {x:apronX+12,y:apronCenterY-apronH/2+12},
+      {x:apronX+apronW-12,y:apronCenterY-apronH/2+12},
+      {x:apronX+12,y:apronCenterY+apronH/2-12},
+      {x:apronX+apronW-12,y:apronCenterY+apronH/2-12},
+      {x:apronX+apronW/2,y:apronCenterY}
+    ];
+    const apron=apronSamples.every(p=>pointClear(p.x,p.y,12))?
+      {x:apronX,y:apronCenterY-apronH/2,w:apronW,h:apronH}:null;
+    return {x1,x2,y:candidate.y,side:candidate.side,spurXs,centerY,apron,samples};
+  }
+  return null;
+}
+
+function drawRunwayTaxiway(plan,index){
+  if(!plan)return;
+  ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
+  const path=()=>{
+    ctx.beginPath();ctx.moveTo(plan.x1,plan.y);ctx.lineTo(plan.x2,plan.y);
+    for(const x of plan.spurXs){ctx.moveTo(x,plan.centerY);ctx.lineTo(x,plan.y);}
+  };
+  path();ctx.strokeStyle='#1d2424';ctx.lineWidth=44;ctx.stroke();
+  path();ctx.strokeStyle='#303838';ctx.lineWidth=34;ctx.stroke();
+  path();ctx.strokeStyle='rgba(223,177,83,.60)';ctx.lineWidth=1.8;ctx.setLineDash([11,10]);ctx.stroke();ctx.setLineDash([]);
+  for(let x=plan.x1+20;x<plan.x2-12;x+=58){
+    ctx.fillStyle='rgba(77,167,152,.52)';ctx.beginPath();ctx.arc(x,plan.y-20,1.8,0,Math.PI*2);ctx.fill();
+  }
+  if(plan.apron){
+    ctx.fillStyle='#2b3333';ctx.fillRect(plan.apron.x,plan.apron.y,plan.apron.w,plan.apron.h);
+    ctx.strokeStyle='rgba(192,181,137,.34)';ctx.lineWidth=1.3;ctx.strokeRect(plan.apron.x,plan.apron.y,plan.apron.w,plan.apron.h);
+    ctx.strokeStyle='rgba(223,177,83,.42)';ctx.setLineDash([8,8]);
+    for(let i=1;i<=2;i++){const x=plan.apron.x+plan.apron.w*i/3;ctx.beginPath();ctx.moveTo(x,plan.apron.y+10);ctx.lineTo(x,plan.apron.y+plan.apron.h-10);ctx.stroke();}
+    ctx.setLineDash([]);
+  }
+  ctx.restore();
+}
+
 function drawRunwaySurface(runway,index){
   const shoulder=14,centerY=runway.y+runway.h/2;
   ctx.save();
+
+  drawRunwayTaxiway(runwayTaxiwayPlan(runway),index);
 
   // A dark compacted shoulder makes the strip read as a built airfield surface,
   // rather than a grey rectangle pasted onto district terrain.
@@ -3283,15 +3350,6 @@ function drawRunwaySurface(runway,index){
   const asphalt=ctx.createLinearGradient(runway.x,runway.y,runway.x,runway.y+runway.h);
   asphalt.addColorStop(0,'#343a3a');asphalt.addColorStop(.5,'#292f2f');asphalt.addColorStop(1,'#343a3a');
   ctx.fillStyle=asphalt;ctx.fillRect(runway.x,runway.y,runway.w,runway.h);
-
-  // Narrow service aprons give parked aircraft a believable paved bay without
-  // changing the logical runway rectangle used by take-off and landing.
-  const apronW=Math.min(190,Math.max(120,runway.w*.22)),apronX=runway.x+runway.w*.33;
-  ctx.fillStyle='#2d3434';
-  ctx.fillRect(apronX,runway.y-30,apronW,30);
-  ctx.fillRect(apronX,runway.y+runway.h,apronW,30);
-  ctx.strokeStyle='rgba(171,169,147,.30)';ctx.lineWidth=1;
-  ctx.strokeRect(apronX,runway.y-30,apronW,30);ctx.strokeRect(apronX,runway.y+runway.h,apronW,30);
 
   // Edge paint and threshold bars.
   ctx.strokeStyle='rgba(226,224,203,.78)';ctx.lineWidth=2;ctx.setLineDash([]);
