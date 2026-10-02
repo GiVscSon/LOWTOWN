@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 const PORT='4175';
 const VIEWPORT={width:1280,height:800};
 const WARMUP_MS=1500;
-const SAMPLE_MS=4500;
+const SAMPLE_FRAMES=60;
 const server=spawn('npx',['vite','--host','127.0.0.1','--port',PORT],{stdio:'inherit',shell:true});
 const browser=await chromium.launch({headless:true});
 mkdirSync('test-results',{recursive:true});
@@ -42,7 +42,7 @@ async function openVariant(mode){
   });
   await page.waitForTimeout(WARMUP_MS);
   await page.evaluate(()=>window.__LOWTOWN_PERF__.reset());
-  await page.waitForTimeout(SAMPLE_MS);
+  await page.waitForFunction(target=>window.__LOWTOWN_PERF__.summary().render.count>=target,SAMPLE_FRAMES,{timeout:30000});
   const result=await page.evaluate(()=>({
     perf:window.__LOWTOWN_PERF__.summary(),
     error:String(window.__lowtownLastError||''),
@@ -53,8 +53,8 @@ async function openVariant(mode){
   assert.equal(result.error,'',`${mode}: runtime error: ${result.error}`);
   assert(result.frameAge<1200,`${mode}: frame loop stalled for ${result.frameAge.toFixed(1)} ms`);
   assert.equal(result.perf.bridgeCaps,mode);
-  assert(result.perf.logic.count>=120,`${mode}: too few logic samples: ${result.perf.logic.count}`);
-  assert(result.perf.render.count>=120,`${mode}: too few render samples: ${result.perf.render.count}`);
+  assert(result.perf.logic.count>=SAMPLE_FRAMES,`${mode}: too few logic samples: ${result.perf.logic.count}`);
+  assert(result.perf.render.count>=SAMPLE_FRAMES,`${mode}: too few render samples: ${result.perf.render.count}`);
   await context.close();
   return result.perf;
 }
@@ -65,7 +65,7 @@ try{
   const round=await openVariant('round');
   const butt=await openVariant('butt');
   const report={
-    viewport:VIEWPORT,warmupMs:WARMUP_MS,sampleMs:SAMPLE_MS,
+    viewport:VIEWPORT,warmupMs:WARMUP_MS,sampleFrames:SAMPLE_FRAMES,
     round,butt,
     deltaPercent:{
       logicMean:pct(butt.logic.mean,round.logic.mean),
