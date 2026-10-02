@@ -20,6 +20,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - name: Three.js and PWA contract
+        run: npm run test:three-pwa-contract
       - name: Original SVG transport views
         run: npm run test:transport-svg
       - name: Swept vehicle contacts, pushing and pedestrian reactions
@@ -34,6 +36,8 @@ jobs:
         run: |
           npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/lowtown-preview.log 2>&1 &
           npm run test:pages-smoke
+      - name: Run Three.js PWA offline smoke
+        run: npm run test:three-pwa-browser
       - name: Run aerial city visual sweep
         run: npm run test:aerial-visual
       - name: Test living city and complete emergency response routes
