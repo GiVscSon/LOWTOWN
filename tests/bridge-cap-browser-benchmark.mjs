@@ -10,6 +10,19 @@ const SAMPLE_MS=4500;
 const server=spawn('npx',['vite','--host','127.0.0.1','--port',PORT],{stdio:'inherit',shell:true});
 const browser=await chromium.launch({headless:true});
 mkdirSync('test-results',{recursive:true});
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+
+async function waitForServer(){
+  const url=`http://127.0.0.1:${PORT}/`;
+  for(let attempt=0;attempt<80;attempt++){
+    try{
+      const response=await fetch(url,{signal:AbortSignal.timeout(1000)});
+      if(response.ok)return;
+    }catch{}
+    await sleep(250);
+  }
+  throw new Error(`Vite did not become ready at ${url}`);
+}
 
 async function openVariant(mode){
   const context=await browser.newContext({viewport:VIEWPORT,deviceScaleFactor:1});
@@ -18,15 +31,7 @@ async function openVariant(mode){
     let seed=0x1f2e3d4c;
     Math.random=()=>((seed=Math.imul(seed,1664525)+1013904223>>>0)/4294967296);
   });
-  for(let attempt=0;attempt<60;attempt++){
-    try{
-      await page.goto(`http://127.0.0.1:${PORT}/?cityQA=1&perf=1&bridgeCaps=${mode}`,{waitUntil:'domcontentloaded',timeout:1000});
-      break;
-    }catch(error){
-      if(attempt===59)throw error;
-      await new Promise(resolve=>setTimeout(resolve,250));
-    }
-  }
+  await page.goto(`http://127.0.0.1:${PORT}/?cityQA=1&perf=1&bridgeCaps=${mode}`,{waitUntil:'domcontentloaded',timeout:10000});
   await page.waitForFunction(()=>Boolean(window.__LOWTOWN_PERF__&&window.__lowtownCityQA)&&
     Number.isFinite(window.__lowtownLastFrame)&&performance.now()-window.__lowtownLastFrame<1200,null,{timeout:10000});
   await page.evaluate(()=>{
@@ -56,6 +61,7 @@ async function openVariant(mode){
 
 const pct=(current,baseline)=>baseline?((current-baseline)/baseline)*100:0;
 try{
+  await waitForServer();
   const round=await openVariant('round');
   const butt=await openVariant('butt');
   const report={
