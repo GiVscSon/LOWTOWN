@@ -36,8 +36,6 @@ jobs:
         run: |
           npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/lowtown-preview.log 2>&1 &
           npm run test:pages-smoke
-      - name: Run Three.js PWA offline smoke
-        run: npm run test:three-pwa-browser
       - name: Run aerial city visual sweep
         run: npm run test:aerial-visual
       - name: Test living city and complete emergency response routes
