@@ -3355,7 +3355,7 @@ function initThreeRuntime(){
       crosswalks:(roadPaintGeometry||(roadPaintGeometry=buildRoadPaintGeometry())).crosswalkJunctions.flatMap(j=>junctionCrosswalkStripes({y:j.y,h:j.h},{x:j.x,w:j.w},j.approaches)),
       buildings,trees,runways:PLANE_RUNWAYS,parks:parkZones,piers,props:solidProps,lights:streetLights,stops:transitStopSigns(),billboards,cranes
     };
-    threeRenderer=createLowtownThreeRenderer({canvas:threeCanvas,world});
+    threeRenderer=createLowtownThreeRenderer({canvas:threeCanvas,world,forceFullMaterials:localBridgeQA&&/(?:\?|&)fullMaterials=1(?:&|$)/.test(LOWTOWN_QUERY)});
     canvas.classList?.add('renderer-hidden');
     threeCanvas.classList?.add('active');
     window.__lowtownRenderer='three';

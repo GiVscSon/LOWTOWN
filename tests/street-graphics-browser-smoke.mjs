@@ -63,6 +63,15 @@ try{
   await page.screenshot({path:`${directory}/mobile-street.png`});
   report.stats=await page.evaluate(()=>window.__lowtownThreeStats);
   assert.equal(report.stats.contextLost,false);assert(report.stats.triangles<220000,'nearby static geometry should be culled by district');
+  assert.equal(report.stats.lowCostMaterials,report.stats.software);
+  // CI has a software GPU; exercise the hardware/PBR shader path as well.
+  await page.goto(origin+'?cityQA=1&fullMaterials=1',{waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>window.__lowtownThreeStats?.frames>=5,null,{timeout:30000});
+  await page.evaluate(()=>window.__lowtownCityQA.setWeather('rain',true));
+  await page.waitForFunction(()=>window.__lowtownThreeStats.frames>=10,null,{timeout:30000});
+  report.fullMaterials=await page.evaluate(()=>window.__lowtownThreeStats);
+  assert.equal(report.fullMaterials.lowCostMaterials,false);
+  await page.screenshot({path:`${directory}/mobile-full-materials.png`});
   assert.deepEqual(errors,[],'graphics generated browser or shader errors');
   writeFileSync(`${directory}/report.json`,JSON.stringify(report,null,2));
   console.log('STREET_GRAPHICS_BROWSER_OK',JSON.stringify({cameras:report.cameras,stats:report.stats,contactHp:resident.hp}));

@@ -20,12 +20,14 @@ function mountedSign(text,width,color='#f4ad52'){
   return new THREE.Mesh(new THREE.PlaneGeometry(width,Math.min(12,width/8)),new THREE.MeshBasicMaterial({map:texture,side:THREE.DoubleSide}));
 }
 
-export function createLowtownThreeRenderer({canvas,world}){
+export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=false}){
   if(!canvas)throw new Error('Three.js canvas is missing');
   const renderer=new THREE.WebGLRenderer({canvas,alpha:false,powerPreference:'high-performance',antialias:(globalThis.devicePixelRatio||1)<2});
   renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;
   const gl=renderer.getContext(),debug=gl.getExtension('WEBGL_debug_renderer_info');
   const software=debug&&/swiftshader|llvmpipe|software/i.test(String(gl.getParameter(debug.UNMASKED_RENDERER_WEBGL)));
+  const lowCostMaterials=!!software&&!forceFullMaterials;
+  const litMaterial=options=>lowCostMaterials?new THREE.MeshLambertMaterial({color:options.color,side:options.side||THREE.FrontSide}):new THREE.MeshStandardMaterial(options);
   let renderQuality=software?.5:1,frameAverage=16,qualityFrames=0;
   let cameraPreset='normal';
   try{const saved=localStorage.getItem(CAMERA_STORAGE_KEY);if(CAMERA_PRESETS.includes(saved))cameraPreset=saved;}catch{}
@@ -35,19 +37,19 @@ export function createLowtownThreeRenderer({canvas,world}){
   const moon=new THREE.DirectionalLight('#b7c9db',1.8);moon.position.set(-1800,2600,-900);scene.add(moon);
   const fill=new THREE.DirectionalLight('#8aa7bd',.6);fill.position.set(1800,1200,2200);scene.add(fill);
   const staticGroup=new THREE.Group();scene.add(staticGroup);
-  const land=new THREE.MeshStandardMaterial({color:'#303a2c',roughness:1,side:THREE.DoubleSide});
-  const beach=new THREE.MeshStandardMaterial({color:'#857853',roughness:1,side:THREE.DoubleSide});
+  const land=litMaterial({color:'#303a2c',roughness:1,side:THREE.DoubleSide});
+  const beach=litMaterial({color:'#857853',roughness:1,side:THREE.DoubleSide});
   for(const island of world.islands||[]){
     const bank=ground(island.points,beach,-.8),mesh=ground(island.points,land,0);
     if(bank){bank.geometry.computeBoundingBox();const center=bank.geometry.boundingBox.getCenter(new THREE.Vector3());
       bank.geometry.translate(-center.x,0,-center.z);bank.scale.set(1.018,1,1.018);bank.position.set(center.x,-.8,center.z);staticGroup.add(bank);}
     if(mesh)staticGroup.add(mesh);
   }
-  const waterMaterial=createWaterMaterial();
+  const waterMaterial=createWaterMaterial(lowCostMaterials);
   const water=new THREE.Mesh(new THREE.PlaneGeometry(world.width+7000,world.height+7000),waterMaterial);
   water.rotation.x=-Math.PI/2;water.position.set(world.width/2,-7,world.height/2);staticGroup.add(water);
-  const groundBoxes=createBoxBatch(staticGroup,'#161c20'),details=createBoxBatch(staticGroup,'#606451');
-  const pavingMaterial=surfaceMaterial('paving'),asphaltMaterial=surfaceMaterial('asphalt'),woodMaterial=surfaceMaterial('wood');
+  const groundBoxes=createBoxBatch(staticGroup,'#161c20',1,undefined,litMaterial({color:0xffffff,roughness:1})),details=createBoxBatch(staticGroup,'#606451',.85,undefined,litMaterial({color:0xffffff,roughness:.85}));
+  const pavingMaterial=surfaceMaterial('paving',0xffffff,lowCostMaterials),asphaltMaterial=surfaceMaterial('asphalt',0xffffff,lowCostMaterials),woodMaterial=surfaceMaterial('wood',0xffffff,lowCostMaterials);
   const paving=createBoxBatch(staticGroup,'#625f53',1,undefined,pavingMaterial);
   const asphalt=createBoxBatch(staticGroup,'#31383b',.88,undefined,asphaltMaterial);
   const timber=createBoxBatch(staticGroup,'#887050',1,undefined,woodMaterial);
@@ -89,7 +91,7 @@ export function createLowtownThreeRenderer({canvas,world}){
     const points=road.points.map(([x,y])=>new THREE.Vector2(x,y));
     scenicDecks.push(ribbonGeometry(points,road.width,2.9));
   }
-  const motorMaterial=surfaceMaterial('asphalt','#3e4b54');
+  const motorMaterial=surfaceMaterial('asphalt','#3e4b54',lowCostMaterials);
   for(const bridge of world.paint?.bridgePaths||[]){
     const points=roundedBridgePoints(bridge.path,bridge.width),deck=ribbonGeometry(points,bridge.width,3.6);
     motorDecks.push(deck);dashed(points,'#d5a752');
@@ -135,7 +137,7 @@ export function createLowtownThreeRenderer({canvas,world}){
     }
   }
   const mergeDecks=(decks,material)=>{if(!decks.length)return;const mesh=new THREE.Mesh(mergeGeometries(decks),material);staticGroup.add(mesh);for(const deck of decks)deck.dispose();};
-  mergeDecks(scenicDecks,surfaceMaterial('paving','#a39b7e'));mergeDecks(motorDecks,motorMaterial);
+  mergeDecks(scenicDecks,surfaceMaterial('paving','#a39b7e',lowCostMaterials));mergeDecks(motorDecks,motorMaterial);
   for(const bridge of world.bridges||[])if(bridge.footway){
     timber.add(bridge.x+bridge.w/2,1.5,bridge.y+bridge.h/2,bridge.w,3,bridge.h);
     const horizontal=bridge.dir==='h',length=horizontal?bridge.w:bridge.h;
@@ -170,7 +172,7 @@ export function createLowtownThreeRenderer({canvas,world}){
     dashed([new THREE.Vector2(runway.x+50,runway.y+runway.h/2),new THREE.Vector2(runway.x+runway.w-50,runway.y+runway.h/2)],'#d6d7bd',3);
     for(let x=runway.x+24;x<runway.x+runway.w;x+=72)for(const side of [0,1])details.add(x,4,runway.y+side*runway.h,3,2,3,'#eedc97');
   }
-  const walls=createBoxBatch(staticGroup,'#4b4540',1,undefined,surfaceMaterial('brick')),windows=createBoxBatch(staticGroup,'#b99b56',1,new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({color:0xffffff,side:THREE.DoubleSide})),roofs=createBoxBatch(staticGroup,'#37434a',1,undefined,surfaceMaterial('roof'));
+  const walls=createBoxBatch(staticGroup,'#4b4540',1,undefined,surfaceMaterial('brick',0xffffff,lowCostMaterials)),windows=createBoxBatch(staticGroup,'#b99b56',1,new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({color:0xffffff,side:THREE.DoubleSide})),roofs=createBoxBatch(staticGroup,'#37434a',1,undefined,surfaceMaterial('roof',0xffffff,lowCostMaterials));
   const wallColors=['#715347','#615451','#6d5946','#40525c','#555c4b','#5b4b5a'];
   for(const [index,b] of (world.buildings||[]).entries()){
     const height=(b.floors??(2+index%5))*24,x=b.x+b.w/2,z=b.y+b.h/2;
@@ -206,7 +208,7 @@ export function createLowtownThreeRenderer({canvas,world}){
     }
     if(b.sign){const sign=mountedSign(b.sign,Math.min(b.w*.78,210),neon);sign.position.set(x,35,b.y+b.h+1);staticGroup.add(sign);}
   }
-  const foliage=createBoxBatch(staticGroup,'#3a5940',1,new THREE.IcosahedronGeometry(.65,0));
+  const foliage=createBoxBatch(staticGroup,'#3a5940',1,new THREE.IcosahedronGeometry(.65,0),litMaterial({color:0xffffff,roughness:1}));
   for(const tree of world.trees||[]){const size=tree.size||20;details.add(tree.x,size*.5,tree.y,4,size,4,'#5e4834');foliage.add(tree.x,size*1.2,tree.y,size*1.25,size,size*1.25,'#3a5940');staticShadows.add(tree.x+size*.25,3.22,tree.y+size*.2,size*1.25,1,size*.85);}
   for(const prop of world.props||[]){
     const w=prop.width||prop.w||16,h=prop.height||prop.h||16;
@@ -226,18 +228,18 @@ export function createLowtownThreeRenderer({canvas,world}){
     shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\ntransformed.x+=sin(windTime*2.0+instanceMatrix[3].x*.02)*windStrength*(position.y+.7)*.08;');
   };
 
-  const actors=new Map(),personBatch=new THREE.InstancedMesh(new THREE.CylinderGeometry(3.7,4.6,10,6),new THREE.MeshStandardMaterial({color:0xffffff,roughness:1}),512);
-  const heads=new THREE.InstancedMesh(new THREE.SphereGeometry(3.1,6,4),new THREE.MeshStandardMaterial({color:'#c1a17b',roughness:1}),512);
+  const actors=new Map(),personBatch=new THREE.InstancedMesh(new THREE.CylinderGeometry(3.7,4.6,10,6),litMaterial({color:0xffffff,roughness:1}),512);
+  const heads=new THREE.InstancedMesh(new THREE.SphereGeometry(3.1,6,4),litMaterial({color:'#c1a17b',roughness:1}),512);
   personBatch.frustumCulled=heads.frustumCulled=false;scene.add(personBatch,heads);
-  const legs=new THREE.InstancedMesh(new THREE.BoxGeometry(2.4,7,2.4),new THREE.MeshStandardMaterial({color:'#344451'}),1024);
+  const legs=new THREE.InstancedMesh(new THREE.BoxGeometry(2.4,7,2.4),litMaterial({color:'#344451',roughness:1}),1024);
   legs.frustumCulled=false;scene.add(legs);
-  const arms=new THREE.InstancedMesh(new THREE.BoxGeometry(2,8,2),new THREE.MeshStandardMaterial({color:0xffffff}),1024);
+  const arms=new THREE.InstancedMesh(new THREE.BoxGeometry(2,8,2),litMaterial({color:0xffffff,roughness:1}),1024);
   arms.frustumCulled=false;scene.add(arms);
   const actorShadows=new THREE.InstancedMesh(new THREE.CircleGeometry(.5,12).rotateX(-Math.PI/2),shadowMaterial,1024);
   actorShadows.frustumCulled=false;scene.add(actorShadows);
   const lampReflections=new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1).rotateX(-Math.PI/2),reflectionMaterial,512);
   lampReflections.frustumCulled=false;scene.add(lampReflections);
-  const props=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshStandardMaterial({color:0xffffff,roughness:.75}),128);
+  const props=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),litMaterial({color:0xffffff,roughness:.75}),128);
   const parts=new THREE.InstancedMesh(new THREE.OctahedronGeometry(6),new THREE.MeshBasicMaterial({color:'#e9b94e'}),32);
   props.frustumCulled=parts.frustumCulled=false;scene.add(props,parts);
   const headlight=new THREE.SpotLight('#ffdea2',1600,260,.45,.5,1);headlight.target=new THREE.Object3D();scene.add(headlight,headlight.target);
@@ -327,7 +329,7 @@ export function createLowtownThreeRenderer({canvas,world}){
       smoke.forEach((mesh,i)=>{const rise=(time*18+i*17)%180;mesh.position.set(Math.sin(i*2.3)*16+rise*.17,30+rise,Math.cos(i*2.3)*16);mesh.scale.setScalar(1+rise*.012);});
     }
     if(!contextLost)renderer.render(scene,camera);frames++;globalThis.__lowtownLastFrame=performance.now();
-    globalThis.__lowtownThreeStats={frames,vehicles:actors.size,pedestrians:people.length,objects:scene.children.length,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,contextLost,renderQuality,software:!!software,
+    globalThis.__lowtownThreeStats={frames,vehicles:actors.size,pedestrians:people.length,objects:scene.children.length,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,contextLost,renderQuality,software:!!software,lowCostMaterials,
       camera:{preset:cameraPreset,x:camera.position.x,y:camera.position.y,z:camera.position.z,distance:Math.hypot(camera.position.x-p.x,camera.position.z-p.y),fov:camera.fov},player:{x:p.x,y:p.y,altitude}};
   }
   function dispose(){const geometries=new Set(),materials=new Set();scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});

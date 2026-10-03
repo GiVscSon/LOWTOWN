@@ -36,7 +36,7 @@ export function createBoxBatch(scene,color,roughness=.85,geometry=new THREE.BoxG
       // District-sized batches share their geometry and material, but only
       // the visible neighbourhood reaches the GPU.
       const cells=new Map();
-      for(const item of items){const key=`${Math.floor(item.x/1536)},${Math.floor(item.z/1536)}`;
+      for(const item of items){const key=`${Math.floor(item.x/3072)},${Math.floor(item.z/3072)}`;
         if(!cells.has(key))cells.set(key,[]);cells.get(key).push(item);}
       const matrix=new THREE.Matrix4(),rotation=new THREE.Quaternion(),axis=new THREE.Vector3(0,1,0);
       let first=null;

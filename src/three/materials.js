@@ -24,8 +24,9 @@ export function surfaceTexture(kind){
   return texture;
 }
 
-export function surfaceMaterial(kind,color=0xffffff){
-  const material=new THREE.MeshStandardMaterial({color,map:surfaceTexture(kind),roughness:kind==='asphalt'?.88:1,side:THREE.DoubleSide});
+export function surfaceMaterial(kind,color=0xffffff,cheap=false){
+  const options={color,map:surfaceTexture(kind),side:THREE.DoubleSide};
+  const material=cheap?new THREE.MeshLambertMaterial(options):new THREE.MeshStandardMaterial({...options,roughness:kind==='asphalt'?.88:1});
   material.onBeforeCompile=shader=>{
     shader.vertexShader=shader.vertexShader.replace('#include <worldpos_vertex>',`#include <worldpos_vertex>
       vec4 surfacePosition=vec4(transformed,1.0);
@@ -56,8 +57,8 @@ export function glowTexture(streaks=false){
   texture.magFilter=texture.minFilter=THREE.LinearFilter;return texture;
 }
 
-export function waterMaterial(){
-  const material=new THREE.MeshStandardMaterial({color:'#2d4b59',roughness:.44,metalness:.16});
+export function waterMaterial(cheap=false){
+  const material=cheap?new THREE.MeshLambertMaterial({color:'#2d4b59'}):new THREE.MeshStandardMaterial({color:'#2d4b59',roughness:.44,metalness:.16});
   material.onBeforeCompile=shader=>{
     shader.uniforms.rippleTime={value:0};material.userData.shader=shader;
     shader.vertexShader='varying vec2 waterPosition;\n'+shader.vertexShader;
