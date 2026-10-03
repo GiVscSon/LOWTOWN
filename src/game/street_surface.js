@@ -93,6 +93,14 @@ function curvedStreetSurface(roads,bridges,graph){
   }
   const crossings=approachCrosswalks(nodes,surfaces);
   crosswalks.push(...crossings.flatMap(band=>band.stripes));
+  const laneClearances=crossings.flatMap(band=>{
+    const clearances=[{...band,gap:14}];
+    for(let k=1;k<band.approach.length;k++){
+      const a=band.approach[k-1],b=band.approach[k],dx=b.x-a.x,dy=b.y-a.y,length=Math.hypot(dx,dy);
+      if(length>.001)clearances.push({cx:(a.x+b.x)/2,cy:(a.y+b.y)/2,ux:dx/length,uy:dy/length,width:band.width,length,gap:30});
+    }
+    return clearances;
+  });
   for(const road of roads){
     const points=streetPoints(road),width=streetWidth(road);let phase=0;
     for(const side of [-1,1]){
@@ -122,8 +130,8 @@ function curvedStreetSurface(roads,bridges,graph){
         const distance2=(px+dx*t)**2+(py+dy*t)**2,radius=j.w*.7;
         if(distance2<radius*radius){const half=Math.sqrt(radius*radius-distance2)/length;masks.push([t-half,t+half]);}
       }
-      for(const band of crossings){
-        const interval=bandInterval(a,b,band,14);if(interval)masks.push(interval);
+      for(const clearance of laneClearances){
+        const interval=bandInterval(a,b,clearance,clearance.gap);if(interval)masks.push(interval);
       }
       for(const [start,end] of subtract(0,1,masks))lanes.push({x1:a[0]+dx*start,y1:a[1]+dy*start,x2:a[0]+dx*end,y2:a[1]+dy*end,phase:phase+length*start});
       phase+=length;
@@ -146,7 +154,7 @@ function approachCrosswalks(nodes,surfaces){
     if(!isJunction(node)||[...node.roads].some(r=>r.serviceAccess||r.bridgeApproach))continue;
     for(const first of node.edges){
       let previous=origin,current=first,travelled=0,done=false;
-      const visited=new Set([origin]);
+      const visited=new Set([origin]),approach=[{x:node.x,y:node.y}];
       while(!done&&!visited.has(current)){
         visited.add(current);
         const a=nodes[previous],b=nodes[current],dx=b.x-a.x,dy=b.y-a.y,length=Math.hypot(dx,dy);
@@ -156,7 +164,7 @@ function approachCrosswalks(nodes,surfaces){
         const ux=dx/length,uy=dy/length;
         for(let distance=Math.max(0,width/2+44-travelled);distance<=length;distance+=6){
           if(travelled+distance>width*4)break;
-          const band={cx:a.x+ux*distance,cy:a.y+uy*distance,ux,uy,width,length:32,origin};
+          const band={cx:a.x+ux*distance,cy:a.y+uy*distance,ux,uy,width,length:32,origin,approach:[...approach,{x:a.x+ux*distance,y:a.y+uy*distance}]};
           // A straight, symmetric set of long zebra bars, inset from both kerbs.
           const count=Math.floor((width-24)/16),span=(count-1)*16;
           if(count<3)break;
@@ -180,7 +188,7 @@ function approachCrosswalks(nodes,surfaces){
         if(done||isJunction(b))break; // Internal links receive no stacked zebras.
         const next=[...b.edges].filter(id=>id!==previous);
         if(next.length!==1)break;
-        travelled+=length;previous=current;current=next[0];
+        approach.push({x:b.x,y:b.y});travelled+=length;previous=current;current=next[0];
       }
     }
   }

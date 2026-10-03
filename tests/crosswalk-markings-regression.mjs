@@ -19,6 +19,19 @@ function audit(paint){
         assert(!paint.junctions.some(j=>Math.hypot(px-j.cx,py-j.cy)<j.w*.32),'zebra crosses the centre of a junction');
       }
     }
+    // The centreline must not resume on the junction side of a distant zebra.
+    for(let k=1;k<band.approach.length;k++){
+      const a=band.approach[k-1],b=band.approach[k];
+      const nearby=paint.lanes.filter(l=>Math.max(l.x1,l.x2)>=Math.min(a.x,b.x)-.1&&Math.min(l.x1,l.x2)<=Math.max(a.x,b.x)+.1&&Math.max(l.y1,l.y2)>=Math.min(a.y,b.y)-.1&&Math.min(l.y1,l.y2)<=Math.max(a.y,b.y)+.1);
+      for(let n=1;n<100;n++){
+        const x=a.x+(b.x-a.x)*n/100,y=a.y+(b.y-a.y)*n/100;
+        assert(!nearby.some(lane=>{
+          const dx=lane.x2-lane.x1,dy=lane.y2-lane.y1;
+          const t=Math.max(0,Math.min(1,((x-lane.x1)*dx+(y-lane.y1)*dy)/(dx*dx+dy*dy)));
+          return Math.hypot(x-lane.x1-dx*t,y-lane.y1-dy*t)<.1;
+        }),'yellow centreline resumes between zebra and junction');
+      }
+    }
     for(const lane of paint.lanes){
       // Clip the entire segment against the zebra plus its stopping gap.
       let start=0,end=1;
