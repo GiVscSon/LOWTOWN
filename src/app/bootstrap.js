@@ -98,6 +98,7 @@ export function installAppBootstrap(ctx) {
       setCamera(preset) {
         ctx.threeRenderer?.setCameraPreset(preset);
         updateCameraButton();
+        ctx.renderWorld();
       },
       getAudio: () => ({
         volume: ctx.sound.volume,

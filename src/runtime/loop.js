@@ -37,7 +37,14 @@ export function installRuntimeLoop(ctx){
       ctx.env.window.__lowtownLastFrame=ctx.env.performance.now();
       ctx.env.requestAnimationFrame(ctx.gameLoop);return;
     }
-    const frameLimit=ctx.isGamePaused()||ctx.env.document.hidden?15:ctx.threeRenderer?.graphics?.fps??60;
+    // Menus keep the last world frame. Camera/graphics settings explicitly
+    // redraw their changes; a stationary scene does not need continuous GPU
+    // work behind a dialog or in a hidden tab.
+    if(ctx.isGamePaused()||ctx.env.document.hidden){
+      ctx.env.window.__lowtownLastFrame=ctx.env.performance.now();
+      ctx.env.requestAnimationFrame(ctx.gameLoop);return;
+    }
+    const frameLimit=ctx.threeRenderer?.graphics?.fps??60;
     const interval=frameLimit?1000/frameLimit:0;
     if(now-ctx.lastGameRenderTime<interval-.5){ctx.env.requestAnimationFrame(ctx.gameLoop);return;}
     ctx.lastGameRenderTime=interval&&Number.isFinite(ctx.lastGameRenderTime)?now-(now-ctx.lastGameRenderTime)%interval:now;

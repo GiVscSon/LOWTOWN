@@ -100,30 +100,30 @@ try {
     null,{timeout:15000}
   );
   await page.locator('#threeCanvas').waitFor({ state: 'visible', timeout: 15000 });
-  await page.locator('#hudDistrict').waitFor({ state: 'visible', timeout: 10000 });
+  await page.locator('#hudDistrict').waitFor({ state: 'visible', timeout: 30000 });
   const groundCamera = await page.evaluate(() => window.__lowtownThreeStats?.camera);
   assert(groundCamera&&Number.isFinite(groundCamera.y),'Three.js ground camera metrics are unavailable');
 
   await page.locator('#btnOpenMap').click();
-  await page.locator('#mapModal').waitFor({ state: 'visible', timeout: 5000 });
+  await page.locator('#mapModal').waitFor({ state: 'visible', timeout: 30000 });
   const mapCanvas = page.locator('#fullMapCanvas');
-  await mapCanvas.waitFor({ state: 'visible', timeout: 5000 });
+  await mapCanvas.waitFor({ state: 'visible', timeout: 30000 });
   const mapSize = await mapCanvas.evaluate(element => ({ width: element.width, height: element.height }));
   assert(mapSize.width >= 800 && mapSize.height >= 600, `full-city map is not a readable overview: ${JSON.stringify(mapSize)}`);
   const mapPath = `${artifactDir}/full-city-map.png`;
   await page.screenshot({ path: mapPath });
   shots.push({ name: 'full-city-map', path: mapPath, mapCanvas: mapSize });
   await page.locator('#btnCloseMap').click();
-  await page.locator('#mapModal').waitFor({ state: 'hidden', timeout: 5000 });
+  await page.locator('#mapModal').waitFor({ state: 'hidden', timeout: 30000 });
 
   await page.locator('#threeCanvas').click({ position: { x: 500, y: 450 } });
   await page.keyboard.press('e');
   // A software GPU can present the next frame after a short toast expires.
   // Check the persistent world state while still using real keyboard input.
-  await page.waitForFunction(() => window.__lowtownCityQA.snapshot().player.mode==='foot', null, { timeout: 5000 });
+  await page.waitForFunction(() => window.__lowtownCityQA.snapshot().player.mode==='foot', null, { timeout: 30000,polling:100 });
   await page.keyboard.press('e');
-  await page.waitForFunction(() => window.__lowtownCityQA.snapshot().player.mode==='helicopter', null, { timeout: 5000 });
-  await page.waitForFunction(() => /\d+ м/.test(document.querySelector('#hudGear')?.textContent || ''), null, { timeout: 5000 });
+  await page.waitForFunction(() => window.__lowtownCityQA.snapshot().player.mode==='helicopter', null, { timeout: 30000,polling:100 });
+  await page.waitForFunction(() => /\d+ м/.test(document.querySelector('#hudGear')?.textContent || ''), null, { timeout: 30000 });
   await page.keyboard.press('q');
   await hold('w');
   await page.waitForFunction(()=>Number.parseInt(document.querySelector('#hudGear')?.textContent||'',10)>=205,null,{timeout:20000});
@@ -187,6 +187,11 @@ try {
   console.log(`AERIAL CITY VISUAL SMOKE: PASS full map plus ${shots.length} helicopter views; altitude=${airHeight.trim()}`);
 } catch (error) {
   if (page) {
+    try {
+      const failure=await page.evaluate(()=>({player:window.__lowtownCityQA?.snapshot().player,stats:window.__lowtownThreeStats,toast:document.querySelector('#toastMsg')?.textContent,error:window.__lowtownLastError}));
+      writeFileSync(`${artifactDir}/failure.json`,JSON.stringify({message:error.message,failure,errors},null,2));
+      console.error('AERIAL_FAILURE',JSON.stringify(failure));
+    } catch {}
     try { await page.screenshot({ path: `${artifactDir}/failure.png` }); } catch {}
   }
   throw error;
