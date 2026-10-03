@@ -3,7 +3,7 @@ import { AUTHORED_TERRAIN, migrateWorld2Point, ARCHIPELAGO_WIDTH, ARCHIPELAGO_HE
 import { drawArchitecture, drawStreetTree, drawStreetFurniture } from './game/architecture.js';
 import { velocityForHeading, stepLandVehicle, projectIso, routeInput } from './game/test_drive_core.js';
 import { createDriveLab } from './game/test_drive_lab.js';
-import { resolveContact, resolveScenery, contact, chassis, captureMotion, solveVehicleMotion } from './game/solid_contacts.js';
+import { resolveContact, resolveScenery, contact, chassis, captureMotion, solveVehicleMotion, createSpatialIndex } from './game/solid_contacts.js';
 import { planEmergencyPassingManeuver, emergencyPassingPathClear } from './game/emergency_passing.js';
 import { coastPath, coastPoints, pointInCoast, pointInBeach, BEACH_WIDTH } from './game/coastline.js';
 import { createFreeRoam, drawTransport, VEHICLES, PLANE_RUNWAYS as LEGACY_RUNWAYS } from './game/free_roam.js';
@@ -12,6 +12,7 @@ import { classifySurface, surfaceMovement, createWeather, weatherMovement, WEATH
 import { createCityIncidentDirector, updateCrowdReactions } from './game/city_incidents.js';
 import { advanceTrafficCar, resolveTrafficPair } from './game/traffic_turns.js';
 import { streetSurfaceGeometry, createRoadCircuits, createRoadGraph, roadPath, roadTerminals, onRoadSurface, createWalkingRoutes, assignWalkingRoutes, nextWalkingGoal, planStopRoute, advanceRouteActor, drawRoadTerminals } from './game/street_network.js';
+import { createLowtownThreeRenderer } from './three/renderer.js';
 import './game/test_drive.css';
 // LOWTOWN // THREE ISLANDS VISUAL OVERHAUL // GTA 2 RETRO-NOIR ENGINE
 // High-detail procedural pedestrian sprites, isometric vehicle chassis, wet road reflections, neon glow & audio
@@ -168,6 +169,9 @@ const sound = new SynthAudio();
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+const threeCanvas = document.getElementById('threeCanvas');
+let threeRenderer = null;
+window.__lowtownRenderer = 'canvas';
 const radarCanvas = document.getElementById('radarCanvas');
 const radarCtx = radarCanvas.getContext('2d');
 const fullMapCanvas = document.getElementById('fullMapCanvas');
@@ -1386,8 +1390,11 @@ function pedestrianCarBlocked(x,y,c){
   return Math.abs(dx*cs+dy*sn)<(c.width||48)/2+5&&Math.abs(-dx*sn+dy*cs)<(c.height||24)/2+5;
 }
 
+let pedestrianSceneryIndex=null;
 function isPedestrianSceneryBlocked(x,y){
   if(!isPositionOnSolidGround(x,y))return true;
+  if(pedestrianSceneryIndex)return pedestrianSceneryIndex.query(x,y,x,y).some(p=>
+    p.tree?Math.hypot(x-p.source.x,y-p.source.y)<11:x>p.left&&x<p.right&&y>p.top&&y<p.bottom);
   if(buildings.some(b=>x>b.x-7&&x<b.x+b.w+7&&y>b.y-7&&y<b.y+b.h+7))return true;
   if(solidProps.some(o=>Math.abs(x-o.x)<o.width*.5+5&&Math.abs(y-o.y)<o.height*.5+5))return true;
   if(trees.some(t=>Math.hypot(x-t.x,y-t.y)<11))return true;
@@ -1473,6 +1480,10 @@ function pedestrianEvacuation(person){
 
 function updatePedestrians(dt){
   const frame=Math.min(dt,.05)*60;
+  const scenery=[...buildings.map(b=>({left:b.x-7,top:b.y-7,right:b.x+b.w+7,bottom:b.y+b.h+7})),
+    ...solidProps.map(p=>({left:p.x-p.width*.5-5,top:p.y-p.height*.5-5,right:p.x+p.width*.5+5,bottom:p.y+p.height*.5+5})),
+    ...trees.map(t=>({left:t.x-11,top:t.y-11,right:t.x+11,bottom:t.y+11,tree:true,source:t}))];
+  pedestrianSceneryIndex=createSpatialIndex(scenery,p=>p);
   const cars=[...trafficCars,...policeCars,...incidentPoliceCars,...incidentResponseVehicles,...(roam?.mode!=='foot'&&!(roam?.altitude>12)?[player]:[])];
   pedestrians.forEach((p,index)=>{
     if(p.homeY===undefined){p.homeY=p.y;p.homeX=p.x;p.pause=index%7*.18;p.trip=0;}
@@ -1591,6 +1602,7 @@ function updatePedestrians(dt){
     if(p.gait===0)p.walkPhase=0;
 
   });
+  pedestrianSceneryIndex=null;
 }
 
 function buildServiceAccess(){
@@ -2754,7 +2766,7 @@ function traceSmoothBridgePath(target, points, radius=120) {
 function drawSmoothBridgeDeck(bridgePath,index=0){
   if(!bridgePath?.path?.length)return;
   const width=Math.max(bridgePath.width||ROAD_W,ROAD_W*.72);
-  const radius=Math.min(180,width*1.35);
+  const radius=width*.5;
   ctx.save();ctx.lineJoin='round';ctx.lineCap=bridgeEndCap;
   if(!traceSmoothBridgePath(ctx,bridgePath.path,radius)){ctx.restore();return;}
   ctx.strokeStyle='rgba(100,113,113,.8)';ctx.lineWidth=width+8;ctx.stroke();
@@ -3327,9 +3339,76 @@ function drawRunwaySurface(runway,index){
   ctx.restore();
 }
 
+function initThreeRuntime(){
+  if(typeof createLowtownThreeRenderer!=='function'||!threeCanvas)return false;
+  if(/(?:\?|&)renderer=canvas(?:&|$)/.test(LOWTOWN_QUERY))return false;
+  try{
+    const world={
+      width:WORLD_W,height:WORLD_H,
+      islands:allIslands.map(island=>({id:island.id,natural:!!island.natural,points:coastPoints(island)})),
+      roads,scenicRoads,bridges,
+      paint:roadPaintGeometry||(roadPaintGeometry=buildRoadPaintGeometry()),
+      crosswalks:(roadPaintGeometry||(roadPaintGeometry=buildRoadPaintGeometry())).crosswalkJunctions.flatMap(j=>junctionCrosswalkStripes({y:j.y,h:j.h},{x:j.x,w:j.w},j.approaches)),
+      buildings,trees,runways:PLANE_RUNWAYS,parks:parkZones,piers,props:solidProps,lights:streetLights,stops:transitStopSigns(),billboards,cranes
+    };
+    threeRenderer=createLowtownThreeRenderer({canvas:threeCanvas,world});
+    canvas.classList?.add('renderer-hidden');
+    threeCanvas.classList?.add('active');
+    window.__lowtownRenderer='three';
+    return true;
+  }catch(error){
+    threeRenderer=null;
+    window.__lowtownRenderer='canvas';
+    window.__lowtownRendererError=String(error?.message||error);
+    canvas.classList?.remove('renderer-hidden');
+    threeCanvas.classList?.remove('active');
+    console.warn('LOWTOWN Three.js fallback:',error);
+    return false;
+  }
+}
+
+function renderHud(){
+  renderRadar();
+  const speedEl = document.getElementById('hudSpeed');
+  if (speedEl) speedEl.innerText = roam?.mode === 'foot' ? 'ПЕШКОМ' : Math.round(Math.abs(player.speed) * 12);
+  const enterEl=document.getElementById('btnRoamEnter');if(enterEl)enterEl.textContent=roam?.mode==='foot'?'Сесть · E':'Выйти · E';
+  const flyEl=document.getElementById('btnRoamFly');if(flyEl)flyEl.style.display=roam?.profile?.kind==='air'?'':'none';
+  const gearEl = document.getElementById('hudGear');
+  if (gearEl) gearEl.innerText = player.gear;
+  const rpmEl = document.getElementById('hudRpm');
+  if (rpmEl) rpmEl.style.width = Math.round(player.rpm * 100) + '%';
+  const cashEl = document.getElementById('hudCash');
+  if (cashEl) cashEl.innerText = state.cash;
+  const hpBarEl = document.getElementById('hudHpBar');
+  if (hpBarEl) hpBarEl.style.width = Math.max(0, player.hp) + '%';
+  const hpValEl = document.getElementById('hudHpVal');
+  if (hpValEl) hpValEl.innerText = Math.round(player.hp) + '%';
+  for (let i = 1; i <= 5; i++) {
+    const star = document.getElementById(`star${i}`);
+    if (!star) continue;
+    if (i <= state.wanted) {
+      if (state.evading) {star.classList.remove('lit');star.classList.add('evade-lit');}
+      else {star.classList.remove('evade-lit');star.classList.add('lit');}
+    } else star.classList.remove('lit', 'evade-lit');
+  }
+}
+
 function renderWorld() {
   const w = window.innerWidth;
   const h = window.innerHeight;
+  if(threeRenderer){
+    threeRenderer.render({
+      player,
+      mode:roam?.mode||'sedan',
+      altitude:roam?.altitude||0,
+      vehicles:[...trafficCars,...parkedCars,...policeCars,...incidentPoliceCars,...incidentResponseVehicles,...(roam?.fleet||[]),...airMedicalVehicles,...(cityIncidentDirector?.current()?.wrecks||[])],
+      pedestrians:[...pedestrians,...(cityIncidentDirector?.current()?.actors||[])],
+      props:breakableProps,parts:CARPARTS,incident:cityIncidentDirector?.current(),
+      weather:{kind:weather?.kind||'clear',rain:weather?.rain||0,fog:weather?.fog||0,wetness:weather?.wetness||0,wind:weather?.gust||0,flash:weather?.flash||0}
+    });
+    renderHud();
+    return;
+  }
   if (canvas.width !== w || canvas.height !== h) {
     canvas.width = w;
     canvas.height = h;
@@ -3550,39 +3629,7 @@ function renderWorld() {
     ctx.fillStyle=`rgba(245,224,205,${Math.min(1,state.deathFlash*1.8)})`;ctx.font='900 34px Inter, sans-serif';ctx.textAlign='center';ctx.fillText('ВОЗРОЖДЕНИЕ',w*.5,h*.5);ctx.restore();
   }
 
-  // Radar & HUD
-  renderRadar();
-  const speedEl = document.getElementById('hudSpeed');
-  if (speedEl) speedEl.innerText = roam?.mode === 'foot' ? 'ПЕШКОМ' : Math.round(Math.abs(player.speed) * 12);
-  const enterEl=document.getElementById('btnRoamEnter');if(enterEl)enterEl.textContent=roam?.mode==='foot'?'Сесть · E':'Выйти · E';
-  const flyEl=document.getElementById('btnRoamFly');if(flyEl)flyEl.style.display=roam?.profile?.kind==='air'?'':'none';
-  const gearEl = document.getElementById('hudGear');
-  if (gearEl) gearEl.innerText = player.gear;
-  const rpmEl = document.getElementById('hudRpm');
-  if (rpmEl) rpmEl.style.width = Math.round(player.rpm * 100) + '%';
-  const cashEl = document.getElementById('hudCash');
-  if (cashEl) cashEl.innerText = state.cash;
-  const hpBarEl = document.getElementById('hudHpBar');
-  if (hpBarEl) hpBarEl.style.width = Math.max(0, player.hp) + '%';
-  const hpValEl = document.getElementById('hudHpVal');
-  if (hpValEl) hpValEl.innerText = Math.round(player.hp) + '%';
-
-  for (let i = 1; i <= 5; i++) {
-    const star = document.getElementById(`star${i}`);
-    if (star) {
-      if (i <= state.wanted) {
-        if (state.evading) {
-          star.classList.remove('lit');
-          star.classList.add('evade-lit');
-        } else {
-          star.classList.remove('evade-lit');
-          star.classList.add('lit');
-        }
-      } else {
-        star.classList.remove('lit', 'evade-lit');
-      }
-    }
-  }
+  renderHud();
 }
 
 function drawScreenPedestrian(ped,sx,sy,index,zoom=1){
@@ -3908,7 +3955,7 @@ function renderFullMap() {
   fullMapCtx.save();fullMapCtx.lineCap='round';fullMapCtx.lineJoin='round';
   for(const bridgePath of mapPaint.bridgePaths||[]){
     const points=bridgePath.path.map(point=>({x:mapX+point.x*scale,y:mapY+point.y*scale}));
-    if(!traceSmoothBridgePath(fullMapCtx,points,Math.min(180,bridgePath.width*1.35)*scale))continue;
+    if(!traceSmoothBridgePath(fullMapCtx,points,bridgePath.width*.5*scale))continue;
     fullMapCtx.strokeStyle='#38bdf8';fullMapCtx.lineWidth=Math.max(3,bridgePath.width*scale);fullMapCtx.stroke();
   }
   fullMapCtx.restore();
@@ -4235,6 +4282,8 @@ function toggleGarage() {
 
 function boot() {
   initTopology();
+  window.addEventListener('lowtown-before-update',()=>autoSaveProgress());
+  initThreeRuntime();
   roam = createFreeRoam(player, parkedCars, buildings, trees, isPositionOnSolidGround, showToast, solidProps, isPositionOnWaterObstacle,
     ()=>[...trafficCars,...policeCars,...incidentPoliceCars,...incidentResponseVehicles],{mapPoint:worldPoint,runways:PLANE_RUNWAYS});
   const roamControls = document.createElement('div');

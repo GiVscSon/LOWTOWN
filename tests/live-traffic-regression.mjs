@@ -6,7 +6,7 @@ import * as streetNetwork from '../src/game/street_network.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import { resolveContact, resolveScenery, contact, chassis, captureMotion, solveVehicleMotion } from '../src/game/solid_contacts.js';
+import { resolveContact, resolveScenery, contact, chassis, captureMotion, solveVehicleMotion, createSpatialIndex } from '../src/game/solid_contacts.js';
 import { advanceTrafficCar, resolveTrafficPair } from '../src/game/traffic_turns.js';
 import { coastPoints, pointInCoast, pointInBeach, BEACH_WIDTH } from '../src/game/coastline.js';
 import * as ocean from '../src/game/ocean_chunks.js';
@@ -16,7 +16,7 @@ import { projectIso, velocityForHeading, stepLandVehicle, routeInput } from '../
 const noop=()=>{};
 const element={style:{},classList:{add:noop,remove:noop},appendChild:noop,remove:noop,addEventListener:noop,getContext:()=>({})};
 let clock=0;
-const sandbox={...authoredWorld,LEGACY_RUNWAYS,VEHICLES,...emergencyPassing,...streetNetwork,...ocean,...surfaces,...incidents,Math,console,advanceClock:()=>clock+=1000/60,performance:{now:()=>clock},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,resolveContact,resolveScenery,contact,chassis,captureMotion,solveVehicleMotion,advanceTrafficCar,resolveTrafficPair,coastPoints,pointInCoast,pointInBeach,BEACH_WIDTH,projectIso,velocityForHeading, stepLandVehicle,routeInput};
+const sandbox={...authoredWorld,LEGACY_RUNWAYS,VEHICLES,...emergencyPassing,...streetNetwork,...ocean,...surfaces,...incidents,Math,console,advanceClock:()=>clock+=1000/60,performance:{now:()=>clock},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,resolveContact,resolveScenery,contact,chassis,captureMotion,solveVehicleMotion,createSpatialIndex,advanceTrafficCar,resolveTrafficPair,coastPoints,pointInCoast,pointInBeach,BEACH_WIDTH,projectIso,velocityForHeading, stepLandVehicle,routeInput};
 vm.createContext(sandbox);
 const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
 vm.runInContext(source+`

@@ -1,4 +1,6 @@
 // Oriented bodies and inelastic momentum exchange used by the live city.
+import { createSpatialIndex } from './spatial_index.js';
+export { createSpatialIndex } from './spatial_index.js';
 export function chassis(body) {
   return { x: body.x, y: body.y, angle: body.angle || 0,
     length: body.width || body.w || 48, breadth: body.height || body.h || 24 };
@@ -86,10 +88,17 @@ export function solveVehicleMotion(bodies,starts,dt,{buildings=[],trees=[],props
     const width=p.width||p.w||12,height=p.height||p.h||12;
     return {...p,width,height,radius:Math.hypot(width,height)/2,source:p};
   });
+  const sceneryIndex=createSpatialIndex(scenery,p=>{
+    // Long bridge barriers occupy thin rectangles, not kilometre-wide circles.
+    // Include rotation so the broad phase remains conservative for every prop.
+    const c=Math.abs(Math.cos(p.angle||0)),s=Math.abs(Math.sin(p.angle||0));
+    const rx=(c*p.width+s*p.height)/2,ry=(s*p.width+c*p.height)/2;
+    return {left:p.x-rx,right:p.x+rx,top:p.y-ry,bottom:p.y+ry};
+  });
   for(const s of states){
     Object.assign(s.body,s.start);
     const travel=Math.hypot(s.vx,s.vy)*frame+s.radius+4;
-    s.scenery=scenery.filter(p=>Math.abs(p.x-s.start.x)<travel+p.radius&&Math.abs(p.y-s.start.y)<travel+p.radius);
+    s.scenery=sceneryIndex.query(s.start.x-travel,s.start.y-travel,s.start.x+travel,s.start.y+travel);
   }
   const reported=new Map();
   function collide(a,b,fixed=false){

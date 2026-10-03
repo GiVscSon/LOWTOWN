@@ -24,7 +24,9 @@ try {
   let lastError;
   for (let attempt = 1; attempt <= 15; attempt += 1) {
     try {
-      response = await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 3000 });
+      // Three.js compiles its first WebGL programs before DOMContentLoaded.
+      // Software WebGL on CI can take longer than the old Canvas boot budget.
+      response = await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 15000 });
       if (response?.ok()) break;
     } catch (error) {
       lastError = error;
@@ -41,11 +43,28 @@ try {
     throw new Error(`Unexpected LOWTOWN title: ${JSON.stringify(title)}`);
   }
 
-  const canvas = page.locator('#gameCanvas');
-  await canvas.waitFor({ state: 'visible', timeout: 10000 });
-  const canvasSize = await canvas.evaluate(element => ({ width: element.width, height: element.height }));
-  if (canvasSize.width < 320 || canvasSize.height < 240) {
-    throw new Error(`LOWTOWN canvas was not initialized: ${canvasSize.width}x${canvasSize.height}`);
+  await page.waitForFunction(() =>
+    ['three','canvas'].includes(window.__lowtownRenderer) &&
+    Number.isFinite(window.__lowtownLastFrame) &&
+    performance.now() - window.__lowtownLastFrame < 1500,
+    null,{timeout:15000}
+  );
+  const runtime = await page.evaluate(() => {
+    const renderer=window.__lowtownRenderer;
+    const element=document.getElementById(renderer==='three'?'threeCanvas':'gameCanvas');
+    return {
+      renderer,
+      width:element?.width||0,
+      height:element?.height||0,
+      visible:!!element&&getComputedStyle(element).display!=='none',
+      frames:window.__lowtownThreeStats?.frames||0
+    };
+  });
+  if (!runtime.visible || runtime.width < 320 || runtime.height < 240) {
+    throw new Error(`LOWTOWN active ${runtime.renderer} canvas was not initialized: ${runtime.width}x${runtime.height}`);
+  }
+  if (runtime.renderer==='three' && runtime.frames < 2) {
+    throw new Error(`LOWTOWN Three.js renderer did not produce enough frames: ${runtime.frames}`);
   }
 
   const district = await page.locator('#hudDistrict').innerText();
@@ -63,7 +82,7 @@ try {
   await page.locator('#mapModal').waitFor({ state: 'hidden', timeout: 5000 });
 
   if (errors.length) throw new Error(`LOWTOWN browser errors:\n${errors.join('\n')}`);
-  console.log(`LOWTOWN PAGES SMOKE: PASS ${URL} HTTP ${response.status()} CANVAS OK MAP OK JS OK`);
+  console.log(`LOWTOWN PAGES SMOKE: PASS ${URL} HTTP ${response.status()} RENDERER ${runtime.renderer.toUpperCase()} MAP OK JS OK`);
 } finally {
   await browser.close();
 }
