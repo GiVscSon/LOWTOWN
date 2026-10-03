@@ -307,6 +307,10 @@ export function installAppBootstrap(ctx) {
           };
         },
         collisionScene(kind = 'car', onFoot = false) {
+          // Fixture input is advanced explicitly by advanceScene(). Freeze
+          // before its first draw so GPU/keyboard latency cannot move actors
+          // between scene setup and the measured contact interval.
+          ctx.qaManualSceneClock ??= ctx.env.performance.now();
           const origin = {
             x: 1600,
             y: 1200
