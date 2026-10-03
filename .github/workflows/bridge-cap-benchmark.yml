@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - src/main.js
+      - src/game/street_surface.js
+      - tests/crosswalk-markings-regression.mjs
       - tests/bridge-cap-browser-benchmark.mjs
       - package.json
       - .github/workflows/bridge-cap-benchmark.yml
