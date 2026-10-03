@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {mkdirSync,writeFileSync} from 'node:fs';
-import {corridorRoad,onStreetCollection} from '../src/game/street_corridors.js';
-import {streetSurfaceGeometry} from '../src/game/street_surface.js';
+import {corridorRoad,onStreetCollection} from '../src/world/street_corridors.js';
+import {streetSurfaceGeometry} from '../src/world/street_surface.js';
 import {runtimeCity} from './helpers/runtime-city.mjs';
 function audit(paint){
   const bands=paint.crossings;

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { createAIWorldModel } from '../src/game/ai_world_model.js';
-import { createAutonomyStack } from '../src/game/autonomy_stack.js';
+import { createAIWorldModel } from '../src/labs/legacy/ai_world_model.js';
+import { createAutonomyStack } from '../src/labs/legacy/autonomy_stack.js';
 
 const world=createAIWorldModel({cellSize:160});
 const stack=createAutonomyStack({worldModel:world});

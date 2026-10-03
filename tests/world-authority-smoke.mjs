@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-import { CITY_ROADS, CITY_DESTINATIONS, destinationPoint, shortestRoute, buildCityGraph } from '../src/game/city_semantics.js';
-import { WORLD } from '../src/game/world.js';
-import { buildingIslandAt, isLand } from '../src/game/islands.js';
-import { buildLayeredRoadTopology, ROAD_LEVELS } from '../src/game/road_topology.js';
+import { CITY_ROADS, CITY_DESTINATIONS, destinationPoint, shortestRoute, buildCityGraph } from '../src/labs/legacy/city_semantics.js';
+import { WORLD } from '../src/labs/legacy/world.js';
+import { buildingIslandAt, isLand } from '../src/labs/legacy/islands.js';
+import { buildLayeredRoadTopology, ROAD_LEVELS } from '../src/labs/legacy/road_topology.js';
 
 const graph = buildCityGraph();
 assert.ok(graph.length >= 50, `city graph unexpectedly small: ${graph.length}`);

@@ -1,66 +1,53 @@
 # LOWTOWN
 
-A browser-based 1990s crime-city driving prototype with a grimy night-city presentation and strict top-down gameplay view.
+Браузерная игра о ночном городе: органическая сеть дорог, острова и мосты, пешеходы, дорожное движение, полиция и экстренные службы. Основной рендерер — Three.js; игра устанавливается как PWA и работает после загрузки без сети.
 
-## Vertical prototype: 0.2 gameplay track
+[Открыть игру](https://givscson.github.io/LOWTOWN/)
 
-Prototype 0.2 is now the primary development track. It is deliberately focused on player-facing gameplay rather than autonomous AI-driver research.
+## Запуск
 
-## What is a job?
-
-A **job** is a player-facing mission with a defined objective, destination and completion condition. Jobs are chained: completing one unlocks the next, and each successful job awards deterministic money/score.
-
-The current chain is:
-
-1. **JOB 01: SHAKE THE NIGHT**
-2. **JOB 02: THROUGH THE BLOCKS**
-3. **JOB 03: LOSE THE TAIL**
-
-The prototype chain is complete only after Job 3 is completed.
-
-## Win condition
-
-The current gameplay milestone is won by completing **Job 1 -> Job 2 -> Job 3** in order and receiving all three rewards: $250 + $450 + $700 = **$1,400**.
-
-## Persistence
-
-Prototype 0.2 stores completed-job progress and money in browser `localStorage`, so a reload can continue the gameplay progression. A fresh reset remains available for development/testing.
-
-## Current limitations
-
-- static building/land collision is implemented through a shared world-geometry contract; curb/road-edge behavior is still being hardened
-- the three-job economy chain is prototype-simple and has no inventory or shop system
-- pedestrian and police reactions are scripted prototype behaviors, not a full wanted/police simulation
-- combat/fight is scoped and approved in Issue #1 but is not yet part of the shipped 0.2 gameplay layer
-- autonomous AI-driver development is intentionally a separate track and is not the current gameplay priority
-
-## Gameplay roadmap
-
-See [`ROADMAP_GAMEPLAY.md`](./ROADMAP_GAMEPLAY.md) for the player-facing Prototype 0.2 sequence and acceptance criteria.
-
-## AI driver roadmap
-
-AI-driver research and testing are isolated in [`LOWTOWN_AI_ROADMAP.md`](./LOWTOWN_AI_ROADMAP.md). Do not expand that track during gameplay sessions unless explicitly requested.
-
-## Run locally
-
-```bash
-npm install
+```sh
+npm ci
 npm run dev
 ```
 
-Then open the Vite URL shown in the terminal.
+Для production-сборки: `npm run build`, затем `npm run preview`.
 
-## Controls
+## Управление
 
-- W / Arrow Up: accelerate
-- S / Arrow Down: reverse / brake
-- A,D / Arrow Left,Right: steer
-- Space: handbrake / tighter steering
-- R: reset car and job
-- N: advance to the next completed job during prototype testing
-- I: toggle AI driver for regression testing only
+WASD / стрелки — движение; пробел — ручной тормоз; Shift — ускорение. E — выйти или сесть в транспорт, Q — взлёт/снижение, M — карта, G — гараж, R — радио. Esc открывает меню паузы. На телефоне доступны экранные кнопки.
 
-## Direction
+Меню содержит три положения камеры, разрешение, частоту кадров, дальность, освещение, отражения, тени, дождь и звук. Настройки сохраняются отдельно от прогресса. Полный режим доступен без автоматического снижения разрешения.
 
-LOWTOWN is deliberately moving toward a grimy, wet, sodium-lit 1990s crime-racer mood rather than neon cyberpunk. The gameplay layer is synchronized around one top-down world-coordinate contract for rendering, driving, traffic, pedestrians, collisions and mission targets.
+## Структура
+
+| Каталог | Назначение |
+| --- | --- |
+| `src/main.js` | Короткий вход: создаёт и запускает игровой runtime |
+| `src/app/` | Запуск, ввод, звук, сохранения, PWA и телеметрия |
+| `src/runtime/` | Единое состояние, зависимости, фиксированный шаг, диагностика и освобождение ресурсов |
+| `src/world/` | Архипелаг, дороги, участки, маршруты, берег и опора |
+| `src/simulation/` | Игрок, люди, транспорт, полиция, службы, события и контакты |
+| `src/render/three/` | Сцена, камера, материалы, модели, анимации и эффекты |
+| `src/render/canvas/` | Совместимый Canvas-рендерер и его проверки |
+| `src/render/shared/`, `src/assets/` | Общая геометрия и ресурсы транспорта |
+| `src/ui/` | HUD, карта, гараж, меню и стили |
+| `src/tools/` | Средства проверки поездок |
+| `src/labs/legacy/` | Исследовательские системы физики и ИИ, используемые лабораториями и CI |
+| `tests/matrix/` | Проверки сочетаний поверхности, контактов, анимаций и настроек |
+
+`createGameRuntime({environment, dependencies})` позволяет управлять временем и подменять окружение в тестах. `start()`, `step(dt)`, `render()` и `stop()` определяют жизненный цикл. Тесты города импортируют рабочий runtime напрямую.
+
+## Проверка
+
+```sh
+npm run test:quality-matrix
+npm run test:human-controls
+npm run test:vehicle-momentum
+npm run test:organic-streets
+npm run test:three-pwa-contract
+```
+
+Для браузерных проверок: `npx playwright install chromium`, затем `npm run test:quality-browser` и `npm run test:three-pwa-browser`. Можно указать системный Chromium через `LOWTOWN_CHROMIUM`.
+
+Архитектурный разбор, сравнение открытых проектов и ограничения физики: [отчёт](docs/ENGINE_ARCHITECTURE_REVIEW_2026-10-03.md). История лабораторий: [дорожная карта ИИ](LOWTOWN_AI_ROADMAP.md), [прежняя игровая дорожная карта](ROADMAP_GAMEPLAY.md).

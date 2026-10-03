@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { createTransportController } from '../src/game/transport_controller.js';
-import { createAIDriver } from '../src/game/ai_driver.js';
-import { createAICharacterDriver, AI_CHARACTER_MODES } from '../src/game/ai_character_driver.js';
+import { createTransportController } from '../src/labs/legacy/transport_controller.js';
+import { createAIDriver } from '../src/labs/legacy/ai_driver.js';
+import { createAICharacterDriver, AI_CHARACTER_MODES } from '../src/labs/legacy/ai_character_driver.js';
 
 const nodes=[];
 for(let x=0;x<=960;x+=160){

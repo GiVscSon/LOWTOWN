@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createTransportState, transportStep, transportSpeed, TRANSPORT_TYPES } from '../src/game/transport_physics.js';
+import { createTransportState, transportStep, transportSpeed, TRANSPORT_TYPES } from '../src/labs/legacy/transport_physics.js';
 
 for (const type of Object.values(TRANSPORT_TYPES)) {
   const s=createTransportState({type,x:0,y:0,z:type==='PLANE'?100:0});

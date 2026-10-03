@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createDriverExitDiagnostic, DRIVER_EXIT_STATES } from '../src/game/driver_exit_diagnostic.js';
+import { createDriverExitDiagnostic, DRIVER_EXIT_STATES } from '../src/labs/legacy/driver_exit_diagnostic.js';
 
 const healthy=createDriverExitDiagnostic({stallSeconds:1});
 for(let i=0;i<10;i++)healthy.update(.1,{x:i+1,y:0,velocity:12,frameDistance:1,acceleration:2,controls:{throttle:1},actuator:{target:{throttle:1},applied:{throttle:1}}});

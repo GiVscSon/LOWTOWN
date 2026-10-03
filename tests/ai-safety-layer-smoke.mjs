@@ -1,4 +1,4 @@
-import { createAISafetyLayer, evaluateTrajectoryAgainstTraffic, shouldReplan } from '../src/game/ai_safety_layer.js';
+import { createAISafetyLayer, evaluateTrajectoryAgainstTraffic, shouldReplan } from '../src/labs/legacy/ai_safety_layer.js';
 
 const layer = createAISafetyLayer();
 

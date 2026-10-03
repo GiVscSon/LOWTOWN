@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { initializeTrafficCar, stepTrafficFleet } from '../src/game/runtime_traffic.js';
-import { resolveRuntimeVehicleCollisions } from '../src/game/runtime_vehicle_collisions.js';
+import { initializeTrafficCar, stepTrafficFleet } from '../src/labs/legacy/runtime_traffic.js';
+import { resolveRuntimeVehicleCollisions } from '../src/labs/legacy/runtime_vehicle_collisions.js';
 
 const node=(id,x,y)=>({id,x,y,links:[]});
 

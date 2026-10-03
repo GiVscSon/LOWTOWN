@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { ISLANDS, BRIDGES, islandAt, isLand, biomeAt } from '../src/game/islands.js';
+import { ISLANDS, BRIDGES, islandAt, isLand, biomeAt } from '../src/labs/legacy/islands.js';
 
 assert.equal(ISLANDS.length, 3, 'world should contain exactly three islands');
 assert.deepEqual(ISLANDS.map(i => i.biome), ['URBAN', 'INDUSTRIAL_COAST', 'FOREST_HIGHLAND']);

@@ -56,7 +56,9 @@
     "test:organic-streets": "node tests/organic-streets-regression.mjs",
     "test:menu-browser": "node tests/game-menu-browser-smoke.mjs",
     "test:refined-transport": "node tests/refined-transport-regression.mjs",
-    "test:refined-transport-browser": "node tests/refined-transport-browser.mjs"
+    "test:refined-transport-browser": "node tests/refined-transport-browser.mjs",
+    "test:quality-matrix": "node tests/matrix/game-quality.mjs",
+    "test:quality-browser": "node tests/matrix/quality-browser.mjs"
   },
   "dependencies": {
     "@sentry/browser": "^10.25.0",

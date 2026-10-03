@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { WORLD } from '../src/game/world.js';
-import { ISLANDS, BRIDGES, isLand, islandAt, buildingIslandAt } from '../src/game/islands.js';
+import { WORLD } from '../src/labs/legacy/world.js';
+import { ISLANDS, BRIDGES, isLand, islandAt, buildingIslandAt } from '../src/labs/legacy/islands.js';
 
 const GRID = 160;
 const LIMIT = 2720;

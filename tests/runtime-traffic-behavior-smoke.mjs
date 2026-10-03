@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { initializeTrafficCar, nextTrafficSegment, stepTrafficFleet } from '../src/game/runtime_traffic.js';
+import { initializeTrafficCar, nextTrafficSegment, stepTrafficFleet } from '../src/labs/legacy/runtime_traffic.js';
 
 const a={id:'A',x:0,y:0,links:[]};
 const b={id:'B',x:100,y:0,links:[]};

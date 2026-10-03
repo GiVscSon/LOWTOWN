@@ -1,7 +1,7 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { createBlackBox } from '../src/game/black_box.js';
+import { createBlackBox } from '../src/labs/legacy/black_box.js';
 
 const ARTIFACT_DIR = 'ai-run-artifacts';
 const RUN_MS = 18000;

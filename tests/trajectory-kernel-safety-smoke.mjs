@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { createTrajectoryLab } from '../src/game/trajectory_lab.js';
-import { createTransportController } from '../src/game/transport_controller.js';
+import { createTrajectoryLab } from '../src/labs/legacy/trajectory_lab.js';
+import { createTransportController } from '../src/labs/legacy/transport_controller.js';
 
 const blocked=()=>false;
 const trafficRisk=()=>({risk:0,minTtc:Infinity});

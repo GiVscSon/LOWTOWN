@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { createTrajectoryLab } from '../src/game/trajectory_lab.js';
-import { createCorridorGuardian } from '../src/game/corridor_guardian.js';
-import { createAISafetyLayer } from '../src/game/ai_safety_layer.js';
+import { createTrajectoryLab } from '../src/labs/legacy/trajectory_lab.js';
+import { createCorridorGuardian } from '../src/labs/legacy/corridor_guardian.js';
+import { createAISafetyLayer } from '../src/labs/legacy/ai_safety_layer.js';
 
 const simulate=(car,horizon,steer,throttle,brake)=>({safe:true,collisionT:horizon,x:car.x,y:car.y,minWall:100,speed:Math.max(0,(car.vx||0)+throttle*40-brake*80)});
 const trafficRisk=()=>({risk:0,minTtc:Infinity});

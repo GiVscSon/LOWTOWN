@@ -1,4 +1,4 @@
-import { generateScenario, generateScenarios, scenarioSignature, scenarioTemplates } from '../src/game/scenario_generator.js';
+import { generateScenario, generateScenarios, scenarioSignature, scenarioTemplates } from '../src/labs/legacy/scenario_generator.js';
 
 const a=generateScenarios({seed:12345,count:1000});
 const b=generateScenarios({seed:12345,count:1000});

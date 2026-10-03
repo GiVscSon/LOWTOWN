@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { createMissionSystem } from '../src/game/missions.js';
-import { CITY_DESTINATIONS, destinationPoint, vehicleRoute } from '../src/game/city_semantics.js';
+import { createMissionSystem } from '../src/labs/legacy/missions.js';
+import { CITY_DESTINATIONS, destinationPoint, vehicleRoute } from '../src/labs/legacy/city_semantics.js';
 
 const missions = createMissionSystem({ mission: { x: 1200, y: -420, radius: 70 } });
 assert.equal(missions.templates.length, 3);

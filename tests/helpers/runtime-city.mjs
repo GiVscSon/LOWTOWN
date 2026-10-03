@@ -1,20 +1,21 @@
-import { VEHICLE_ASSETS } from '../../src/game/assets.js';
-import * as authoredWorld from '../../src/game/authored_archipelago.js';
-import { PLANE_RUNWAYS as LEGACY_RUNWAYS } from '../../src/game/free_roam.js';
-import { readFileSync } from 'node:fs';
+import { VEHICLE_ASSETS } from '../../src/assets/vehicle_icons.js';
+import * as authoredWorld from '../../src/world/archipelago.js';
+import { PLANE_RUNWAYS as LEGACY_RUNWAYS } from '../../src/simulation/free_roam.js';
 import vm from 'node:vm';
-import * as street from '../../src/game/street_network.js';
-import * as core from '../../src/game/test_drive_core.js';
-import * as contacts from '../../src/game/solid_contacts.js';
-import * as emergencyPassing from '../../src/game/emergency_passing.js';
-import * as coast from '../../src/game/coastline.js';
-import * as roaming from '../../src/game/free_roam.js';
-import * as traffic from '../../src/game/traffic_turns.js';
-import * as ocean from '../../src/game/ocean_chunks.js';
-import * as surfaces from '../../src/game/surface_physics.js';
-import * as incidents from '../../src/game/city_incidents.js';
-import * as organic from '../../src/game/organic_streets.js';
-import * as corridors from '../../src/game/street_corridors.js';
+import * as street from '../../src/world/street_network.js';
+import * as core from '../../src/simulation/vehicle_dynamics.js';
+import * as contacts from '../../src/simulation/solid_contacts.js';
+import * as emergencyPassing from '../../src/simulation/emergency_passing.js';
+import * as coast from '../../src/world/coastline.js';
+import * as roaming from '../../src/simulation/free_roam.js';
+import * as traffic from '../../src/simulation/traffic_turns.js';
+import * as ocean from '../../src/world/ocean_chunks.js';
+import * as surfaces from '../../src/simulation/surfaces.js';
+import * as incidents from '../../src/simulation/incidents.js';
+import * as organic from '../../src/world/organic_streets.js';
+import * as corridors from '../../src/world/street_corridors.js';
+import * as walking from '../../src/world/walk_surface.js';
+import {attachRuntime} from './runtime-vm.mjs';
 
 export function runtimeCity(seed = 19,{legacyStreets=false}={}) {
   let clock = 0, randomState = seed;
@@ -28,9 +29,8 @@ export function runtimeCity(seed = 19,{legacyStreets=false}={}) {
       querySelectorAll: () => [], addEventListener: noop }, window: { addEventListener: noop },
     localStorage: { getItem: () => null, setItem: noop }, setTimeout: noop, setInterval: noop,
     requestAnimationFrame: noop, ...street, ...core, ...contacts, ...emergencyPassing, ...coast, ...roaming,
-    ...traffic, ...ocean, ...surfaces, ...incidents, ...organic, ...corridors });
-  let source = readFileSync(new URL('../../src/main.js', import.meta.url), 'utf8').replace(/^import .*;\n/gm, '');
-  if(legacyStreets)context.organicStreetNetwork=undefined;
-  vm.runInContext(`${source}\ninitTopology();`, context);
-  return { run: code => vm.runInContext(code, context), tick: dt => { clock += dt * 1000; } };
+    ...traffic, ...ocean, ...surfaces, ...incidents, ...organic, ...corridors, ...walking });
+  const runtime=attachRuntime(context,{legacyStreets});
+  vm.runInContext('initTopology();', context);
+  return {runtime,run: code => vm.runInContext(code, context),tick: dt => {clock += dt * 1000;}};
 }

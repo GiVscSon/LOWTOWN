@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { createAIDriver } from '../src/game/ai_driver.js';
-import { createTransportController } from '../src/game/transport_controller.js';
-import { resolveTransportPhysics } from '../src/game/transport_profiles.js';
+import { createAIDriver } from '../src/labs/legacy/ai_driver.js';
+import { createTransportController } from '../src/labs/legacy/transport_controller.js';
+import { resolveTransportPhysics } from '../src/labs/legacy/transport_profiles.js';
 
 const VEHICLES=['sedan','coupe','truck','police'];
 const templates=['straight','turn90','sharp_turn','obstacle','slow_car','oncoming','overtake','braking','recovery','stuck','high_speed','series_turns','near_collision','collision'];

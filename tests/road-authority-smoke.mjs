@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildRoadNetwork, roadSegments, snapToRoad, ROAD_GRID, ROAD_WIDTH } from '../src/game/road_authority.js';
+import { buildRoadNetwork, roadSegments, snapToRoad, ROAD_GRID, ROAD_WIDTH } from '../src/labs/legacy/road_authority.js';
 
 const blocked=(x,y)=>x>100&&x<260&&y>-120&&y<120;
 const isLand=()=>true;

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import {mkdirSync,writeFileSync} from 'node:fs';
 import {runtimeCity} from './helpers/runtime-city.mjs';
-import {DISTRICT_DRAFTS,AUTHORED_ISLETS,ARTERIAL_X,ARTERIAL_Y,worldPoint} from '../src/game/authored_archipelago.js';
-import {coastPoints,pointInCoast} from '../src/game/coastline.js';
+import {DISTRICT_DRAFTS,AUTHORED_ISLETS,ARTERIAL_X,ARTERIAL_Y,worldPoint} from '../src/world/archipelago.js';
+import {coastPoints,pointInCoast} from '../src/world/coastline.js';
 
 const districts=Object.values(DISTRICT_DRAFTS);
 assert.equal(new Set(districts.map(d=>d.w*d.h)).size,16,'every major island needs its own area');
@@ -47,7 +47,8 @@ const report=JSON.parse(city.run(`JSON.stringify((()=>{
  const footways=bridges.filter(b=>b.footway),blockedWalks=[];
  for(const b of footways){
   const distance=b.dir==='h'?b.w:b.h;
-  for(let along=0;along<=distance;along+=8){
+  // Foot centres remain inside the deck; its outer cap has no water margin.
+  for(let along=5;along<=distance-5;along+=8){
    const x=b.x+(b.dir==='h'?along:b.w/2),y=b.y+(b.dir==='v'?along:b.h/2);
    if(isPedestrianSceneryBlocked(x,y))blockedWalks.push({id:b.id,x,y});
   }

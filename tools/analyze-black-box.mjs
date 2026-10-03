@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { createBlackBoxAnalysisAI } from '../src/game/ai_analysts.js';
+import { createBlackBoxAnalysisAI } from '../src/labs/legacy/ai_analysts.js';
 
 const input = process.argv[2] || 'ai-run-artifacts/black-box.json';
 const output = process.argv[3] || 'ai-run-artifacts/analysis.json';

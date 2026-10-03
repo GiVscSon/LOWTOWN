@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { createAICitizen } from '../src/game/ai_citizen.js';
-import { createTransportController } from '../src/game/transport_controller.js';
+import { createAICitizen } from '../src/labs/legacy/ai_citizen.js';
+import { createTransportController } from '../src/labs/legacy/transport_controller.js';
 
 const nodes=[];for(let i=0;i<12;i++)nodes.push({x:i*160,y:0});
 let made=0;

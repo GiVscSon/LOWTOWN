@@ -1,6 +1,6 @@
 # LOWTOWN visual asset sources
 
-The live city draws oriented vehicle bodies procedurally on canvas. The original SVG generator in `src/game/transport_svg.js` provides 19 transport types and 16 true isometric headings for each (304 views). The garage uses these local SVGs. The earlier six side-profile drawings remain exported as `LEGACY_VEHICLE_ASSETS` in `src/game/assets.js`. The game does not depend on remote image hotlinks.
+The live city draws oriented vehicle bodies procedurally on canvas. The original SVG generator in `src/render/shared/transport_svg.js` provides 19 transport types and 16 true isometric headings for each (304 views). The garage uses these local SVGs. The earlier six side-profile drawings remain exported as `LEGACY_VEHICLE_ASSETS` in `src/assets/vehicle_icons.js`. The game does not depend on remote image hotlinks.
 
 For the next asset expansion, these public CC0 packs are suitable references/sources:
 

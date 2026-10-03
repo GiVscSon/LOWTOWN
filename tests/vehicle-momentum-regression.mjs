@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {captureMotion,solveVehicleMotion,contact,chassis,resolveContact,resolveScenery} from '../src/game/solid_contacts.js';
+import {captureMotion,solveVehicleMotion,contact,chassis,resolveContact,resolveScenery} from '../src/simulation/solid_contacts.js';
 import {runtimeCity} from './helpers/runtime-city.mjs';
 const body=(x,mass=1500,width=48,height=24)=>({x,y:0,angle:0,width,height,mass,speed:0,vx:0,vy:0});
 const results=[];

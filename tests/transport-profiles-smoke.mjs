@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { VEHICLE_PROFILES, getTransportProfile, resolveTransportPhysics, listTransportProfiles } from '../src/game/transport_profiles.js';
-import { TRANSPORT_TYPES } from '../src/game/transport_constants.js';
+import { VEHICLE_PROFILES, getTransportProfile, resolveTransportPhysics, listTransportProfiles } from '../src/labs/legacy/transport_profiles.js';
+import { TRANSPORT_TYPES } from '../src/labs/legacy/transport_constants.js';
 
 assert.ok(Object.keys(VEHICLE_PROFILES).length >= 10);
 assert.equal(getTransportProfile('coupe').type,TRANSPORT_TYPES.CAR);

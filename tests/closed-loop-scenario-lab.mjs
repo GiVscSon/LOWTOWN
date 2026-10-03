@@ -2,9 +2,9 @@ import { strict as assert } from 'node:assert';
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { generateScenarios } from '../src/game/scenario_generator.js';
-import { adaptScenario, scoreBlackBox } from '../src/game/scenario_feedback.js';
-import { createBlackBox } from '../src/game/black_box.js';
+import { generateScenarios } from '../src/labs/legacy/scenario_generator.js';
+import { adaptScenario, scoreBlackBox } from '../src/labs/legacy/scenario_feedback.js';
+import { createBlackBox } from '../src/labs/legacy/black_box.js';
 
 const COUNT = Number(process.env.LOWTOWN_SCENARIOS || 20);
 const RUN_MS = Number(process.env.LOWTOWN_SCENARIO_RUN_MS || 12000);

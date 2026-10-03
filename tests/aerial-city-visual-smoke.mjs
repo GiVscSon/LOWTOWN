@@ -1,4 +1,4 @@
-import {worldPoint} from '../src/game/authored_archipelago.js';
+import {worldPoint} from '../src/world/archipelago.js';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';

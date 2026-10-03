@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createNavigationBrain } from '../src/game/navigation_brain.js';
+import { createNavigationBrain } from '../src/labs/legacy/navigation_brain.js';
 
 const nodes=[];
 for(let y=0;y<8;y++) for(let x=0;x<8;x++) nodes.push({id:`${x}:${y}`,x:x*160,y:y*160,links:[]});

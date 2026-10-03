@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createTransportController } from '../src/game/transport_controller.js';
+import { createTransportController } from '../src/labs/legacy/transport_controller.js';
 
 const ids=['taxi','sedan','coupe','police','van','truck','ferry','speedboat','light_plane','cargo_plane'];
 for(const id of ids){

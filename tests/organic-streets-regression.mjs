@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {runtimeCity} from './helpers/runtime-city.mjs';
-import {createBridgeProfiles,bridgeSurfaceIndex,raisedBridgeGeometry,addBridgeStructures} from '../src/three/bridges.js';
-import {createBoxBatch} from '../src/three/geometry.js';
+import {createBridgeProfiles,bridgeSurfaceIndex,raisedBridgeGeometry,addBridgeStructures} from '../src/render/three/bridges.js';
+import {createBoxBatch} from '../src/render/three/geometry.js';
 import {mkdirSync,writeFileSync} from 'node:fs';
 const city=runtimeCity(73),report=JSON.parse(city.run(`JSON.stringify((()=>{
  const paint=buildRoadPaintGeometry(),network=[...roads,...bridges.filter(b=>!b.footway)],seen=new Set([0]),queue=[0];

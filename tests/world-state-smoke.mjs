@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createWorldState, WORLD_STATE_STORAGE_KEY } from '../src/game/world_state.js';
+import { createWorldState, WORLD_STATE_STORAGE_KEY } from '../src/labs/legacy/world_state.js';
 
 function storage(){const m=new Map();return{getItem:k=>m.get(k)??null,setItem:(k,v)=>m.set(k,v),removeItem:k=>m.delete(k)};}
 

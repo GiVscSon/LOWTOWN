@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { advanceTrafficCar, resolveTrafficPair } from '../src/game/traffic_turns.js';
+import { advanceTrafficCar, resolveTrafficPair } from '../src/simulation/traffic_turns.js';
 
 const horizontal={x:50,y:10,axis:'x',angle:0,speed:2,cruiseSpeed:2,minX:0,maxX:100,width:46,height:22};
 let maxJump=0,turns=0,previous={x:horizontal.x,y:horizontal.y};

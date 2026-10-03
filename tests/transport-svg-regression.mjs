@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import {SVG_TRANSPORT_TYPES,createTransportSVG} from '../src/game/transport_svg.js';
-import {VEHICLE_ASSETS} from '../src/game/assets.js';
+import {SVG_TRANSPORT_TYPES,createTransportSVG} from '../src/render/shared/transport_svg.js';
+import {VEHICLE_ASSETS} from '../src/assets/vehicle_icons.js';
 assert.equal(SVG_TRANSPORT_TYPES.length,19);
 for(const type of SVG_TRANSPORT_TYPES){
  const views=new Set();assert(VEHICLE_ASSETS[type].startsWith('data:image/svg+xml'));

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { createFreeRoam } from '../src/game/free_roam.js';
-import { pointInCoast, coastPoints } from '../src/game/coastline.js';
+import { createFreeRoam } from '../src/simulation/free_roam.js';
+import { pointInCoast, coastPoints } from '../src/world/coastline.js';
 const island={x:300,y:300,w:2200,h:2200};
 assert(pointInCoast(1200,1200,island));assert(!pointInCoast(300,300,island));
 assert(coastPoints(island).length>12);

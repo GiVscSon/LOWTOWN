@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createAutopilotBot } from '../src/game/autonomy_bot.js';
+import { createAutopilotBot } from '../src/labs/legacy/autonomy_bot.js';
 
 const bot = createAutopilotBot();
 assert.equal(bot.state.enabled, false, 'autopilot should start disabled');

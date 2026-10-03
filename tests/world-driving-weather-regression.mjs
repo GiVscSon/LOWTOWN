@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {runtimeCity} from './helpers/runtime-city.mjs';
-import {createWeather,weatherMovement,surfaceMovement,WEATHER_PRESETS} from '../src/game/surface_physics.js';
-import {roofEquipment} from '../src/game/architecture.js';
+import {createWeather,weatherMovement,surfaceMovement,WEATHER_PRESETS} from '../src/simulation/surfaces.js';
+import {roofEquipment} from '../src/render/canvas/architecture.js';
 const weather=createWeather();
 for(const kind of Object.keys(WEATHER_PRESETS)){
  weather.set(kind);for(let i=0;i<1200;i++)weather.step(1/60);

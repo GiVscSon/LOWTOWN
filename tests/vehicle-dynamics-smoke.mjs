@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { estimateLoadTransfer, estimateFriction, applyTireFriction } from '../src/game/vehicle_dynamics.js';
+import { estimateLoadTransfer, estimateFriction, applyTireFriction } from '../src/labs/legacy/vehicle_dynamics.js';
 
 const neutral=estimateLoadTransfer({mass:1500});
 const accel=estimateLoadTransfer({mass:1500,longitudinalAccel:4});

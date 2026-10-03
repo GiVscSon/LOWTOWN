@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { resolveVehicleOverlap, handlePoliceBuildingSlide } from '../src/game/vehicle_collision.js';
+import { resolveVehicleOverlap, handlePoliceBuildingSlide } from '../src/labs/legacy/vehicle_collision.js';
 
 // Test mutual vehicle collision resolution
 const carA = { x: 100, y: 100, radius: 20, v: 50 };

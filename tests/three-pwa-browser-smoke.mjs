@@ -16,7 +16,7 @@ async function waitServer(){
   throw new Error('preview server did not become ready');
 }
 
-const browser=await chromium.launch({headless:true});
+const browser=await chromium.launch({headless:true,executablePath:process.env.LOWTOWN_CHROMIUM||undefined});
 const context=await browser.newContext({viewport:{width:1280,height:800}});
 const page=await context.newPage();
 const errors=[];

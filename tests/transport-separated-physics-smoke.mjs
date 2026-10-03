@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
-import { createTransportState, TRANSPORT_TYPES } from '../src/game/transport_physics.js';
-import { getTypePhysics } from '../src/game/transport_type_physics.js';
-import { resolveTransportPhysics } from '../src/game/transport_profiles.js';
-import { stepCarPhysics } from '../src/game/car_physics.js';
-import { stepBoatPhysics } from '../src/game/boat_physics.js';
-import { stepPlanePhysics } from '../src/game/plane_physics.js';
+import { createTransportState, TRANSPORT_TYPES } from '../src/labs/legacy/transport_physics.js';
+import { getTypePhysics } from '../src/labs/legacy/transport_type_physics.js';
+import { resolveTransportPhysics } from '../src/labs/legacy/transport_profiles.js';
+import { stepCarPhysics } from '../src/labs/legacy/car_physics.js';
+import { stepBoatPhysics } from '../src/labs/legacy/boat_physics.js';
+import { stepPlanePhysics } from '../src/labs/legacy/plane_physics.js';
 
 const car=createTransportState({type:TRANSPORT_TYPES.CAR,vehicleId:'sedan'});
 const boat=createTransportState({type:TRANSPORT_TYPES.BOAT,vehicleId:'speedboat'});

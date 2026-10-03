@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { isoSpriteRotation } from '../src/game/iso_sprite_rotation.js';
+import { isoSpriteRotation } from '../src/labs/legacy/iso_sprite_rotation.js';
 
 const a0=isoSpriteRotation(0);
 const a90=isoSpriteRotation(Math.PI/2);

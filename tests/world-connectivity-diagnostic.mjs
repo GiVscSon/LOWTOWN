@@ -1,5 +1,5 @@
-import { WORLD } from '../src/game/world.js';
-import { ISLANDS, BRIDGES, isLand } from '../src/game/islands.js';
+import { WORLD } from '../src/labs/legacy/world.js';
+import { ISLANDS, BRIDGES, isLand } from '../src/labs/legacy/islands.js';
 
 const GRID = 160, LIMIT = 2720, R = 18;
 const blocked = (x,y) => !isLand(x,y) || WORLD.buildings.some(([bx,by,bw,bh]) => x > bx-R && x < bx+bw+R && y > by-R && y < by+bh+R);

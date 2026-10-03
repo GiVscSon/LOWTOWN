@@ -1,21 +1,24 @@
-import * as authoredWorld from '../src/game/authored_archipelago.js';
-import { PLANE_RUNWAYS as LEGACY_RUNWAYS } from '../src/game/free_roam.js';
+import {attachRuntime} from './helpers/runtime-vm.mjs';
+import {createWalkSurface} from '../src/world/walk_surface.js';
+import {createSceneryIndex} from '../src/simulation/solid_contacts.js';
+import * as authoredWorld from '../src/world/archipelago.js';
+import { PLANE_RUNWAYS as LEGACY_RUNWAYS } from '../src/simulation/free_roam.js';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import { pointInCoast, pointInBeach, coastPoints, BEACH_WIDTH } from '../src/game/coastline.js';
-import * as street from '../src/game/street_network.js';
-import * as ocean from '../src/game/ocean_chunks.js';
-import * as surfaces from '../src/game/surface_physics.js';
-import * as incidents from '../src/game/city_incidents.js';
-import { createSpatialIndex } from '../src/game/solid_contacts.js';
+import { pointInCoast, pointInBeach, coastPoints, BEACH_WIDTH } from '../src/world/coastline.js';
+import * as street from '../src/world/street_network.js';
+import * as ocean from '../src/world/ocean_chunks.js';
+import * as surfaces from '../src/simulation/surfaces.js';
+import * as incidents from '../src/simulation/incidents.js';
+import { createSpatialIndex } from '../src/simulation/solid_contacts.js';
 
 const noop=()=>{};
 const element={style:{},classList:{add:noop,remove:noop},appendChild:noop,addEventListener:noop,getContext:()=>({}),remove:noop};
 const sandbox={...authoredWorld,LEGACY_RUNWAYS,console,Math,performance:{now:()=>0},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,pointInCoast,pointInBeach,coastPoints,BEACH_WIDTH,...street,...ocean,...surfaces,...incidents,createSpatialIndex};
 vm.createContext(sandbox);
-const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
-vm.runInContext(source+`
+Object.assign(sandbox,{createWalkSurface,createSceneryIndex});
+attachRuntime(sandbox,{legacyStreets:true});
+vm.runInContext(`
 initTopology();
 const target=buildings.find(b=>b.archetype==='warehouse'&&isPositionOnSolidGround(b.x-12,b.y+b.h*.5));
 const walker={x:target.x-12,y:target.y+target.h*.5,vx:1,visualScale:.91,fleeTimer:1,pause:0};

@@ -24,7 +24,7 @@ assert.equal(city.run('driveway.signals.length'),0,'service driveways must stay 
 const social=runtimeCity(37);
 const interaction=JSON.parse(social.run(`{
   trafficCars.length=0;parkedCars.length=0;policeCars.length=0;pedestrians.length=0;buildings.length=0;trees.length=0;solidProps.length=0;
-  isPositionOnSolidGround=()=>true;Object.assign(player,{x:10000,y:10000,speed:0});
+  isPositionOnSolidGround=()=>true;getWalkSurface=()=>()=>true;Object.assign(player,{x:10000,y:10000,speed:0});
   const route={districtId:'test',kind:'sidewalk',points:Array.from({length:40},(_,i)=>({x:i*8,y:0}))};
   const a={x:80,y:0,route,routeIndex:10,routeDirection:1,reaction:'calm',socialCooldown:0,pause:0,activityTimer:999},
     b={x:108,y:0,route,routeIndex:14,routeDirection:-1,reaction:'calm',socialCooldown:0,pause:0,activityTimer:999};

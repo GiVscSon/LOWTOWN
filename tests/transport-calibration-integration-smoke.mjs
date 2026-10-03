@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { createTransportController } from '../src/game/transport_controller.js';
-import { resolveTransportPhysics } from '../src/game/transport_profiles.js';
+import { createTransportController } from '../src/labs/legacy/transport_controller.js';
+import { resolveTransportPhysics } from '../src/labs/legacy/transport_profiles.js';
 
 const transport=createTransportController('sedan',{x:0,y:0});
 const base=resolveTransportPhysics('sedan');

@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import { createBlackBox } from '../src/game/black_box.js';
+import { createBlackBox } from '../src/labs/legacy/black_box.js';
 
 const box=createBlackBox({capacity:32,eventCapacity:32});
 box.start();

@@ -11,12 +11,18 @@ on:
       - public/pwa-icon.svg
       - public/sw.js
       - src/main.js
-      - src/pwa.js
-      - src/three/**
-      - src/game/game_menu.*
-      - src/game/street_surface.js
-      - src/game/street_vehicle.js
-      - src/game/vehicle_shapes.js
+      - src/app/pwa.js
+      - src/render/**
+      - src/runtime/**
+      - src/simulation/**
+      - src/world/**
+      - src/ui/**
+      - src/app/**
+      - src/assets/**
+      - tests/matrix/**
+      - src/world/street_surface.js
+      - src/render/shared/street_vehicle.js
+      - src/assets/vehicle_shapes.js
       - tests/refined-transport*.mjs
       - tests/fixtures/refined-transport.html
       - tests/crosswalk-markings-regression.mjs
@@ -40,6 +46,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - name: Runtime, terrain, contact and graphics matrix
+        run: npm run test:quality-matrix
       - run: npm run test:three-pwa-contract
       - run: node tests/three-city-geometry.mjs
       - run: npm run test:refined-transport
@@ -47,6 +55,8 @@ jobs:
       - run: npm run test:organic-streets
       - run: node tests/crosswalk-markings-regression.mjs
       - run: npx playwright install --with-deps chromium
+      - name: Full graphics, weather, settings and mobile matrix
+        run: npm run test:quality-browser
       - name: Refined transport and building gallery
         run: npm run test:refined-transport-browser
       - name: Three.js live rendering and PWA offline restart

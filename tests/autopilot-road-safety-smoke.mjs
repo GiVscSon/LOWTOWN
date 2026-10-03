@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import { createAIDriver } from '../src/game/ai_driver.js';
-import { buildRoadNetwork, roadSegments } from '../src/game/road_authority.js';
-import { createTransportController } from '../src/game/transport_controller.js';
-import { pointInBuilding } from '../src/game/world_geometry.js';
-import { vehicleWorldBlocked } from '../src/game/vehicle_collision.js';
+import { createAIDriver } from '../src/labs/legacy/ai_driver.js';
+import { buildRoadNetwork, roadSegments } from '../src/labs/legacy/road_authority.js';
+import { createTransportController } from '../src/labs/legacy/transport_controller.js';
+import { pointInBuilding } from '../src/labs/legacy/world_geometry.js';
+import { vehicleWorldBlocked } from '../src/labs/legacy/vehicle_collision.js';
 
 // Mirror the browser integration setup without requiring a browser. The AI's
 // prediction and the transport controller must share the same drivable-world

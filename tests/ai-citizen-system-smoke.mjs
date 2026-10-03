@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { createTransportController } from '../src/game/transport_controller.js';
-import { createAIDriver } from '../src/game/ai_driver.js';
-import { createAICitizenSystem } from '../src/game/ai_citizen_system.js';
+import { createTransportController } from '../src/labs/legacy/transport_controller.js';
+import { createAIDriver } from '../src/labs/legacy/ai_driver.js';
+import { createAICitizenSystem } from '../src/labs/legacy/ai_citizen_system.js';
 
 const nodes=[];for(let x=0;x<=960;x+=160)nodes.push({x,y:0,id:nodes.length,links:[]});
 for(const n of nodes)for(const m of nodes)if(Math.abs(n.x-m.x)===160)n.links.push(m);

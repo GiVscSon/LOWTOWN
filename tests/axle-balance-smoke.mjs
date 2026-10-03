@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { axleLoads, drivetrainDistribution, limitDriveForce } from '../src/game/axle_physics.js';
+import { axleLoads, drivetrainDistribution, limitDriveForce } from '../src/labs/legacy/axle_physics.js';
 
 const braking=axleLoads({mass:1500,longitudinalAcceleration:-6});
 const accelerating=axleLoads({mass:1500,longitudinalAcceleration:6});

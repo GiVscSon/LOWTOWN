@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { createTransportSystem, FERRY_ROUTES, AIR_ROUTES } from '../src/game/transport.js';
-import { ISLANDS, isLand } from '../src/game/islands.js';
+import { createTransportSystem, FERRY_ROUTES, AIR_ROUTES } from '../src/labs/legacy/transport.js';
+import { ISLANDS, isLand } from '../src/labs/legacy/islands.js';
 
 const water=(a,b)=>[...Array(19)].every((_,i)=>{const t=(i+1)/20;return !isLand(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t);});
 for(const r of FERRY_ROUTES){assert.ok(isLand(r.a.x,r.a.y),`${r.id}: ferry origin is not on land`);assert.ok(isLand(r.b.x,r.b.y),`${r.id}: ferry destination is not on land`);assert.ok(water(r.a,r.b),`${r.id}: ferry path is not water-only`);}
