@@ -173,7 +173,10 @@
           <button class="btn-top" id="btnOpenMap">M</button>
           <button class="btn-top" id="btnOpenGarage">G</button>
         </div>
-        <button class="btn-top camera-toggle" id="btnCamera" title="Ближе → Обычный → Обзор" aria-label="Приближение камеры: Обычный. Нажмите, чтобы переключить.">Камера: Обычный</button>
+        <div class="menu-camera-row">
+          <button class="btn-top menu-trigger" id="btnMenu" title="Меню · Esc" aria-label="Открыть меню" aria-haspopup="dialog" aria-controls="gameMenu" aria-expanded="false">☰</button>
+          <button class="btn-top camera-toggle" id="btnCamera" title="Ближе → Обычный → Обзор" aria-label="Приближение камеры: Обычный. Нажмите, чтобы переключить.">Камера: Обычный</button>
+        </div>
       </div>
     </div>
     <div class="banner-container" id="bannerContainer">
@@ -204,6 +207,70 @@
         <button class="btn-drive btn-brake" id="btnBrake"><span>▼</span></button>
       </div>
     </div>
+  </div>
+  <div class="game-menu" id="gameMenu" role="dialog" aria-modal="true" aria-labelledby="menuTitle" aria-describedby="menuContext" hidden>
+    <section class="menu-card">
+      <div class="menu-brand">LOWTOWN</div>
+      <p class="menu-context" id="menuContext"></p>
+      <header class="menu-heading">
+        <div class="menu-heading-title">
+          <button id="menuBack" type="button" aria-label="Назад в главное меню" title="Назад" hidden>←</button>
+          <h1 id="menuTitle">Пауза</h1>
+        </div>
+        <button id="menuClose" type="button" aria-label="Вернуться в игру">×</button>
+      </header>
+      <div class="menu-view" data-menu-view="main">
+        <button class="menu-primary" id="menuResume" type="button">Продолжить игру <span aria-hidden="true">▶</span></button>
+        <div class="menu-main-actions">
+          <button id="menuMap" type="button">Карта города</button>
+          <button id="menuGarage" type="button">Гараж и тюнинг</button>
+          <button data-menu-page="settings" type="button">Настройки</button>
+          <button data-menu-page="controls" type="button">Управление</button>
+        </div>
+        <div class="menu-return">
+          <button class="menu-subtle" id="menuRestart" type="button">Вернуться на старт</button>
+          <p>Деньги и найденные детали сохранятся.</p>
+        </div>
+      </div>
+      <div class="menu-view" data-menu-view="settings" hidden>
+        <fieldset class="menu-setting" id="menuCameraSettings">
+          <legend>Приближение камеры</legend>
+          <div class="menu-camera-options" role="group" aria-label="Приближение камеры">
+            <button type="button" data-camera="near" aria-pressed="false">Ближе</button>
+            <button type="button" data-camera="normal" aria-pressed="true">Обычный</button>
+            <button type="button" data-camera="overview" aria-pressed="false">Обзор</button>
+          </div>
+        </fieldset>
+        <div class="menu-setting">
+          <label class="menu-volume-label" for="menuVolume">Звуки и радио <output id="menuVolumeValue" for="menuVolume">100%</output></label>
+          <input id="menuVolume" type="range" min="0" max="100" step="5" value="100">
+          <label for="menuRadio">Радиостанция</label>
+          <select id="menuRadio">
+            <option value="0">Выключено</option>
+            <option value="1">90s Retrowave</option>
+            <option value="2">Noir Electro</option>
+            <option value="3">Synth Rock</option>
+          </select>
+          <p>Настройки сохраняются автоматически.</p>
+        </div>
+      </div>
+      <div class="menu-view" data-menu-view="controls" hidden>
+        <dl class="menu-controls">
+          <div><dt>Движение и руль</dt><dd><kbd>WASD</kbd><kbd>↑↓←→</kbd></dd></div>
+          <div><dt>Выйти / сесть</dt><dd><kbd>E</kbd></dd></div>
+          <div><dt>Ручной тормоз</dt><dd><kbd>Пробел</kbd></dd></div>
+          <div><dt>Нитро</dt><dd><kbd>Shift</kbd></dd></div>
+          <div><dt>Взлёт / снижение</dt><dd><kbd>Q</kbd></dd></div>
+          <div><dt>Карта / гараж / радио</dt><dd><kbd>M</kbd><kbd>G</kbd><kbd>R</kbd></dd></div>
+          <div><dt>Меню и пауза</dt><dd><kbd>Esc</kbd></dd></div>
+        </dl>
+        <p class="menu-controls-note">На телефоне — руль и педали внизу экрана. Самолёт взлетает после разгона по полосе; для вертолёта нажми Q.</p>
+      </div>
+      <footer class="menu-footer">
+        <span id="menuKeyHint">Esc · Продолжить</span>
+        <span>Игра на паузе</span>
+      </footer>
+    </section>
   </div>
   <div class="modal-overlay" id="mapModal">
     <div class="modal-card">

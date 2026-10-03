@@ -15,6 +15,7 @@ import { streetSurfaceGeometry, createRoadCircuits, createRoadGraph, roadPath, r
 import { createLowtownThreeRenderer } from './three/renderer.js';
 import { organicStreetNetwork, fitBuildingsToStreets } from './game/organic_streets.js';
 import { onStreetCollection, corridorRoad, corridorContains, nearestStreet, streetWidth, streetPoints, rectangleClearOfStreets } from './game/street_corridors.js';
+import { createGameMenu } from './game/game_menu.js';
 import './game/test_drive.css';
 // LOWTOWN // THREE ISLANDS VISUAL OVERHAUL // GTA 2 RETRO-NOIR ENGINE
 // High-detail procedural pedestrian sprites, isometric vehicle chassis, wet road reflections, neon glow & audio
@@ -53,10 +54,18 @@ class SynthAudio {
     this.radioInterval = null;
     this.enabled = false;
     this.stationIdx = 0;
+    this.masterGain = null;
+    this.volume = 1;
+    this.paused = false;
     this.stations = ['📻 OFF', '📻 90s RETROWAVE', '📻 NOIR ELECTRO', '📻 SYNTH ROCK'];
+    try {
+      const saved=JSON.parse(localStorage.getItem('lowtown_audio_settings'));
+      if(Number.isFinite(saved?.volume))this.volume=Math.max(0,Math.min(1,saved.volume));
+      if(Number.isInteger(saved?.station)&&saved.station>=0&&saved.station<this.stations.length)this.stationIdx=saved.station;
+    } catch {}
   }
   init() {
-    if (this.ctx) return;
+    if (this.ctx) { if(this.ctx.state==='suspended')this.ctx.resume().catch(()=>{});return; }
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       this.ctx = new AudioContext();
@@ -64,8 +73,11 @@ class SynthAudio {
       this.motorOsc = this.ctx.createOscillator();
       this.motorGain = this.ctx.createGain();
       this.radioGain = this.ctx.createGain();
+      this.masterGain = this.ctx.createGain();
+      this.masterGain.gain.setValueAtTime(this.paused?0:this.volume,this.ctx.currentTime);
+      this.masterGain.connect(this.ctx.destination);
       this.radioGain.gain.setValueAtTime(0.04, this.ctx.currentTime);
-      this.radioGain.connect(this.ctx.destination);
+      this.radioGain.connect(this.masterGain);
 
       this.motorOsc.type = 'sawtooth';
       this.motorOsc.frequency.setValueAtTime(45, this.ctx.currentTime);
@@ -75,10 +87,22 @@ class SynthAudio {
       filter.frequency.setValueAtTime(380, this.ctx.currentTime);
       this.motorOsc.connect(filter);
       filter.connect(this.motorGain);
-      this.motorGain.connect(this.ctx.destination);
+      this.motorGain.connect(this.masterGain);
       this.motorOsc.start();
       this.enabled = true;
+      if(this.stationIdx)this.startSynthRadio();
     } catch (e) {}
+  }
+  saveSettings() {
+    try{localStorage.setItem('lowtown_audio_settings',JSON.stringify({volume:this.volume,station:this.stationIdx}));}catch{}
+  }
+  setVolume(volume) {
+    if(!Number.isFinite(volume))return;
+    this.volume=Math.max(0,Math.min(1,volume));this.saveSettings();this.setPaused(this.paused);
+  }
+  setPaused(paused) {
+    this.paused=Boolean(paused);
+    this.masterGain?.gain.setTargetAtTime(this.paused?0:this.volume,this.ctx.currentTime,.03);
   }
   update(rpmRatio, speed) {
     if (!this.enabled || !this.ctx) return;
@@ -86,8 +110,14 @@ class SynthAudio {
     this.motorOsc.frequency.setTargetAtTime(targetFreq, this.ctx.currentTime, 0.05);
   }
   nextStation() {
-    this.stationIdx = (this.stationIdx + 1) % this.stations.length;
+    return this.setStation((this.stationIdx + 1) % this.stations.length);
+  }
+  setStation(index) {
+    if(!Number.isInteger(index)||index<0||index>=this.stations.length)return this.stations[this.stationIdx];
+    this.stationIdx = index;
     if (this.radioInterval) clearInterval(this.radioInterval);
+    this.radioInterval = null;
+    this.saveSettings();
     if (this.stationIdx === 0) return this.stations[0];
     this.startSynthRadio();
     return this.stations[this.stationIdx];
@@ -97,7 +127,7 @@ class SynthAudio {
     const notes = this.stationIdx === 1 ? [130, 164, 196, 246, 261, 329] : this.stationIdx === 2 ? [110, 138, 165, 220, 277] : [98, 123, 147, 196, 220];
     let step = 0;
     this.radioInterval = setInterval(() => {
-      if (!this.ctx || this.stationIdx === 0) return;
+      if (!this.ctx || this.stationIdx === 0 || this.paused || !this.volume) return;
       try {
         const osc = this.ctx.createOscillator();
         const g = this.ctx.createGain();
@@ -126,7 +156,7 @@ class SynthAudio {
       gain.gain.setValueAtTime(0.3, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.masterGain);
       osc.start(now);
       osc.stop(now + 0.36);
     } catch (e) {}
@@ -143,7 +173,7 @@ class SynthAudio {
       gain.gain.setValueAtTime(0.2, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.masterGain);
       osc.start(now);
       osc.stop(now + 0.19);
     } catch (e) {}
@@ -160,7 +190,7 @@ class SynthAudio {
       gain.gain.setValueAtTime(0.15, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.masterGain);
       osc.start(now);
       osc.stop(now + 0.16);
     } catch (e) {}
@@ -225,6 +255,9 @@ const state = {
   nitroAmount: 100,
   isMapOpen: false,
   isGarageOpen: false,
+  isMenuOpen: false,
+  pauseStarted: null,
+  pausedDuration: 0,
   lastFrameTime: performance.now(),
   keys: { up: false, down: false, left: false, right: false, handbrake: false, nitro: false }
 };
@@ -502,7 +535,7 @@ function buildRoadPaintGeometry(){
 
 let qaSignalTimeOffset=0;
 let qaManualSceneClock=null;
-function streetSignal(axis,now=qaManualSceneClock??performance.now()){
+function streetSignal(axis,now=qaManualSceneClock??((state.pauseStarted??performance.now())-state.pausedDuration)){
   const phase=(((now+qaSignalTimeOffset)/1000)%12+12)%12,active=phase<6?'x':'y',elapsed=phase%6;
   return elapsed>=5.7||axis!==active?'red':elapsed>=5?'amber':'green';
 }
@@ -2598,6 +2631,7 @@ function resolveCityMotion(starts,dt){
 }
 
 function updatePhysics(dt) {
+  if(state.isMenuOpen)return;
   weather.step(dt);
   state.deathFlash=Math.max(0,state.deathFlash-dt*1.15);
   if (state.isMapOpen || state.isGarageOpen) {
@@ -4203,12 +4237,31 @@ function showToast(msg) {
 
 let accumulator = 0;
 let driveLab;
+let gameMenu;
+const drivePointerSets=[];
+function isGamePaused(){return state.isMenuOpen||state.isMapOpen||state.isGarageOpen;}
+function clearGameInput(){
+  for(const {button,pointers} of drivePointerSets){
+    for(const id of pointers)if(button.hasPointerCapture?.(id))button.releasePointerCapture?.(id);
+    pointers.clear();
+  }
+  Object.keys(state.keys).forEach(key=>state.keys[key]=false);
+  document.querySelectorAll('.btn-drive').forEach(button=>button.classList.remove('active'));
+  accumulator=0;state.lastFrameTime=performance.now();
+}
+function syncGamePause(){
+  const paused=isGamePaused(),now=performance.now();
+  if(paused&&state.pauseStarted===null)state.pauseStarted=now;
+  else if(!paused&&state.pauseStarted!==null){state.pausedDuration+=now-state.pauseStarted;state.pauseStarted=null;}
+  clearGameInput();sound.setPaused(paused);
+}
 function gameLoop(now) {
   if(qaManualSceneClock!==null){window.__lowtownLastFrame=performance.now();requestAnimationFrame(gameLoop);return;}
   const framePerfStart=perfEnabled?performance.now():0;
   const dt = Math.max(0, Math.min(0.1, (now - state.lastFrameTime) / 1000));
   state.lastFrameTime = now;
-  accumulator += dt;
+  if(isGamePaused())accumulator=0;
+  else accumulator += dt;
   try {
     const logicPerfStart=perfEnabled?performance.now():0;
     while (accumulator >= 1 / 60) {
@@ -4238,6 +4291,16 @@ function gameLoop(now) {
 
 function setupInputListeners() {
   window.addEventListener('keydown', e => {
+    if(e.code==='Escape'){
+      e.preventDefault();if(e.repeat)return;
+      if(state.isMapOpen)toggleMap();else if(state.isGarageOpen)toggleGarage();else gameMenu?.escape();
+      return;
+    }
+    if(isGamePaused()){
+      if(!e.repeat&&e.code==='KeyM'&&state.isMapOpen)toggleMap();
+      if(!e.repeat&&e.code==='KeyG'&&state.isGarageOpen)toggleGarage();
+      return;
+    }
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
     if(state.custodyTimer>0)return;
     if (driveLab?.running) return;
@@ -4250,9 +4313,9 @@ function setupInputListeners() {
     if (e.code === 'KeyD' || e.code === 'ArrowRight') state.keys.right = true;
     if (e.code === 'Space') state.keys.handbrake = true;
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') state.keys.nitro = true;
-    if (e.code === 'KeyM') toggleMap();
-    if (e.code === 'KeyG') toggleGarage();
-    if (e.code === 'KeyR') {
+    if (e.code === 'KeyM' && !e.repeat) toggleMap();
+    if (e.code === 'KeyG' && !e.repeat) toggleGarage();
+    if (e.code === 'KeyR' && !e.repeat) {
       const st = sound.nextStation();
       showToast(st);
     }
@@ -4267,12 +4330,12 @@ function setupInputListeners() {
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') state.keys.nitro = false;
   });
 
-  const drivePointerSets=[];
   function bindDriveButton(elementId, keyName) {
     const btn = document.getElementById(elementId);
     if (!btn) return;
     const onPress = e => {
       if (e.cancelable) e.preventDefault();
+      if(isGamePaused())return;
       if(state.custodyTimer>0)return;
       sound.init();
       state.keys[keyName] = true;
@@ -4285,8 +4348,8 @@ function setupInputListeners() {
       btn.classList.remove('active');
     };
     if(window.PointerEvent){
-      const pointers=new Set();drivePointerSets.push(pointers);
-      btn.addEventListener('pointerdown',e=>{pointers.add(e.pointerId);btn.setPointerCapture?.(e.pointerId);onPress(e);});
+      const pointers=new Set();drivePointerSets.push({button:btn,pointers});
+      btn.addEventListener('pointerdown',e=>{if(isGamePaused())return;pointers.add(e.pointerId);btn.setPointerCapture?.(e.pointerId);onPress(e);});
       const release=e=>{pointers.delete(e.pointerId);if(!pointers.size)onRelease(e);};
       btn.addEventListener('pointerup',release);btn.addEventListener('pointercancel',release);
       btn.addEventListener('lostpointercapture',release);
@@ -4306,15 +4369,8 @@ function setupInputListeners() {
   bindDriveButton('btnRight', 'right');
   bindDriveButton('btnHandbrake', 'handbrake');
   bindDriveButton('btnNitro', 'nitro');
-  const clearInput = () => {
-    drivePointerSets.forEach(pointers=>pointers.clear());
-    Object.keys(state.keys).forEach(k => state.keys[k] = false);
-    document.querySelectorAll('.btn-drive').forEach(b => b.classList.remove('active'));
-    accumulator = 0;
-    state.lastFrameTime = performance.now();
-  };
-  window.addEventListener('blur', clearInput);
-  document.addEventListener('visibilitychange', clearInput);
+  window.addEventListener('blur', clearGameInput);
+  document.addEventListener('visibilitychange', clearGameInput);
 
   window.addEventListener('mouseup', () => {
     state.keys.up = false;
@@ -4358,7 +4414,9 @@ function toggleMap() {
   const modal = document.getElementById('mapModal');
   if (!modal) return;
   state.isMapOpen = modal.style.display !== 'flex';
+  if(state.isMapOpen){state.isGarageOpen=false;document.getElementById('garageModal').style.display='none';}
   modal.style.display = state.isMapOpen ? 'flex' : 'none';
+  syncGamePause();
   if (state.isMapOpen) renderFullMap();
 }
 
@@ -4374,29 +4432,34 @@ function toggleGarage() {
   const modal = document.getElementById('garageModal');
   if (!modal) return;
   state.isGarageOpen = modal.style.display !== 'flex';
+  if(state.isGarageOpen){state.isMapOpen=false;document.getElementById('mapModal').style.display='none';}
   if(state.isGarageOpen)updateGarageVehicle();
   modal.style.display = state.isGarageOpen ? 'flex' : 'none';
+  syncGamePause();
 }
 
 function boot() {
   initTopology();
+  const startLocation={x:player.x,y:player.y,angle:player.angle};
   window.addEventListener('lowtown-before-update',()=>autoSaveProgress());
   initThreeRuntime();
   roam = createFreeRoam(player, parkedCars, buildings, trees, isPositionOnSolidGround, showToast, solidProps, isPositionOnWaterObstacle,
     ()=>[...trafficCars,...policeCars,...incidentPoliceCars,...incidentResponseVehicles],{mapPoint:worldPoint,runways:PLANE_RUNWAYS,streets:roads});
   const roamControls = document.createElement('div');
   roamControls.className = 'roam-controls';
-  const enterButton = document.createElement('button');enterButton.id='btnRoamEnter';enterButton.textContent = 'Выйти / сесть · E';enterButton.addEventListener('click',()=>roam.interact());
-  const flyButton = document.createElement('button');flyButton.id='btnRoamFly';flyButton.textContent = 'Взлёт / снижение · Q';flyButton.addEventListener('click',()=>roam.toggleFlight());
+  const enterButton = document.createElement('button');enterButton.id='btnRoamEnter';enterButton.textContent = 'Выйти / сесть · E';enterButton.addEventListener('click',()=>{if(!isGamePaused())roam.interact();});
+  const flyButton = document.createElement('button');flyButton.id='btnRoamFly';flyButton.textContent = 'Взлёт / снижение · Q';flyButton.addEventListener('click',()=>{if(!isGamePaused())roam.toggleFlight();});
   roamControls.append(enterButton,flyButton);document.body.appendChild(roamControls);
   loadProgress();
   setupInputListeners();
   const cameraButton=document.getElementById('btnCamera');
+  let updateCameraButton=()=>{};
   if(cameraButton&&threeRenderer){
     const presets=['near','normal','overview'],labels={near:'Ближе',normal:'Обычный',overview:'Обзор'};
-    const updateCameraButton=()=>{
+    updateCameraButton=()=>{
       const label=labels[threeRenderer.cameraPreset];cameraButton.textContent='Камера: '+label;
       cameraButton.setAttribute('aria-label','Приближение камеры: '+label+'. Нажмите, чтобы переключить.');
+      gameMenu?.refresh();
     };
     updateCameraButton();
     cameraButton.addEventListener('click',()=>{
@@ -4404,11 +4467,30 @@ function boot() {
     });
   }else if(cameraButton)cameraButton.style.display='none';
   document.getElementById('btnWeather')?.addEventListener('click',()=>{weather.next();showToast('Погода: '+WEATHER_PRESETS[weather.kind].label);});
-  driveLab = createDriveLab({ player, state, canvas, roads, buildings, trafficCars, policeCars, routeInput, roam, responseActors:[incidentPoliceCars,incidentResponseVehicles,airMedicalVehicles] });
+  driveLab = createDriveLab({ player, state, canvas, roads, buildings, trafficCars, policeCars, routeInput, roam, responseActors:[incidentPoliceCars,incidentResponseVehicles,airMedicalVehicles],visible:localBridgeQA });
+  if(typeof createGameMenu==='function')gameMenu=createGameMenu({
+    onPause(open){state.isMenuOpen=open;syncGamePause();},
+    save:autoSaveProgress,
+    getContext:()=>`${districtAt(player.x,player.y)?.name||'LOWTOWN'} · $${state.cash.toLocaleString('ru-RU')}${state.custodyTimer>0?' · Задержание':''}`,
+    canTravel:()=>state.custodyTimer<=0,
+    getCamera:()=>threeRenderer?.cameraPreset||null,
+    setCamera(preset){threeRenderer?.setCameraPreset(preset);updateCameraButton();},
+    getAudio:()=>({volume:sound.volume,station:sound.stationIdx}),
+    setVolume(volume){sound.init();sound.setVolume(volume);},
+    setStation(station){sound.init();sound.setStation(station);},
+    openMap:toggleMap,openGarage:toggleGarage,
+    returnToStart(){
+      document.getElementById('labReset')?.click();
+      roam.resetToSedan(startLocation.x,startLocation.y,startLocation.angle);
+      Object.assign(player,{...startLocation,vx:0,vy:0,speed:0,steeringAngle:0,reverseDelay:0});
+      clearGameInput();autoSaveProgress();showToast('Возвращение на старт · прогресс сохранён');
+    }
+  });
   // Deterministic survey positions are available only on a local QA preview.
   // The published game never exposes this control surface.
   if(['127.0.0.1','localhost'].includes(window.location?.hostname)&&window.location.search.includes('cityQA=1')){
     window.__lowtownCityQA={
+      menuState:()=>({paused:isGamePaused(),view:gameMenu?.isOpen?'menu':state.isMapOpen?'map':state.isGarageOpen?'garage':'game',audio:{volume:sound.volume,station:sound.stationIdx,gain:sound.masterGain?.gain.value??null},keys:{...state.keys}}),
       worldPoint,
       advanceScene(seconds=1){
         qaManualSceneClock??=performance.now();

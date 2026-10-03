@@ -13,10 +13,12 @@ on:
       - src/main.js
       - src/pwa.js
       - src/three/**
+      - src/game/game_menu.*
       - scripts/pwa-icons.mjs
       - vite.config.js
       - tests/three-city-geometry.mjs
       - tests/three-pwa-*.mjs
+      - tests/game-menu-browser-smoke.mjs
       - tests/street-*graphics*.mjs
       - .github/workflows/three-pwa.yml
   workflow_dispatch:
@@ -39,6 +41,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Three.js live rendering and PWA offline restart
         run: npm run test:three-pwa-browser
+      - name: Pause menu, persistent settings and mobile controls
+        run: npm run test:menu-browser
       - name: Street materials, three camera views and walking contacts
         run: npm run test:street-graphics-browser
       - name: Three.js production Pages smoke
@@ -61,5 +65,13 @@ jobs:
         with:
           name: lowtown-street-graphics
           path: artifacts/street-graphics/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload menu screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lowtown-game-menu
+          path: artifacts/game-menu/
           if-no-files-found: ignore
           retention-days: 14
