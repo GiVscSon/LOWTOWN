@@ -14,6 +14,8 @@ on:
       - src/pwa.js
       - src/three/**
       - src/game/game_menu.*
+      - src/game/street_surface.js
+      - tests/crosswalk-markings-regression.mjs
       - scripts/pwa-icons.mjs
       - vite.config.js
       - tests/three-city-geometry.mjs
@@ -38,6 +40,7 @@ jobs:
       - run: node tests/three-city-geometry.mjs
       - run: npm run test:street-graphics
       - run: npm run test:organic-streets
+      - run: node tests/crosswalk-markings-regression.mjs
       - run: npx playwright install --with-deps chromium
       - name: Three.js live rendering and PWA offline restart
         run: npm run test:three-pwa-browser
