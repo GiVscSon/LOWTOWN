@@ -58,6 +58,7 @@ ctx.initThreeRuntime = function initThreeRuntime() {
   }
 };
 ctx.renderWorld = function renderWorld() {
+  ctx.env.window.__lowtownRenderPaused = ctx.isGamePaused() || ctx.qaManualSceneClock !== null;
   const w = ctx.env.window.innerWidth;
   const h = ctx.env.window.innerHeight;
   if (ctx.threeRenderer) {
@@ -84,6 +85,7 @@ ctx.renderWorld = function renderWorld() {
       }
     });
     ctx.renderHud();
+    ctx.env.window.__lowtownFrameReady?.();
     return;
   }
   if (ctx.canvas.width !== w || ctx.canvas.height !== h) {

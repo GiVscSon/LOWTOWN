@@ -172,6 +172,7 @@ export function installAppBootstrap(ctx) {
         viewStreet(x, y) {
           if (!ctx.isPositionOnSolidGround(x, y) || ctx.isPedestrianSceneryBlocked(x, y)) throw new Error('Street view requires clear ground');
           ctx.roam.resetToSedan(x, y, 0);
+          ctx.threeRenderer.setCameraPreset(ctx.threeRenderer.cameraPreset);
           Object.keys(ctx.state.keys).forEach(key => ctx.state.keys[key] = false);
           ctx.state.wanted = 0;
           ctx.state.invulnTimer = 9999;
