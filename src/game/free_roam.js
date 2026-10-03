@@ -1,3 +1,4 @@
+import {streetPoints,streetWidth} from './street_corridors.js';
 import { resolveScenery, resolveContact, contact, chassis } from './solid_contacts.js';
 import { drawStreetVehicle } from './street_vehicle.js';
 export const VEHICLES = {
@@ -52,6 +53,28 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
         vessel.x=x;vessel.y=y;placed=true;break;
       }
     }
+  }
+  if(layout.streets?.some(r=>r.points))for(const vehicle of fleet.filter(v=>v.kind==='land')){
+    const candidates=[];
+    for(const road of layout.streets.filter(r=>!r.serviceAccess&&!r.bridgeApproach)){
+      const points=streetPoints(road);
+      for(let i=3;i<points.length-3;i+=3){
+        const a=points[i-1],b=points[i+1],angle=Math.atan2(b[1]-a[1],b[0]-a[0]);
+        if(Math.hypot(points[i][0]-vehicle.x,points[i][1]-vehicle.y)>1500)continue;
+        for(const side of [-1,1]){
+          const setback=streetWidth(road)/2+10;
+          const x=points[i][0]-Math.sin(angle)*side*setback,y=points[i][1]+Math.cos(angle)*side*setback;
+          const pose={...vehicle,x,y,angle:angle+(side<0?Math.PI:0)},cs=Math.cos(pose.angle),sn=Math.sin(pose.angle);
+          const clear=[[0,0],[vehicle.width/2,vehicle.height/2],[vehicle.width/2,-vehicle.height/2],[-vehicle.width/2,vehicle.height/2],[-vehicle.width/2,-vehicle.height/2]]
+            .every(([u,v])=>{const px=x+cs*u-sn*v,py=y+sn*u+cs*v;
+              return solid(px,py)&&!buildings.some(b=>px>b.x-5&&px<b.x+b.w+5&&py>b.y-5&&py<b.y+b.h+5)&&
+                !obstacles.some(o=>Math.abs(px-o.x)<(o.width||o.w||12)/2+4&&Math.abs(py-o.y)<(o.height||o.h||12)/2+4);});
+          if(clear&&![...fleet,...parked,...dynamicActors()].some(other=>other!==vehicle&&contact(chassis(pose),chassis(other))))
+            candidates.push({x,y,angle:pose.angle,distance:Math.hypot(x-vehicle.x,y-vehicle.y)});
+        }
+      }
+    }
+    candidates.sort((a,b)=>a.distance-b.distance);if(candidates[0])Object.assign(vehicle,candidates[0]);
   }
   let mode='sedan', altitude=0;
   const bodyClear=(x,y)=>!buildings.some(b=>x>b.x-5&&x<b.x+b.w+5&&y>b.y-5&&y<b.y+b.h+5)&&

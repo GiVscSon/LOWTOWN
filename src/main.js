@@ -13,6 +13,8 @@ import { createCityIncidentDirector, updateCrowdReactions } from './game/city_in
 import { advanceTrafficCar, resolveTrafficPair } from './game/traffic_turns.js';
 import { streetSurfaceGeometry, createRoadCircuits, createRoadGraph, roadPath, roadTerminals, onRoadSurface, createWalkingRoutes, assignWalkingRoutes, nextWalkingGoal, planStopRoute, advanceRouteActor, drawRoadTerminals } from './game/street_network.js';
 import { createLowtownThreeRenderer } from './three/renderer.js';
+import { organicStreetNetwork, fitBuildingsToStreets } from './game/organic_streets.js';
+import { onStreetCollection, corridorRoad, corridorContains, nearestStreet, streetWidth, streetPoints, rectangleClearOfStreets } from './game/street_corridors.js';
 import './game/test_drive.css';
 // LOWTOWN // THREE ISLANDS VISUAL OVERHAUL // GTA 2 RETRO-NOIR ENGINE
 // High-detail procedural pedestrian sprites, isometric vehicle chassis, wet road reflections, neon glow & audio
@@ -467,6 +469,7 @@ function subtractRoadIntervals(start,end,masks){
 }
 
 function buildRoadPaintGeometry(){
+  if(roads.some(r=>r.points))return streetSurfaceGeometry(roads,bridges,roadGraph);
   const junctions=[],curbs=[],lanes=[];
   for(const horizontal of roads.filter(r=>r.dir==='h'))for(const vertical of roads.filter(r=>r.dir==='v')){
     const overlapX=Math.min(horizontal.x+horizontal.w,vertical.x+vertical.w)-Math.max(horizontal.x,vertical.x);
@@ -1101,16 +1104,41 @@ function initTopology() {
       if(bridge.landfallEnd)roads.push(h?{x:bridge.x+bridge.w,y:bridge.y,w:a,h:bridge.h,dir:'h',bridgeApproach:true}:
         {x:bridge.x,y:bridge.y+bridge.h,w:bridge.w,h:a,dir:'v',bridgeApproach:true});
     }
+    if(typeof organicStreetNetwork==='function'&&!bridge.footway)continue;
     if(bridge.dir==='v')bridgeRails.push({x:bridge.x-12,y:bridge.y,w:14,h:bridge.h,axis:'x'},
       {x:bridge.x+bridge.w-2,y:bridge.y,w:14,h:bridge.h,axis:'x'});
     else bridgeRails.push({x:bridge.x,y:bridge.y-12,w:bridge.w,h:14,axis:'y'},
       {x:bridge.x,y:bridge.y+bridge.h-2,w:bridge.w,h:14,axis:'y'});
   }
   normalizeStreetGeometry(roads);
+  roadTerminals(roads,bridges,isPositionOnIslandLand);
+  if(typeof organicStreetNetwork==='function'){
+    const network=organicStreetNetwork(roads,bridges,islands,createRoadGraph(roads,bridges.filter(b=>!b.footway)));
+    roads.splice(0,roads.length,...network.roads);bridges.splice(0,bridges.length,...network.bridges);
+    for(const road of scenicRoads)road.points=road.points.map(([x,y])=>{const p=network.bend({x,y});return [p.x,p.y];});
+    const paths=scenicRoads.map(r=>corridorRoad(r.points,r.width));
+    fitBuildingsToStreets(buildings,[...roads,...paths,...bridges],isPositionOnIslandLand,islands,[...parkZones,...PLANE_RUNWAYS,...helipads.map(p=>({x:p.x-105,y:p.y-155,w:210,h:250}))]);
+    bridgeRails.splice(0,bridgeRails.length,...bridgeRails.filter(rail=>bridges.some(b=>b.footway&&
+      rail.x+rail.w>=b.x-14&&rail.x<=b.x+b.w+14&&rail.y+rail.h>=b.y-14&&rail.y<=b.y+b.h+14)));
+    for(let i=parkObstacles.length-1;i>=0;i--)if(onStreetCollection(parkObstacles[i].x,parkObstacles[i].y,roads,45))parkObstacles.splice(i,1);
+  }
   const openRails=[];
   for(const rail of bridgeRails){
     const vertical=rail.axis==='x',start=vertical?rail.y:rail.x,length=vertical?rail.h:rail.w;
     const fixed=vertical?rail.x+rail.w/2:rail.y+rail.h/2;
+    if(roads.some(r=>r.points)){
+      const motor=[...roads,...bridges.filter(b=>!b.footway)],steps=Math.ceil(length/4);let from=null;
+      for(let i=0;i<=steps;i++){
+        const along=start+length*i/steps,x=vertical?fixed:along,y=vertical?along:fixed;
+        const clear=!onStreetCollection(x,y,motor,22);
+        if(clear&&from===null)from=along;
+        if(from!==null&&(!clear||i===steps)){
+          const end=clear?along:along-length/steps;
+          if(end-from>4)openRails.push(vertical?{...rail,y:from,h:end-from}:{...rail,x:from,w:end-from});from=null;
+        }
+      }
+      continue;
+    }
     const masks=[...roads,...bridges.filter(b=>b.dir!==(vertical?'v':'h'))].filter(r=>
       fixed>=(vertical?r.x:r.y)-12&&fixed<=(vertical?r.x+r.w:r.y+r.h)+12)
       .map(r=>vertical?[r.y-12,r.y+r.h+12]:[r.x-12,r.x+r.w+12]);
@@ -1141,6 +1169,7 @@ function initTopology() {
     }
   }
   buildServiceAccess();
+  if(roads.some(r=>r.points))roadEnds.splice(0,roadEnds.length,...roadTerminals(roads,bridges,isPositionOnIslandLand));
   relocateStreetObstacles();
   // Reserve the complete visible footprint, including bridge decks and kerbs.
   shorelineDetails=shorelineDraft.filter(detail=>Array.from({length:17},(_,i)=>i===16?[0,0]:
@@ -1148,6 +1177,7 @@ function initTopology() {
       !onRoadSurface(detail.x+dx,detail.y+dy,roads,bridges,scenicRoads.map(r=>({...r,footway:false})),roadEnds)));
 
   roadGraph=createRoadGraph(roads,bridges.filter(b=>!b.footway),serviceBases.map(base=>base.origin));
+  if(typeof nearestStreet==='function')alignStreetLocations();
   const circuits=createRoadCircuits(roadGraph);
   for(const car of trafficCars){
     let choice=null;
@@ -1229,6 +1259,36 @@ function initTopology() {
   preparePedestrianRoutines();
 }
 
+function alignStreetLocations(){
+  if(!roads.some(r=>r.points))return;
+  const streets=roads.filter(r=>!r.serviceAccess&&!r.bridgeApproach),used=[];
+  const clear=p=>isPositionOnIslandLand(p.x,p.y)&&!isPedestrianSceneryBlocked(p.x,p.y)&&
+    !buildings.some(b=>p.x>b.x-32&&p.x<b.x+b.w+32&&p.y>b.y-32&&p.y<b.y+b.h+32);
+  for(const car of parkedCars){
+    const owner=districtAt(car.x,car.y),choices=[];
+    for(const road of streets){
+      const points=streetPoints(road);
+      for(let i=4;i<points.length-4;i+=4){
+        const a=points[i-1],b=points[i+1],angle=Math.atan2(b[1]-a[1],b[0]-a[0]);
+        if(owner&&districtAt(...points[i])?.id!==owner.id)continue;
+        for(const side of [-1,1]){
+          const distance=streetWidth(road)/2+10,p={x:points[i][0]-Math.sin(angle)*side*distance,y:points[i][1]+Math.cos(angle)*side*distance,angle:angle+(side<0?Math.PI:0)};
+          if(!clear(p)||used.some(q=>Math.hypot(p.x-q.x,p.y-q.y)<85)||onStreetCollection(p.x,p.y,roads,-8))continue;
+          choices.push({...p,distance:Math.hypot(p.x-car.x,p.y-car.y)});
+        }
+      }
+    }
+    choices.sort((a,b)=>a.distance-b.distance);
+    if(!choices.length)throw new Error('No clear roadside parking bay');
+    Object.assign(car,choices[0]);used.push(car);
+  }
+  for(const point of [...safeSpawnPoints,...CARPARTS]){
+    const location=nearestStreet(point.x,point.y,streets);if(location)Object.assign(point,{x:location.x,y:location.y});
+  }
+  const spawn=nearestStreet(player.x,player.y,streets);
+  if(spawn)Object.assign(player,{x:spawn.x,y:spawn.y,angle:spawn.angle});
+}
+
 function relocateStreetObstacles(requested=null){
   const asphalt=[...roads,...bridges];
   const furniture=[...solidProps,...trees,...breakableProps,...streetLights,...billboards,...cranes];
@@ -1239,7 +1299,7 @@ function relocateStreetObstacles(requested=null){
   const clear=(p,ignore)=>{
     const w=widthOf(ignore),h=heightOf(ignore);
     const margin=lamps.has(ignore)?2:8;
-    return [[0,0],[-w/2,-h/2],[w/2,-h/2],[-w/2,h/2],[w/2,h/2]]
+    return (typeof rectangleClearOfStreets!=='function'||rectangleClearOfStreets({x:p.x-w/2,y:p.y-h/2,w,h},asphalt,margin))&&[[0,0],[-w/2,-h/2],[w/2,-h/2],[-w/2,h/2],[w/2,h/2]]
       .every(([dx,dy])=>isPositionOnSolidGround(p.x+dx,p.y+dy))&&
       [[0,0],[-w/2-margin,-h/2-margin],[w/2+margin,-h/2-margin],[-w/2-margin,h/2+margin],[w/2+margin,h/2+margin]]
       .every(([dx,dy])=>!onRoadSurface(p.x+dx,p.y+dy,asphalt,[],scenicRoads,roadEnds))&&
@@ -1249,7 +1309,7 @@ function relocateStreetObstacles(requested=null){
   for(const prop of requested||furniture){
     if(clear(prop,prop))continue;
     const home={x:prop.x,y:prop.y};let placed=false;
-    for(let radius=16;radius<=320&&!placed;radius+=16)for(let n=0;n<16;n++){
+    for(let radius=16;radius<=1600&&!placed;radius+=16)for(let n=0;n<16;n++){
       const a=n*Math.PI/8,candidate={...prop,x:home.x+Math.cos(a)*radius,y:home.y+Math.sin(a)*radius};
       if(!clear(candidate,prop))continue;Object.assign(prop,candidate);placed=true;break;
     }
@@ -1267,6 +1327,7 @@ function isPositionOnSolidGround(x, y) {
   if(isPositionOnIslandLand(x,y)||(constructingLegacyScene?legacyLand:allIslands).some(isl=>pointInBeach(x,y,isl,isl.natural?42:BEACH_WIDTH))||
     (constructingLegacyScene?legacyPiers:piers).some(p=>x>=p.x&&x<=p.x+p.w&&y>=p.y&&y<=p.y+p.h))return true;
   for (let br of bridges) {
+    if(br.points){if(corridorContains(x,y,br,8))return true;continue;}
     if (x >= br.x - 10 && x <= br.x + br.w + 10 && y >= br.y - 12 && y <= br.y + br.h + 12) return true;
   }
   return false;
@@ -1356,7 +1417,7 @@ function transitStopSideClear(x,y){
   // Existing non-transit furniture is static input and can reject a side;
   // shelters themselves are deliberately excluded because they are assigned
   // after the stable sign side has been chosen.
-  return !streetProps.some(o=>o.type!=='shelter'&&Math.abs(x-o.x)<(o.width||o.w||12)*.5+8&&Math.abs(y-o.y)<(o.height||o.h||12)*.5+8);
+  return !streetProps.some(o=>o.type!=='shelter'&&Math.abs(x-o.x)<(o.width||o.w||12)*.5+25&&Math.abs(y-o.y)<(o.height||o.h||12)*.5+22);
 }
 
 function associateBusShelters(){
@@ -1613,6 +1674,24 @@ function buildServiceAccess(){
     if(!['police','hospital','firestation','guardBase'].includes(kind)||!building.serviceParcel)continue;
     const parcel=building.serviceParcel;
     let choice;
+    if(roads.some(r=>r.points)){
+      const sources=[{x:building.x+building.w+70,y:building.y+building.h/2},
+        {x:building.x-70,y:building.y+building.h/2},{x:building.x+building.w/2,y:building.y+building.h+70},
+        {x:building.x+building.w/2,y:building.y-70}];
+      for(const origin of sources){
+        const entry=nearestStreet(origin.x,origin.y,roads.filter(r=>!r.serviceAccess&&!r.bridgeApproach));
+        if(!entry||entry.distance>420)continue;
+        const driveway=corridorRoad([[origin.x,origin.y],[entry.x,entry.y]],110,{dir:Math.abs(entry.x-origin.x)>Math.abs(entry.y-origin.y)?'h':'v',serviceAccess:true,name:building.sign});
+        const steps=Math.max(1,Math.ceil(entry.distance/8));let clear=true;
+        const angle=Math.atan2(entry.y-origin.y,entry.x-origin.x),nx=-Math.sin(angle),ny=Math.cos(angle);
+        for(let i=0;i<=steps&&clear;i++)for(const side of [-1,0,1]){
+          const x=origin.x+(entry.x-origin.x)*i/steps+nx*side*50,y=origin.y+(entry.y-origin.y)*i/steps+ny*side*50;
+          if(!isPositionOnSolidGround(x,y)||buildings.some(b=>x>b.x-8&&x<b.x+b.w+8&&y>b.y-8&&y<b.y+b.h+8)){clear=false;break;}
+        }
+        if(clear){choice={building,kind,origin,entry:{x:entry.x,y:entry.y},driveway};break;}
+      }
+      if(choice){serviceBases.push(choice);roads.push(choice.driveway);}continue;
+    }
     for(const ratio of [.84,.88,.80]){
       const origin={x:parcel.x+parcel.w*.82,y:parcel.y+parcel.h*ratio};
       const candidates=roads.filter(r=>!r.serviceAccess&&!r.bridgeApproach&&r.dir==='v'&&origin.y>=r.y+48&&origin.y<=r.y+r.h-48)
@@ -1881,12 +1960,8 @@ function yieldBetweenResponders(unit){
 
 function recoverServiceRoad(unit){
   if(unit.emergencyManeuver||policeFootprintOnRoad(unit)||!emergencyPassingGroundClear(unit))return false;
-  const candidates=[...roads,...bridges.filter(b=>!b.footway)].map(r=>{
-    const h=r.dir==='h',margin=Math.hypot(unit.width||48,unit.height||24)/2+4;
-    const along=h?Math.max(r.x+margin,Math.min(r.x+r.w-margin,unit.x)):
-      Math.max(r.y+margin,Math.min(r.y+r.h-margin,unit.y));
-    return {x:h?along:r.x+r.w/2,y:h?r.y+r.h/2:along};
-  }).filter(p=>Math.hypot(p.x-unit.x,p.y-unit.y)<180).sort((a,b)=>Math.hypot(a.x-unit.x,a.y-unit.y)-Math.hypot(b.x-unit.x,b.y-unit.y));
+  const candidates=[...roads,...bridges.filter(b=>!b.footway)].map(r=>nearestStreet(unit.x,unit.y,[r]))
+    .filter(p=>p&&p.distance<180).sort((a,b)=>a.distance-b.distance);
   for(const point of candidates){
     const goal=unit.route?.[0],finalHeading=goal?Math.atan2(goal.y-point.y,goal.x-point.x):unit.angle;
     if(!policeFootprintOnRoad({...unit,...point,angle:finalHeading}))continue;
@@ -1983,7 +2058,8 @@ function incidentLocation(kind,anchor){
   const candidates=buildings.filter(b=>!b.serviceParcel).sort((a,b)=>
     Math.hypot(a.x+a.w/2-anchor.x,a.y+a.h-anchor.y)-Math.hypot(b.x+b.w/2-anchor.x,b.y+b.h-anchor.y));
   for(const b of candidates.slice(0,30))for(const offset of [32,48,64]){
-    const x=b.x+b.w/2,y=b.y+b.h+offset;
+    const facing=b.streetFacing||'south',x=facing==='east'?b.x+b.w+offset:facing==='west'?b.x-offset:b.x+b.w/2,
+      y=facing==='north'?b.y-offset:facing==='south'?b.y+b.h+offset:b.y+b.h/2;
     if(Math.hypot(x-anchor.x,y-anchor.y)>600)continue;
     if([[-40,18],[0,0],[0,18],[60,28]].every(([dx,dy])=>!isPedestrianBlocked(x+dx,y+dy)&&
       !onRoadSurface(x+dx,y+dy,roads,bridges,scenicRoads,roadEnds)))return {x,y,site:'building',buildingSign:b.sign};
@@ -1999,16 +2075,16 @@ function responseParkingTarget(incident,model,reserve=true){
   const candidates=[];
   for(const r of roads){
     if(r.bridgeApproach||r.serviceAccess)continue;
-    const h=r.dir==='h',start=h?r.x:r.y,length=h?r.w:r.h;
-    if(length<300)continue;
-    const center=h?r.y+r.h/2:r.x+r.w/2,along=h?incident.x:incident.y;
-    for(const offset of [0,120,-120,240,-240,360,-360,480,-480])for(const side of [1,-1]){
-      const value=Math.max(start+120,Math.min(start+length-120,along+offset));
-      const p={x:h?value:center+side*24,y:h?center+side*24:value,parkingAxis:r.dir};
-      if(reserved.some(t=>Math.hypot(p.x-t.x,p.y-t.y)<115)||
+    let points=typeof streetPoints==='function'?streetPoints(r):r.dir==='h'?[[r.x,r.y+r.h/2],[r.x+r.w,r.y+r.h/2]]:[[r.x+r.w/2,r.y],[r.x+r.w/2,r.y+r.h]];
+    if(points.length===2){const [a,b]=points,n=Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/40);
+      points=Array.from({length:n+1},(_,i)=>[a[0]+(b[0]-a[0])*i/n,a[1]+(b[1]-a[1])*i/n]);}
+    for(let i=3;i<points.length-3;i+=2)for(const side of [-1,1]){
+      const a=points[i-1],b=points[i+1],heading=Math.atan2(b[1]-a[1],b[0]-a[0]);
+      const p={x:points[i][0]-Math.sin(heading)*side*24,y:points[i][1]+Math.cos(heading)*side*24,parkingHeading:heading};
+      if(Math.hypot(p.x-incident.x,p.y-incident.y)>2200||reserved.some(t=>Math.hypot(p.x-t.x,p.y-t.y)<115)||
         (model!=='crash'&&Math.hypot(p.x-incident.x,p.y-incident.y)<100)||
-        junctions.some(j=>p.x>j.x-105&&p.x<j.x+j.w+105&&p.y>j.y-105&&p.y<j.y+j.h+105))continue;
-      const pose={...p,width:84,height:38,angle:h?0:Math.PI/2};
+        junctions.some(j=>Math.hypot(p.x-(j.cx??j.x+j.w/2),p.y-(j.cy??j.y+j.h/2))<j.w/2+120))continue;
+      const pose={...p,width:84,height:38,angle:heading};
       if(!policeFootprintOnRoad(pose)||!emergencyPassingGroundClear(pose))continue;
       candidates.push({...p,distance:Math.hypot(p.x-incident.x,p.y-incident.y)});
     }
@@ -2019,13 +2095,13 @@ function responseParkingTarget(incident,model,reserve=true){
 
 function serviceRoadPath(start,target){
   const route=roadPath(roadGraph,start,target,{fromSegment:true});
-  if(!route.length||!target.parkingAxis)return route;
+  if(!route.length||(!target.parkingAxis&&!Number.isFinite(target.parkingHeading)))return route;
   const end=route.at(-1);
   if(Math.hypot(end.x-target.x,end.y-target.y)<1)return route;
   // A shallow approach reaches the kerb without pivoting across a lane.
-  const previous=route.at(-2)||start,h=target.parkingAxis==='h';
-  const sign=Math.sign(h?end.x-previous.x:end.y-previous.y)||1;
-  const approach={x:end.x-(h?sign*100:0),y:end.y-(h?0:sign*100)};
+  const previous=route.at(-2)||start,heading=target.parkingHeading??(target.parkingAxis==='h'?0:Math.PI/2);
+  const cs=Math.cos(heading),sn=Math.sin(heading),sign=Math.sign((end.x-previous.x)*cs+(end.y-previous.y)*sn)||1;
+  const approach={x:end.x-cs*sign*100,y:end.y-sn*sign*100};
   if(Math.hypot(previous.x-end.x,previous.y-end.y)>105)route.splice(-1,1,approach,{...target});
   else route.push({...target});
   return route;
@@ -2088,10 +2164,8 @@ function nearestRoadNode(point){
 
 function nearestResponseRoadNode(point){
   // End nodes can support a point while leaving the nose of a truck over water.
-  const supported=roadGraph.filter(node=>[0,Math.PI/2].every(angle=>
-    policeFootprintOnRoad({...node,width:72,height:34,angle})));
-  return supported.reduce((best,node)=>Math.hypot(node.x-point.x,node.y-point.y)<Math.hypot(best.x-point.x,best.y-point.y)?node:best,
-    supported[0]||nearestRoadNode(point));
+  const nearest=[...roadGraph].sort((a,b)=>(a.x-point.x)**2+(a.y-point.y)**2-(b.x-point.x)**2-(b.y-point.y)**2);
+  return nearest.find(node=>[0,Math.PI/2].every(angle=>policeFootprintOnRoad({...node,width:72,height:34,angle})))||nearest[0];
 }
 
 function responseRouteLength(route){
@@ -2312,7 +2386,8 @@ function policeStationRelease(x,y){
     const b=station.building;
     // Release at a walkable front entrance, away from the response driveway.
     for(const offset of [20,36,52,68,84,100])for(const ratio of [.12,.88,.2,.8,.35,.65,.5]){
-      const px=b.x+b.w*ratio,py=b.y+b.h+offset;
+      const facing=b.streetFacing||'south',px=facing==='east'?b.x+b.w+offset:facing==='west'?b.x-offset:b.x+b.w*ratio,
+        py=facing==='north'?b.y-offset:facing==='south'?b.y+b.h+offset:b.y+b.h*ratio;
       if(clear(px,py)){
         const path=pedestrianExitPath({x:px,y:py});
         if(path){b.exitPath=path;return {x:px,y:py,sign:b.sign,exitPath:path};}
@@ -2362,9 +2437,8 @@ function yieldTrafficToServices(car,dt){
   // Finish crossing before pulling over. Waiting for a parallel responder
   // inside the junction can block another responder that must turn through it.
   const reach=(car.width||46)/2+16;
-  const inJunction=roads.some(r=>r.dir!==(horizontal?'h':'v')&&
-    car.x>=r.x-(horizontal?reach:0)&&car.x<=r.x+r.w+(horizontal?reach:0)&&
-    car.y>=r.y-(vertical?reach:0)&&car.y<=r.y+r.h+(vertical?reach:0));
+  const inJunction=(roadPaintGeometry||(roadPaintGeometry=buildRoadPaintGeometry())).junctions.some(j=>
+    Math.hypot(car.x-(j.cx??j.x+j.w/2),car.y-(j.cy??j.y+j.h/2))<j.w/2+reach);
   const units=[...policeCars,...incidentPoliceCars,...incidentResponseVehicles];
   const heldByResponder=units.some(unit=>{
     const dx=unit.x-car.x,dy=unit.y-car.y,along=dx*cs+dy*sn;
@@ -2384,6 +2458,32 @@ function yieldTrafficToServices(car,dt){
     return along>-((car.width||46)+(unit.width||48))/2-18&&along<200&&Math.abs(-dx*us+dy*uc)<Math.max(62,((unit.width||48)+(car.width||46))/2+24);
   });
   if(!approaching&&!car.yieldHome)return false;
+  if(roads.some(r=>r.points)){
+    const collection=[...roads,...bridges.filter(b=>!b.footway)],home=car.yieldHome;
+    const hit=nearestStreet(car.x,car.y,home?.road&&corridorContains(car.x,car.y,home.road,20)?[home.road]:collection);
+    if(!hit)return approaching;
+    const nx=-Math.sin(hit.angle),ny=Math.cos(hit.angle),offset=(car.x-hit.x)*nx+(car.y-hit.y)*ny;
+    if(approaching&&!home)car.yieldHome={organic:true,road:hit.road,offset,side:Math.sign(offset)||-1};
+    const current=car.yieldHome;if(!current)return false;
+    const direction=Math.cos(car.angle-hit.angle)>=0?1:-1,heading=hit.angle+(direction<0?Math.PI:0);
+    const error=Math.atan2(Math.sin(heading-car.angle),Math.cos(heading-car.angle));
+    const desiredAngle=car.angle+Math.sign(error)*Math.min(Math.abs(error),.07*dt*60);
+    const across=Math.abs(Math.sin(desiredAngle-hit.angle))*(car.width||46)/2+Math.abs(Math.cos(desiredAngle-hit.angle))*(car.height||24)/2;
+    const target=approaching?current.side*(streetWidth(hit.road)/2-across-2):current.offset;
+    const delta=Math.max(-.35*dt*60,Math.min(.35*dt*60,target-offset));
+    const pose={...car,x:car.x+nx*delta,y:car.y+ny*delta,angle:desiredAngle};
+    const shifted=policeFootprintOnRoad(pose)&&emergencyPassingPoseClear(pose,car);
+    if(shifted)Object.assign(car,{x:pose.x,y:pose.y,angle:pose.angle});
+    // Once at the kerb, clear a crossing responder along the verified lane.
+    // Holding an entire bus beside its turning nose can otherwise deadlock.
+    const crossing=units.some(u=>Math.hypot(u.x-car.x,u.y-car.y)<160&&Math.abs(Math.cos(u.angle-car.angle))<.85);
+    if(approaching&&(!shifted||(crossing&&Math.abs(target-offset)<2)))for(const sign of [1,-1]){
+      const step=sign*.8*dt*60,p={...car,x:car.x+cs*step,y:car.y+sn*step};
+      if(policeFootprintOnRoad(p)&&emergencyPassingPoseClear(p,car)){car.x=p.x;car.y=p.y;break;}
+    }
+    if(!approaching&&Math.abs(offset-target)<.5){car.yieldHome=null;return false;}
+    return true;
+  }
   const road=[...roads,...bridges].find(r=>r.dir===(horizontal?'h':'v')&&
     car.x>=r.x&&car.x<=r.x+r.w&&car.y>=r.y&&car.y<=r.y+r.h);
   if(!road)return approaching;
@@ -2706,6 +2806,21 @@ function stableVisualHash(a, b, c = 0) {
   return value - Math.floor(value);
 }
 
+function streetPaintVisible(x1,y1,x2=x1,y2=y1){
+  if((roam?.altitude||0)>30)return true;
+  const range=Math.max(canvas.width,canvas.height)*2.2+200;
+  return Math.max(x1,x2)>=player.x-range&&Math.min(x1,x2)<=player.x+range&&
+    Math.max(y1,y2)>=player.y-range&&Math.min(y1,y2)<=player.y+range;
+}
+
+function drawStreetCorridor(target,road,color,extra=0,scale=1,ox=0,oy=0){
+  if(target===ctx&&!streetPaintVisible(road.x,road.y,road.x+road.w,road.y+road.h))return;
+  target.save();target.strokeStyle=color;target.lineWidth=(streetWidth(road)+extra)*scale;
+  target.lineJoin='round';target.lineCap='round';target.beginPath();
+  streetPoints(road).forEach(([x,y],i)=>i?target.lineTo(ox+x*scale,oy+y*scale):target.moveTo(ox+x*scale,oy+y*scale));
+  target.stroke();target.restore();
+}
+
 function drawWetRoadSurface(r, index) {
   if(r.x>player.x+1500||r.y>player.y+1500||r.x+r.w<player.x-1500||r.y+r.h<player.y-1500)return;
   ctx.save();
@@ -2746,10 +2861,7 @@ function drawWetRoadSurface(r, index) {
   ctx.restore();
 }
 
-// Motor bridges are still axis-aligned rectangles for collision and routing,
-// but their visible deck follows a rounded centerline. This removes the hard
-// square elbows caused by the staggered island remap without weakening the
-// road-support checks used by vehicles and pedestrians.
+// Canvas and map views follow the same centreline as the road corridor.
 function traceSmoothBridgePath(target, points, radius=120) {
   if(!Array.isArray(points)||points.length<2)return false;
   const safe=points.filter(p=>Number.isFinite(p?.x)&&Number.isFinite(p?.y));
@@ -3352,8 +3464,8 @@ function initThreeRuntime(){
       islands:allIslands.map(island=>({id:island.id,natural:!!island.natural,points:coastPoints(island)})),
       roads,scenicRoads,bridges,bridgeRails,roadEnds,
       paint:roadPaintGeometry||(roadPaintGeometry=buildRoadPaintGeometry()),
-      crosswalks:(roadPaintGeometry||(roadPaintGeometry=buildRoadPaintGeometry())).crosswalkJunctions.flatMap(j=>junctionCrosswalkStripes({y:j.y,h:j.h},{x:j.x,w:j.w},j.approaches)),
-      buildings,trees,runways:PLANE_RUNWAYS,parks:parkZones,piers,props:solidProps,lights:streetLights,stops:transitStopSigns(),billboards,cranes
+      crosswalks:(roadPaintGeometry||(roadPaintGeometry=buildRoadPaintGeometry())).crosswalks||roadPaintGeometry.crosswalkJunctions.flatMap(j=>junctionCrosswalkStripes({y:j.y,h:j.h},{x:j.x,w:j.w},j.approaches)),
+      buildings,trees,runways:PLANE_RUNWAYS,helipads,parks:parkZones,piers,props:solidProps,lights:streetLights,stops:transitStopSigns(),billboards,cranes
     };
     threeRenderer=createLowtownThreeRenderer({canvas:threeCanvas,world,forceFullMaterials:localBridgeQA&&/(?:\?|&)fullMaterials=1(?:&|$)/.test(LOWTOWN_QUERY)});
     canvas.classList?.add('renderer-hidden');
@@ -3517,33 +3629,20 @@ function renderWorld() {
   // Paint the entire sidewalk union before asphalt. Individual road rectangles
   // must never put a kerb or an opaque repair patch across another street.
   const roadPaint=roadPaintGeometry||(roadPaintGeometry=buildRoadPaintGeometry());
-  ctx.fillStyle=PALETTE.sidewalk;ctx.beginPath();
-  roads.forEach(r=>ctx.rect(r.x-36,r.y-36,r.w+72,r.h+72));ctx.fill();
-  // Walkers use the strip 22 units beyond the kerb; pavement must cover it.
-  ctx.strokeStyle='rgba(181,177,155,.12)';ctx.lineWidth=1;ctx.beginPath();
-  for(const r of roads){
-    if(r.bridgeApproach||r.serviceAccess)continue;
-    if(r.dir==='h')for(let x=r.x+28;x<r.x+r.w;x+=56){
-      ctx.moveTo(x,r.y-34);ctx.lineTo(x,r.y-2);ctx.moveTo(x,r.y+r.h+2);ctx.lineTo(x,r.y+r.h+34);
-    }else for(let y=r.y+28;y<r.y+r.h;y+=56){
-      ctx.moveTo(r.x-34,y);ctx.lineTo(r.x-2,y);ctx.moveTo(r.x+r.w+2,y);ctx.lineTo(r.x+r.w+34,y);
-    }
-  }ctx.stroke();
-  ctx.fillStyle=PALETTE.asphalt;ctx.beginPath();
-  // Keep bridge rectangles in the logical surface set for collision checks,
-  // but paint their visible deck as one rounded path so elbows do not look
-  // like square slabs pasted over the water.
-  roadPaint.surfaces.filter(r=>!r.logicalId).forEach(r=>ctx.rect(r.x,r.y,r.w,r.h));ctx.fill();
-  roadPaint.surfaces.filter(r=>!r.logicalId).forEach(drawWetRoadSurface);
+  roads.forEach(r=>drawStreetCorridor(ctx,r,PALETTE.sidewalk,80));
+  roadPaint.surfaces.filter(r=>!r.logicalId).forEach(r=>drawStreetCorridor(ctx,r,PALETTE.asphalt));
+  roadPaint.surfaces.filter(r=>!r.logicalId&&!r.points).forEach(drawWetRoadSurface);
   (roadPaint.bridgePaths||[]).forEach((bridgePath,index)=>drawSmoothBridgeDeck(bridgePath,index));
   ctx.strokeStyle=PALETTE.curb;ctx.lineWidth=2;ctx.beginPath();
-  for(const edge of roadPaint.curbs.filter(edge=>!edge.bridge)){ctx.moveTo(edge.x1,edge.y1);ctx.lineTo(edge.x2,edge.y2);}ctx.stroke();
+  for(const edge of roadPaint.curbs.filter(edge=>!edge.bridge&&streetPaintVisible(edge.x1,edge.y1,edge.x2,edge.y2))){ctx.moveTo(edge.x1,edge.y1);ctx.lineTo(edge.x2,edge.y2);}ctx.stroke();
   ctx.strokeStyle=PALETTE.roadMarkingYellow;ctx.lineWidth=2.5;ctx.setLineDash([16,20]);
-  for(const lane of roadPaint.lanes.filter(lane=>!lane.bridge)){ctx.lineDashOffset=-lane.phase;ctx.beginPath();ctx.moveTo(lane.x1,lane.y1);ctx.lineTo(lane.x2,lane.y2);ctx.stroke();}
+  for(const lane of roadPaint.lanes.filter(lane=>!lane.bridge&&streetPaintVisible(lane.x1,lane.y1,lane.x2,lane.y2))){ctx.lineDashOffset=-lane.phase;ctx.beginPath();ctx.moveTo(lane.x1,lane.y1);ctx.lineTo(lane.x2,lane.y2);ctx.stroke();}
   ctx.setLineDash([]);ctx.lineDashOffset=0;
   drawRoadTerminals(ctx,roadEnds);drawTransitStops();
   ctx.fillStyle='rgba(220,216,197,.48)';
-  for(const j of roadPaint.crosswalkJunctions)junctionCrosswalkStripes({y:j.y,h:j.h},{x:j.x,w:j.w},j.approaches).forEach(s=>ctx.fillRect(s.x,s.y,s.w,s.h));
+  const canvasCrosswalks=roadPaint.crosswalks||roadPaint.crosswalkJunctions.flatMap(j=>junctionCrosswalkStripes({y:j.y,h:j.h},{x:j.x,w:j.w},j.approaches));
+  for(const stripe of canvasCrosswalks){if(!streetPaintVisible(stripe.x,stripe.y))continue;ctx.save();ctx.translate(stripe.x+stripe.w/2,stripe.y+stripe.h/2);
+    ctx.rotate(-(stripe.angle||0));ctx.fillRect(-stripe.w/2,-stripe.h/2,stripe.w,stripe.h);ctx.restore();}
   for(const j of roadPaint.signals){
     ctx.fillRect(j.x-39,j.y+7,3,j.h/2-14);ctx.fillRect(j.x+j.w+36,j.y+j.h/2+7,3,j.h/2-14);
     ctx.fillRect(j.x+j.w/2+7,j.y+j.h+36,j.w/2-14,3);ctx.fillRect(j.x+7,j.y-39,j.w/2-14,3);
@@ -3898,17 +3997,9 @@ function renderRadar() {
     coastPath(radarCtx,isl,scale,-player.x*scale,-player.y*scale);radarCtx.fill();
   });
 
-  bridges.forEach(br => {
-    radarCtx.fillStyle = 'rgba(56, 189, 248, 0.4)';
-    radarCtx.fillRect((br.x - player.x) * scale, (br.y - player.y) * scale, br.w * scale, br.h * scale);
-  });
-
-  radarCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+  bridges.forEach(br=>drawStreetCorridor(radarCtx,br,'rgba(56,189,248,.4)',0,scale,-player.x*scale,-player.y*scale));
   drawScenicRoads(radarCtx,scale,-player.x*scale,-player.y*scale,true);
-  radarCtx.lineWidth = 6 * scale;
-  roads.forEach(r => {
-    radarCtx.strokeRect((r.x - player.x) * scale, (r.y - player.y) * scale, r.w * scale, r.h * scale);
-  });
+  roads.forEach(r=>drawStreetCorridor(radarCtx,r,'rgba(255,255,255,.2)',0,scale,-player.x*scale,-player.y*scale));
 
   CARPARTS.forEach(p => {
     if (!p.found) {
@@ -3970,9 +4061,7 @@ function renderFullMap() {
 
   fullMapCtx.fillStyle = 'rgba(235, 240, 250, 0.5)';
   drawScenicRoads(fullMapCtx,scale,mapX,mapY,true);
-  roads.forEach(r => {
-    fullMapCtx.fillRect(mapX + r.x * scale, mapY + r.y * scale, r.w * scale, r.h * scale);
-  });
+  roads.forEach(r=>drawStreetCorridor(fullMapCtx,r,'rgba(235,240,250,.5)',0,scale,mapX,mapY));
 
   fullMapCtx.textAlign='center';fullMapCtx.font='bold 9px sans-serif';
   for(const island of islands){
@@ -4038,6 +4127,7 @@ function autoSaveProgress() {
   if (driveLab?.running) return;
   const saveData = {
     worldVersion:3,
+    streetLayout:'organic-v1',
     mode:roam?.mode==='foot'?'foot':'sedan',
     cash: state.cash,
     x: player.x,
@@ -4059,6 +4149,10 @@ function loadProgress() {
       state.cash = Number.isFinite(data.cash)?Math.max(0,data.cash):750;
       player.x = Number.isFinite(data.x) && data.x > 0 && data.x < WORLD_W ? data.x : 1200;
       player.y = Number.isFinite(data.y) && data.y > 0 && data.y < WORLD_H ? data.y : 1200;
+      if(data.streetLayout!=='organic-v1'||isPedestrianSceneryBlocked(player.x,player.y)||!isPositionOnSolidGround(player.x,player.y)){
+        const location=nearestStreet(player.x,player.y,roads.filter(r=>!r.serviceAccess&&!r.bridgeApproach));
+        if(location){player.x=location.x;player.y=location.y;player.angle=location.angle;}
+      }
       if(data.mode==='foot'&&roam){
         const exit=roam.canWalkAt(player.x,player.y)?player:policeStationRelease(player.x,player.y);
         if(exit)roam.resetToFoot(exit.x,exit.y);
@@ -4289,7 +4383,7 @@ function boot() {
   window.addEventListener('lowtown-before-update',()=>autoSaveProgress());
   initThreeRuntime();
   roam = createFreeRoam(player, parkedCars, buildings, trees, isPositionOnSolidGround, showToast, solidProps, isPositionOnWaterObstacle,
-    ()=>[...trafficCars,...policeCars,...incidentPoliceCars,...incidentResponseVehicles],{mapPoint:worldPoint,runways:PLANE_RUNWAYS});
+    ()=>[...trafficCars,...policeCars,...incidentPoliceCars,...incidentResponseVehicles],{mapPoint:worldPoint,runways:PLANE_RUNWAYS,streets:roads});
   const roamControls = document.createElement('div');
   roamControls.className = 'roam-controls';
   const enterButton = document.createElement('button');enterButton.id='btnRoamEnter';enterButton.textContent = 'Выйти / сесть · E';enterButton.addEventListener('click',()=>roam.interact());
@@ -4338,6 +4432,18 @@ function boot() {
         roam.resetToSedan(x,y,heading);Object.keys(state.keys).forEach(key=>state.keys[key]=false);
         state.wanted=0;state.invulnTimer=9999;renderWorld();
         return {id:bridge.id,index,x,y,heading,start:{x:a.x,y:a.y},width:bridge.width};
+      },
+      viewBridgeSpan(index=0,t=.5,onFoot=false,sideView=false){
+        qaManualSceneClock??=performance.now();
+        const profiles=threeRenderer.bridgeProfiles,profile=profiles[((index%profiles.length)+profiles.length)%profiles.length];
+        const point=profile.samples[Math.min(profile.samples.length-1,Math.round(Math.max(0,Math.min(1,t))*(profile.samples.length-1)))];
+        const heading=Math.atan2(point.tangent.y,point.tangent.x);
+        if(onFoot)roam.resetToFoot(point.point.x,point.point.y,heading);else roam.resetToSedan(point.point.x,point.point.y,heading);
+        Object.keys(state.keys).forEach(key=>state.keys[key]=false);state.wanted=0;state.invulnTimer=9999;renderWorld();
+        if(sideView){const {camera,renderer,scene}=threeRenderer;
+          camera.position.set(point.point.x-Math.sin(heading)*950+Math.cos(heading)*300,point.height+320,point.point.y+Math.cos(heading)*950+Math.sin(heading)*300);
+          camera.lookAt(point.point.x,point.height+35,point.point.y);renderer.render(scene,camera);}
+        return {id:profile.id,x:point.point.x,y:point.point.y,height:point.height,heading};
       },
       startMedicalIncident(){
         const incident=cityIncidentDirector.start('crash',safeSpawnPoints[13],{duration:600});

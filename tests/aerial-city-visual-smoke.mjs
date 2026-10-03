@@ -1,3 +1,4 @@
+import {worldPoint} from '../src/game/authored_archipelago.js';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
@@ -84,11 +85,11 @@ try {
   page.on('console', message => {
     if (message.type() === 'error') errors.push(`console: ${message.text()}`);
   });
-  await page.addInitScript(() => {
+  await page.addInitScript(savedSpawn => {
     // Spawn just north of the airport helicopter so the first safe exit leaves
     // it closer than the sedan we just exited.
-    localStorage.setItem('lowtown_integrity_save', JSON.stringify({ cash: 750, x: 1040, y: 2010 }));
-  });
+    localStorage.setItem('lowtown_integrity_save', JSON.stringify({cash:750,worldVersion:3,streetLayout:'organic-v1',...savedSpawn}));
+  },worldPoint({x:1040,y:2010}));
   const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
   assert(response?.ok(), `LOWTOWN preview returned HTTP ${response?.status()}`);
   await page.waitForFunction(() =>

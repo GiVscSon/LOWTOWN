@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import {mkdirSync,writeFileSync} from 'node:fs';
 import {streetSurfaceGeometry} from '../src/game/street_surface.js';
 import {createVehicleMesh,projectedVehicleFaces,drawStreetVehicle} from '../src/game/street_vehicle.js';
+import {onStreetCollection} from '../src/game/street_corridors.js';
 import {runtimeCity} from './helpers/runtime-city.mjs';
-const contains=(surfaces,x,y)=>surfaces.some(r=>x>r.x&&x<r.x+r.w&&y>r.y&&y<r.y+r.h);
+const contains=(surfaces,x,y)=>onStreetCollection(x,y,surfaces);
 function audit(paint){
   const seen=new Set();
   for(const edge of paint.curbs){
@@ -11,7 +12,9 @@ function audit(paint){
     const horizontal=edge.y1===edge.y2;
     for(const t of [.15,.37,.61,.85]){
       const x=edge.x1+(edge.x2-edge.x1)*t,y=edge.y1+(edge.y2-edge.y1)*t;
-      const dx=horizontal?0:edge.side*.1,dy=horizontal?edge.side*.1:0;
+      const length=Math.hypot(edge.x2-edge.x1,edge.y2-edge.y1);
+      const dx=paint.organic?-(edge.y2-edge.y1)/length*edge.side*1.2:(horizontal?0:edge.side*.1),
+        dy=paint.organic?(edge.x2-edge.x1)/length*edge.side*1.2:(horizontal?edge.side*.1:0);
       assert(contains(paint.surfaces,x-dx,y-dy),'kerb is detached from asphalt '+JSON.stringify({edge,x,y,dx,dy}));
       assert(!contains(paint.surfaces,x+dx,y+dy),'internal seam drawn across supported asphalt '+JSON.stringify({edge,x,y,dx,dy}));
     }
@@ -20,7 +23,7 @@ function audit(paint){
     const x=lane.x1+(lane.x2-lane.x1)*t,y=lane.y1+(lane.y2-lane.y1)*t;
     assert(contains(paint.surfaces,x,y),'lane stripe painted outside its road');
     const horizontal=lane.y1===lane.y2;
-    assert(!paint.surfaces.some(r=>r.dir===(horizontal?'v':'h')&&contains([r],x,y)),'centreline runs through a crossing or bridge turn');
+    assert(paint.organic?!paint.junctions.some(j=>Math.hypot(x-j.cx,y-j.cy)<j.w*.32):!paint.surfaces.some(r=>r.dir===(horizontal?'v':'h')&&contains([r],x,y)),'centreline runs through a crossing or bridge turn');
   }
 }
 const road={x:0,y:0,w:300,h:100,dir:'h'};

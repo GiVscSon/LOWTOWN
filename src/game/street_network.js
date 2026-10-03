@@ -1,6 +1,9 @@
 // Shared geometry for readable road endings and pedestrian routes.
+import {buildCorridorGraph,corridorCircuits,simplifyStreetPath} from './street_graph.js';
+import {onStreetCollection,corridorContains,offsetStreet,streetWidth} from './street_corridors.js';
 const inside=(x,y,r,pad=0)=>x>=r.x-pad&&x<=r.x+r.w+pad&&y>=r.y-pad&&y<=r.y+r.h+pad;
 export function createRoadGraph(roads,bridges,accessPoints=[]){
+  if(roads.some(r=>r.points))return buildCorridorGraph([...roads,...bridges],accessPoints);
   const nodes=[],lookup=new Map(),lines=[...roads,...bridges].map(r=>({...r,nodes:[]}));
   const add=(x,y,line)=>{const key=`${x.toFixed(1)}:${y.toFixed(1)}`;let id=lookup.get(key);if(id===undefined){id=nodes.length;nodes.push({x,y,edges:new Set()});lookup.set(key,id);}line.nodes.push(id);return id;};
   for(const r of lines){
@@ -31,6 +34,7 @@ export function createRoadGraph(roads,bridges,accessPoints=[]){
 
 // Closed road circuits support civilian trips across staggered bridge landings.
 export function createRoadCircuits(graph){
+ if(graph.organic)return corridorCircuits(graph);
  const circuits=[],seen=new Set();
  for(let from=0;from<graph.length;from++)for(const to of graph[from].edges){
   if(to<=from)continue;
@@ -62,6 +66,7 @@ export function createRoadCircuits(graph){
 export function roadPath(graph,start,finish,{fromSegment=false}={}){
   if(!graph.length)return [];
   const nearest=p=>graph.reduce((best,n,i)=>Math.hypot(n.x-p.x,n.y-p.y)<Math.hypot(graph[best].x-p.x,graph[best].y-p.y)?i:best,0);
+  const organic=graph.organic;
   let from=nearest(start);
   let finishSegment=null;
   let to=nearest(finish);
@@ -113,7 +118,7 @@ export function roadPath(graph,start,finish,{fromSegment=false}={}){
   }
   if(!parents.has(to))return [];
   const path=[];for(let id=to;id!==null;id=parents.get(id))path.unshift({x:graph[id].x,y:graph[id].y});
-  return path;
+  return organic?simplifyStreetPath(path,2):path;
 }
 
 // Build continuous bus/emergency routes by joining shortest paths between
@@ -169,6 +174,15 @@ export function roadTerminals(roads,bridges,solid){
   const ends=[];
   for(const road of roads){
     if(road.bridgeApproach||road.serviceAccess)continue;
+    if(road.points){
+      for(const side of [-1,1]){
+        const end=side<0?road.points[0]:road.points.at(-1),neighbor=side<0?road.points[1]:road.points.at(-2);
+        const dx=end[0]-neighbor[0],dy=end[1]-neighbor[1],length=Math.hypot(dx,dy)||1;
+        if(onStreetCollection(...end,roads,0,road)||onStreetCollection(end[0]+dx/length*8,end[1]+dy/length*8,roads,0,road)||onStreetCollection(...end,bridges))continue;
+        ends.push({x:end[0],y:end[1],width:streetWidth(road),radius:streetWidth(road)/2,dir:road.dir,roadId:road.id,side,angle:Math.atan2(dy,dx),flat:false});
+      }
+      continue;
+    }
     const horizontal=road.dir==='h',width=horizontal?road.h:road.w;
     for(const side of [-1,1]){
       const edge={x:horizontal?road.x+(side>0?road.w:0):road.x+road.w/2,y:horizontal?road.y+road.h/2:road.y+(side>0?road.h:0)};
@@ -196,7 +210,7 @@ export function roadTerminals(roads,bridges,solid){
 }
 
 export function onRoadSurface(x,y,roads,bridges,curves=[],terminals=[]){
-  if([...roads,...bridges].some(r=>inside(x,y,r)))return true;
+  if(onStreetCollection(x,y,roads)||onStreetCollection(x,y,bridges))return true;
 
   for(const road of curves.filter(r=>!r.footway))for(let i=1;i<road.points.length;i++){
     const a=road.points[i-1],b=road.points[i],dx=b[0]-a[0],dy=b[1]-a[1],length=dx*dx+dy*dy;
@@ -223,6 +237,7 @@ export function createWalkingRoutes(roads,parks,clear){
   }
   for(const r of roads){
     if(r.bridgeApproach||r.serviceAccess)continue;
+    if(r.points){for(const side of [-1,1])sample(offsetStreet(r.points,side*(streetWidth(r)/2+34)).map(([x,y])=>({x,y})),'sidewalk');continue;}
     if(r.dir==='h')for(const y of [r.y-22,r.y+r.h+22])sample([{x:r.x+25,y},{x:r.x+r.w-25,y}],'sidewalk');
     else for(const x of [r.x-22,r.x+r.w+22])sample([{x,y:r.y+25},{x,y:r.y+r.h-25}],'sidewalk');
   }
@@ -271,9 +286,12 @@ export function drawRoadTerminals(ctx,terminals){
   ctx.strokeStyle='#898172';ctx.lineWidth=3;
   for(const t of terminals){
     ctx.beginPath();
-    if(t.dir==='h'){ctx.moveTo(t.x,t.y-t.width/2);ctx.lineTo(t.x,t.y+t.width/2);}
+    if(Number.isFinite(t.angle)){const nx=-Math.sin(t.angle)*t.width/2,ny=Math.cos(t.angle)*t.width/2;ctx.moveTo(t.x+nx,t.y+ny);ctx.lineTo(t.x-nx,t.y-ny);}
+    else if(t.dir==='h'){ctx.moveTo(t.x,t.y-t.width/2);ctx.lineTo(t.x,t.y+t.width/2);}
     else{ctx.moveTo(t.x-t.width/2,t.y);ctx.lineTo(t.x+t.width/2,t.y);}
     ctx.stroke();
   }
 }
 export { streetSurfaceGeometry } from './street_surface.js';
+
+export {onStreetCollection,corridorContains,nearestStreet,streetWidth,streetPoints,rectangleClearOfStreets,corridorRoad} from './street_corridors.js';
