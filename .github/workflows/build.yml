@@ -22,6 +22,8 @@ jobs:
       - run: npm run build
       - name: Three.js and PWA contract
         run: npm run test:three-pwa-contract
+      - name: Supported streets, walking contacts and camera presets
+        run: npm run test:street-graphics
       - name: Original SVG transport views
         run: npm run test:transport-svg
       - name: Swept vehicle contacts, pushing and pedestrian reactions

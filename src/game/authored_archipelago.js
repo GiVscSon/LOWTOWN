@@ -163,7 +163,8 @@ export function remapLegacyScene(scene){
   for(const road of scene.scenicRoads){
     const start=road.points[0],owner=sourceDistrict({x:start[0],y:start[1]});
     road.districtId=owner.id;
-    road.width=Math.min(58,58*owner.w/owner.source.w,58*owner.h/owner.source.h);
+    const width=road.width||28;
+    road.width=Math.min(width,width*owner.w/owner.source.w,width*owner.h/owner.source.h);
     road.points=road.points.map(([x,y])=>{const p=districtPoint({x,y},owner.id);return [p.x,p.y];});
   }
   for(const key of ['buildings','parkZones','breakableProps','piers'])for(const object of scene[key]||[])move(object,true);

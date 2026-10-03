@@ -50,7 +50,9 @@
     "test:transport-svg": "node tests/transport-svg-regression.mjs",
     "test:bridge-caps": "node tests/bridge-cap-browser-benchmark.mjs",
     "test:three-pwa-contract": "node tests/three-pwa-contract.mjs",
-    "test:three-pwa-browser": "node tests/three-pwa-browser-smoke.mjs"
+    "test:three-pwa-browser": "node tests/three-pwa-browser-smoke.mjs",
+    "test:street-graphics": "node tests/street-contact-graphics-regression.mjs",
+    "test:street-graphics-browser": "node tests/street-graphics-browser-smoke.mjs"
   },
   "dependencies": {
     "@sentry/browser": "^10.25.0",

@@ -1,6 +1,6 @@
 // Original continuous-heading, model-space vehicle meshes. Height is projected
 // vertically in world space, so windows and equipment stay attached in turns.
-const GLASS='#426877',TRIM='#303b40',CHROME='#abb6b4';
+const GLASS='#263b46',TRIM='#232b30',CHROME='#abb6b4';
 const cache=new Map();
 // The canvas camera looks along the isometric diagonal.  Keep this test in
 // one place so the body, glass overlays and service equipment agree about
@@ -54,7 +54,8 @@ export function createVehicleMesh(type='sedan',length=48,breadth=24,color='#e09a
   }else{
     const shape=[[-w*.5,-h*.33],[-w*.44,-h*.47],[w*.36,-h*.47],[w*.5,-h*.31],[w*.5,h*.31],[w*.36,h*.47],[-w*.44,h*.47],[-w*.5,h*.33]];
     const bodyZ=type==='sports'||type==='coupe'?6:8;
-    prism(shape,shape,3,bodyZ,paint);
+    const shoulder=shape.map(([x,y])=>[x*.985,y*.96]);
+    prism(shape,shoulder,3,bodyZ,paint);
     box(-w*.51,-h*.31,2,h*.62,3.5,5.3,CHROME);box(w*.48,-h*.3,2,h*.6,3.5,5.3,CHROME);
     sidePanel(-w*.35,w*.7,4,5.5,service?(fire||ems?'#ead6a0':guard?'#596247':'#354753'):TRIM);
     let back=-w*.24,front=w*.19,roofBack=-w*.17,roofFront=w*.07,roofZ=14;
@@ -64,6 +65,49 @@ export function createVehicleMesh(type='sedan',length=48,breadth=24,color='#e09a
     if(type==='truck'||guard||fire){back=w*.07;roofBack=w*.09;roofZ=20;}
     const bottom=rect(back,-h*.43,front-back,h*.86),top=rect(roofBack,-h*.34,roofFront-roofBack,h*.68);
     prism(bottom,top,bodyZ,roofZ,paint,GLASS);
+    if(!tall){
+      // Dark seals frame the sloped glass, with narrow reflected sky streaks
+      // and a rear demister. Every piece belongs to the same continuous mesh.
+      const glassPatch=(end,u0,u1,v0,v1,fill)=>{
+        const baseX=end?front:back,roofX=end?roofFront:roofBack,epsilon=end?.035:-.035;
+        const p=(u,v)=>[baseX+(roofX-baseX)*v+epsilon,(u-.5)*h*(.86-.18*v),bodyZ+(roofZ-bodyZ)*v+.025];
+        const pts=[p(u0,v0),p(u1,v0),p(u1,v1),p(u0,v1)];if(!end)pts.reverse();face(pts,fill,false);
+      };
+      for(const end of [false,true]){
+        glassPatch(end,0,1,.01,.06,TRIM);glassPatch(end,0,1,.94,.99,TRIM);
+        glassPatch(end,.015,.045,.06,.94,TRIM);glassPatch(end,.955,.985,.06,.94,TRIM);
+        glassPatch(end,.08,.46,.12,.18,'#17252c');
+        glassPatch(end,.53,.87,.16,.19,'#81918f');
+        if(!end)for(let row=0;row<5;row++)glassPatch(false,.07,.93,.28+row*.11,.289+row*.11,'#55625e');
+      }
+      // A restrained dark sunroof and its seal are especially visible in the
+      // close camera, instead of an unbroken flat roof slab.
+      if(type==='coupe'||type==='sports'||type==='sedan'){
+        const roofLength=roofFront-roofBack;
+        box(roofBack+roofLength*.2,-h*.21,roofLength*.55,h*.42,roofZ+.025,roofZ+.1,TRIM);
+        box(roofBack+roofLength*.23,-h*.185,roofLength*.49,h*.37,roofZ+.1,roofZ+.14,'#34474c');
+      }
+      sidePanel(-w*.34,w*.69,bodyZ-.7,bodyZ-.45,shade(paint,1.22));
+      // Door seams, handles, fuel flap and a lower sill highlight.
+      const doors=type==='coupe'||type==='sports'?[back,front]:[back,(back+front)/2,front];
+      for(const side of [-1,1]){
+        const y=side*h*.474;
+        const panel=(x,z,l,height,fill)=>{const pts=[[x,y,z],[x+l,y,z],[x+l,y,z+height],[x,y,z+height]];if(side>0)pts.reverse();face(pts,fill,false);};
+        for(const x of doors){panel(x,4.9,.16,bodyZ-5,TRIM);panel(x-2.5,bodyZ-1.6,1.8,.5,CHROME);}
+        panel(-w*.41,bodyZ-2.1,w*.065,1.3,shade(paint,.7));
+        panel(-w*.36,3.5,w*.7,.32,'#79807b');
+      }
+      box(-w*.506,-h*.14,.45,h*.28,3.7,5.4,'#c3c4ad');
+      box(-w*.513,-h*.1,.16,h*.2,4,5,'#3a4549');
+      box(w*.498,-h*.35,.5,h*.7,3,3.6,TRIM);
+      for(const side of [-1,1]){
+        box(-w*.505,side<0?-h*.38:h*.26,.7,h*.12,5.4,6.4,'#d89232');
+        box(w*.487,side<0?-h*.36:h*.26,.7,h*.1,4.5,5.3,'#dca450');
+        // Twin small exhaust tips and a front fog lamp bezel.
+        if(side<0)box(-w*.535,-h*.27,1.9,1,2.7,3.6,CHROME);
+        box(w*.495,side<0?-h*.28:h*.2,.5,h*.08,3.7,4.4,'#b9bbab');
+      }
+    }
     // Narrow pillars follow the tapered window planes rather than floating on top.
     for(const side of [-1,1]){
       const pts=[[back,side*h*.431,bodyZ],[back+2,side*h*.431,bodyZ],[roofBack+2,side*h*.341,roofZ],[roofBack,side*h*.341,roofZ]];
@@ -140,8 +184,15 @@ export function createVehicleMesh(type='sedan',length=48,breadth=24,color='#e09a
     for(let i=0;i<12;i++)face([rings[0][i],rings[1][i],rings[1][(i+1)%12],rings[0][(i+1)%12]],'#1d2428',false);
     face(rings[0],TRIM);face([...rings[1]].reverse(),TRIM);
     for(const cy of [y-half-.02,y+half+.02]){
-      const hub=Array.from({length:12},(_,i)=>[x+Math.cos(i*Math.PI/6)*radius*.5,cy,radius+Math.sin(i*Math.PI/6)*radius*.5]);
+      const hub=Array.from({length:12},(_,i)=>[x+Math.cos(i*Math.PI/6)*radius*.7,cy,radius+Math.sin(i*Math.PI/6)*radius*.7]);
       if(cy>y)hub.reverse();face(hub,CHROME,false);
+      const outer=cy+(cy>y?.02:-.02),recess=Array.from({length:12},(_,i)=>[x+Math.cos(i*Math.PI/6)*radius*.58,outer,radius+Math.sin(i*Math.PI/6)*radius*.58]);
+      if(cy>y)recess.reverse();face(recess,'#333b3e',false);
+      for(let spoke=0;spoke<5;spoke++){
+        const angle=spoke*Math.PI*2/5,point=(r,a)=>[x+Math.cos(a)*radius*r,outer+(cy>y?.02:-.02),radius+Math.sin(a)*radius*r];
+        const pts=[point(.17,angle-.32),point(.62,angle-.12),point(.62,angle+.12),point(.17,angle+.32)];
+        if(cy>y)pts.reverse();face(pts,'#b9c2bf',false);
+      }
     }
   }
   return {type,length,breadth,faces,windshield:faces.find(f=>f.fill===GLASS&&f.normal[0]>0&&Math.abs(f.normal[1])<.01)};

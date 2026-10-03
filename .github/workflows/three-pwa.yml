@@ -17,6 +17,7 @@ on:
       - vite.config.js
       - tests/three-city-geometry.mjs
       - tests/three-pwa-*.mjs
+      - tests/street-*graphics*.mjs
       - .github/workflows/three-pwa.yml
   workflow_dispatch:
 
@@ -33,9 +34,12 @@ jobs:
       - run: npm run build
       - run: npm run test:three-pwa-contract
       - run: node tests/three-city-geometry.mjs
+      - run: npm run test:street-graphics
       - run: npx playwright install --with-deps chromium
       - name: Three.js live rendering and PWA offline restart
         run: npm run test:three-pwa-browser
+      - name: Street materials, three camera views and walking contacts
+        run: npm run test:street-graphics-browser
       - name: Three.js production Pages smoke
         run: |
           npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/lowtown-three-preview.log 2>&1 &
@@ -48,5 +52,13 @@ jobs:
         with:
           name: lowtown-three-aerial
           path: artifacts/aerial-city/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload street graphics screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lowtown-street-graphics
+          path: artifacts/street-graphics/
           if-no-files-found: ignore
           retention-days: 14

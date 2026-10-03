@@ -24,19 +24,31 @@ export function ribbonGeometry(points,width,elevation=3.6){
   const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geometry.setIndex(indices);geometry.computeVertexNormals();geometry.computeBoundingSphere();return geometry;
 }
 
-export function createBoxBatch(scene,color,roughness=.85,geometry=new THREE.BoxGeometry(1,1,1)){
+export function createBoxBatch(scene,color,roughness=.85,geometry=new THREE.BoxGeometry(1,1,1),material=null){
   const items=[];
   return {
     add(x,y,z,w,h,d,paint=color,angle=0){items.push({x,y,z,w,h,d,paint,angle});},
     flush(){
       if(!items.length)return null;
-      const mesh=new THREE.InstancedMesh(geometry,new THREE.MeshStandardMaterial({color:0xffffff,roughness,vertexColors:false}),items.length);
+      const paintMaterial=material||new THREE.MeshStandardMaterial({color:0xffffff,roughness,vertexColors:false});
+      // A single city-wide instance batch defeats frustum culling: every
+      // facade and railing would be drawn even with the close walking camera.
+      // District-sized batches share their geometry and material, but only
+      // the visible neighbourhood reaches the GPU.
+      const cells=new Map();
+      for(const item of items){const key=`${Math.floor(item.x/1536)},${Math.floor(item.z/1536)}`;
+        if(!cells.has(key))cells.set(key,[]);cells.get(key).push(item);}
       const matrix=new THREE.Matrix4(),rotation=new THREE.Quaternion(),axis=new THREE.Vector3(0,1,0);
-      items.forEach((item,index)=>{
-        rotation.setFromAxisAngle(axis,item.angle);matrix.compose(new THREE.Vector3(item.x,item.y,item.z),rotation,new THREE.Vector3(item.w,item.h,item.d));
-        mesh.setMatrixAt(index,matrix);mesh.setColorAt(index,new THREE.Color(item.paint));
-      });
-      mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();scene.add(mesh);return mesh;
+      let first=null;
+      for(const cell of cells.values()){
+        const mesh=new THREE.InstancedMesh(geometry,paintMaterial,cell.length);
+        cell.forEach((item,index)=>{
+          rotation.setFromAxisAngle(axis,item.angle);matrix.compose(new THREE.Vector3(item.x,item.y,item.z),rotation,new THREE.Vector3(item.w,item.h,item.d));
+          mesh.setMatrixAt(index,matrix);mesh.setColorAt(index,new THREE.Color(item.paint));
+        });
+        mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();scene.add(mesh);first??=mesh;
+      }
+      return first;
     }
   };
 }
