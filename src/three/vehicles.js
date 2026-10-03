@@ -6,7 +6,7 @@ const palette={sirenRed:'#e95642',sirenBlue:'#4199e2',sirenAmber:'#e6b352',tail:
 export function landVehicleGeometry(type,width=48,height=24,color='#e8b84a',police=false){
   const key=`${type}:${width}:${height}:${color}:${police}`;
   if(geometries.has(key))return geometries.get(key);
-  const model=createVehicleMesh(type,width,height,color,police),positions=[],colors=[],lights=[];
+  const model=createVehicleMesh(type,width,height,color,police),positions=[],colors=[],surfaces=[],lights=[];
   for(const face of model.faces){
     const normal=face.normal,drop=normal.map(Math.abs).indexOf(Math.max(...normal.map(Math.abs)));
     const flat=face.points.map(point=>new THREE.Vector2(...point.filter((_,axis)=>axis!==drop)));
@@ -17,6 +17,9 @@ export function landVehicleGeometry(type,width=48,height=24,color='#e8b84a',poli
       const ordered=winding.dot(new THREE.Vector3(normal[0],normal[2],normal[1]))<0?[...triangle].reverse():triangle;
       for(const vertex of ordered){
         const [x,y,z]=face.points[vertex];positions.push(x,z,y);colors.push(paint.r,paint.g,paint.b);
+        const glass=face.fill==='#263b46'||face.fill==='#34474c',chrome=face.fill==='#abb6b4'||face.fill==='#b9c2bf',rubber=face.fill==='#1d2428';
+        const lamp=face.fill==='tail'||face.fill.startsWith('siren')||face.fill==='#fff0b7';
+        surfaces.push(glass?.18:chrome?.24:rubber?.96:.44,chrome?.82:glass?.25:rubber?0:.28,lamp?1.3:0);
         if(face.fill.startsWith('siren'))lights.push({index:colors.length-3,color:paint.clone(),blue:face.fill==='sirenBlue'});
       }
     }
@@ -24,11 +27,21 @@ export function landVehicleGeometry(type,width=48,height=24,color='#e8b84a',poli
   const geometry=new THREE.BufferGeometry();
   geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
   geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+  geometry.setAttribute('surface',new THREE.Float32BufferAttribute(surfaces,3));
   geometry.computeVertexNormals();geometry.computeBoundingSphere();
   geometry.userData={type,lights};geometries.set(key,geometry);return geometry;
 }
 
 const material=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.5,metalness:.22,side:THREE.DoubleSide});
+material.onBeforeCompile=shader=>{
+  shader.vertexShader='attribute vec3 surface;varying vec3 vehicleSurface;\n'+shader.vertexShader;
+  shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvehicleSurface=surface;');
+  shader.fragmentShader='varying vec3 vehicleSurface;\n'+shader.fragmentShader;
+  shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=vehicleSurface.x;');
+  shader.fragmentShader=shader.fragmentShader.replace('#include <metalnessmap_fragment>','#include <metalnessmap_fragment>\nmetalnessFactor=vehicleSurface.y;');
+  shader.fragmentShader=shader.fragmentShader.replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance+=vColor.rgb*vehicleSurface.z;');
+};
+material.customProgramCacheKey=()=> 'lowtown-vehicle-surfaces';
 const materials=new Map(),unitBox=new THREE.BoxGeometry(1,1,1);
 function painted(color){
   if(!materials.has(color))materials.set(color,new THREE.MeshStandardMaterial({color,roughness:.6,metalness:.15}));

@@ -1391,6 +1391,11 @@ function pedestrianCarBlocked(x,y,c){
 }
 
 let pedestrianSceneryIndex=null;
+function pedestrianSceneryBounds(){
+  return [...buildings.map(b=>({left:b.x-7,top:b.y-7,right:b.x+b.w+7,bottom:b.y+b.h+7})),
+    ...solidProps.map(p=>({left:p.x-p.width*.5-5,top:p.y-p.height*.5-5,right:p.x+p.width*.5+5,bottom:p.y+p.height*.5+5})),
+    ...trees.map(t=>({left:t.x-11,top:t.y-11,right:t.x+11,bottom:t.y+11,tree:true,source:t}))];
+}
 function isPedestrianSceneryBlocked(x,y){
   if(!isPositionOnSolidGround(x,y))return true;
   if(pedestrianSceneryIndex)return pedestrianSceneryIndex.query(x,y,x,y).some(p=>
@@ -1480,10 +1485,7 @@ function pedestrianEvacuation(person){
 
 function updatePedestrians(dt){
   const frame=Math.min(dt,.05)*60;
-  const scenery=[...buildings.map(b=>({left:b.x-7,top:b.y-7,right:b.x+b.w+7,bottom:b.y+b.h+7})),
-    ...solidProps.map(p=>({left:p.x-p.width*.5-5,top:p.y-p.height*.5-5,right:p.x+p.width*.5+5,bottom:p.y+p.height*.5+5})),
-    ...trees.map(t=>({left:t.x-11,top:t.y-11,right:t.x+11,bottom:t.y+11,tree:true,source:t}))];
-  pedestrianSceneryIndex=createSpatialIndex(scenery,p=>p);
+  pedestrianSceneryIndex=createSpatialIndex(pedestrianSceneryBounds(),p=>p);
   const cars=[...trafficCars,...policeCars,...incidentPoliceCars,...incidentResponseVehicles,...(roam?.mode!=='foot'&&!(roam?.altitude>12)?[player]:[])];
   pedestrians.forEach((p,index)=>{
     if(p.homeY===undefined){p.homeY=p.y;p.homeX=p.x;p.pause=index%7*.18;p.trip=0;}
@@ -2476,14 +2478,16 @@ function resolveCityMotion(starts,dt){
       if((trafficCars.includes(other)||services.has(other))&&Math.abs(player.speed)>.75&&state.wanted===0)setWanted(1);
     }
   };
+  pedestrianSceneryIndex=createSpatialIndex(pedestrianSceneryBounds(),p=>p);
   solveVehicleMotion(bodies.filter(b=>!water(b)),starts,dt,{buildings,trees,
     props:[...solidProps,...rails,...hydrants],people,passive,player,onImpact:impact,
     isEnabled:body=>body.type!=='hydrant'||body.intact,
     canOccupy:(body,pose,person)=>{
-      if(person)return isPositionOnSolidGround(pose.x,pose.y);
+      if(person)return !isPedestrianSceneryBlocked(pose.x,pose.y);
       if(services.has(body)&&serviceFootprintSupported(body))return serviceFootprintSupported(pose);
       return isPositionOnSolidGround(pose.x,pose.y);
     }});
+  pedestrianSceneryIndex=null;
   const vessels=bodies.filter(water);
   for(const unit of services)if(['enroute','returning'].includes(unit.status))recoverServiceRoad(unit);
   if(vessels.length)solveVehicleMotion(vessels,starts,dt,{passive,player,onImpact:impact,
@@ -3346,12 +3350,12 @@ function initThreeRuntime(){
     const world={
       width:WORLD_W,height:WORLD_H,
       islands:allIslands.map(island=>({id:island.id,natural:!!island.natural,points:coastPoints(island)})),
-      roads,scenicRoads,bridges,
+      roads,scenicRoads,bridges,bridgeRails,roadEnds,
       paint:roadPaintGeometry||(roadPaintGeometry=buildRoadPaintGeometry()),
       crosswalks:(roadPaintGeometry||(roadPaintGeometry=buildRoadPaintGeometry())).crosswalkJunctions.flatMap(j=>junctionCrosswalkStripes({y:j.y,h:j.h},{x:j.x,w:j.w},j.approaches)),
       buildings,trees,runways:PLANE_RUNWAYS,parks:parkZones,piers,props:solidProps,lights:streetLights,stops:transitStopSigns(),billboards,cranes
     };
-    threeRenderer=createLowtownThreeRenderer({canvas:threeCanvas,world});
+    threeRenderer=createLowtownThreeRenderer({canvas:threeCanvas,world,forceFullMaterials:localBridgeQA&&/(?:\?|&)fullMaterials=1(?:&|$)/.test(LOWTOWN_QUERY)});
     canvas.classList?.add('renderer-hidden');
     threeCanvas.classList?.add('active');
     window.__lowtownRenderer='three';
@@ -4293,6 +4297,18 @@ function boot() {
   roamControls.append(enterButton,flyButton);document.body.appendChild(roamControls);
   loadProgress();
   setupInputListeners();
+  const cameraButton=document.getElementById('btnCamera');
+  if(cameraButton&&threeRenderer){
+    const presets=['near','normal','overview'],labels={near:'Ближе',normal:'Обычный',overview:'Обзор'};
+    const updateCameraButton=()=>{
+      const label=labels[threeRenderer.cameraPreset];cameraButton.textContent='Камера: '+label;
+      cameraButton.setAttribute('aria-label','Приближение камеры: '+label+'. Нажмите, чтобы переключить.');
+    };
+    updateCameraButton();
+    cameraButton.addEventListener('click',()=>{
+      threeRenderer.setCameraPreset(presets[(presets.indexOf(threeRenderer.cameraPreset)+1)%presets.length]);updateCameraButton();
+    });
+  }else if(cameraButton)cameraButton.style.display='none';
   document.getElementById('btnWeather')?.addEventListener('click',()=>{weather.next();showToast('Погода: '+WEATHER_PRESETS[weather.kind].label);});
   driveLab = createDriveLab({ player, state, canvas, roads, buildings, trafficCars, policeCars, routeInput, roam, responseActors:[incidentPoliceCars,incidentResponseVehicles,airMedicalVehicles] });
   // Deterministic survey positions are available only on a local QA preview.
@@ -4347,7 +4363,7 @@ function boot() {
         Object.keys(state.keys).forEach(key=>state.keys[key]=false);
         state.wanted=0;renderWorld();return {id,altitude:roam.altitude,mode:roam.mode};
       },
-      collisionScene(kind='car'){
+      collisionScene(kind='car',onFoot=false){
         const origin={x:1600,y:1200};
         for(const list of [trafficCars,parkedCars,pedestrians,roam.fleet])for(let i=list.length-1;i>=0;i--)
           if(Math.hypot(list[i].x-origin.x,list[i].y-origin.y)<350)list.splice(i,1);
@@ -4359,9 +4375,10 @@ function boot() {
         else if(kind==='bin')breakableProps.push({...target,type:'dumpster',intact:true,w:26,h:18,mass:130});
         else if(kind==='person')pedestrians.push({...target,pause:999,walkSpeed:0,reaction:'calm',hp:100,shirt:'#8a733b',skin:'#caa17e'});
         else throw new Error('Unknown collision scene');
+        if(onFoot)roam.resetToFoot(target.x-28,target.y-28,Math.PI/4);
         Object.keys(state.keys).forEach(key=>state.keys[key]=false);renderWorld();return {origin,target};
       },
-      setWeather(kind){weather.set(kind);},
+      setWeather(kind,instant=false){weather.set(kind);if(instant)Object.assign(weather,{...WEATHER_PRESETS[kind],wetness:WEATHER_PRESETS[kind].rain});},
       detain(){respawnPlayer('задержание');renderWorld();},
       snapshot:()=>({
         stationExitPath:serviceBases.find(b=>b.kind==='police')?.building.exitPath,

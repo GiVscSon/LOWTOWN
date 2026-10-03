@@ -68,6 +68,8 @@
     .wallet-badge span { color: var(--accent-amber); }
     .btn-top { background: var(--glass-panel); border: 1px solid var(--glass-border); backdrop-filter: blur(12px); color: var(--text-main); padding: 5px 9px; border-radius: 8px; font-size: 10px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; }
     .btn-top:active { background: rgba(255, 255, 255, 0.2); border-color: var(--glass-border-focus); transform: scale(0.96); }
+    .camera-toggle { min-height: 36px; touch-action: manipulation; }
+    @media(pointer:coarse) { .camera-toggle { min-height: 44px; } }
     .banner-container { position: absolute; top: 110px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; align-items: center; width: 90%; max-width: 400px; pointer-events: none; }
     .evade-status-card { background: rgba(20, 25, 36, 0.94); border: 1px solid var(--accent-amber); box-shadow: 0 6px 20px rgba(229, 157, 53, 0.3); padding: 5px 14px; border-radius: 16px; font-size: 11px; font-weight: 800; color: var(--accent-amber); display: none; align-items: center; gap: 8px; }
     .toast-alert { background: rgba(18, 22, 32, 0.96); border: 1px solid var(--glass-border); border-radius: 8px; padding: 6px 14px; font-size: 11px; font-weight: 700; color: var(--accent-white); box-shadow: 0 8px 24px rgba(0,0,0,0.6); display: flex; align-items: center; gap: 6px; }
@@ -171,6 +173,7 @@
           <button class="btn-top" id="btnOpenMap">M</button>
           <button class="btn-top" id="btnOpenGarage">G</button>
         </div>
+        <button class="btn-top camera-toggle" id="btnCamera" title="Ближе → Обычный → Обзор" aria-label="Приближение камеры: Обычный. Нажмите, чтобы переключить.">Камера: Обычный</button>
       </div>
     </div>
     <div class="banner-container" id="bannerContainer">

@@ -103,13 +103,14 @@ export function solveVehicleMotion(bodies,starts,dt,{buildings=[],trees=[],props
   const reported=new Map();
   function collide(a,b,fixed=false){
     if(!isEnabled(a.body)||!isEnabled(b.body.source||b.body))return false;
-    if(!fixed&&a.person&&b.person)return false;
     if(Math.abs(a.body.x-b.body.x)>a.radius+b.radius||Math.abs(a.body.y-b.body.y)>a.radius+b.radius)return false;
     const hit=contact(shape(a),shape(b));if(!hit)return false;
     const closing=Math.max(0,-((a.vx-b.vx)*hit.x+(a.vy-b.vy)*hit.y));
     const target=b.body.source||b.body;
     let touched=reported.get(a.body);if(!touched)reported.set(a.body,touched=new Set());
-    if(closing>.15&&!touched.has(target)){
+    // Walking into another person is a solid, gentle contact, not a vehicle
+    // impact. Keep the sweep and separation, without damage or knockdowns.
+    if(!(a.person&&b.person)&&closing>.15&&!touched.has(target)){
       touched.add(target);onImpact(a.body,target,closing,{x:hit.x,y:hit.y});
       if(!isEnabled(target))return false;
     }
@@ -119,17 +120,21 @@ export function solveVehicleMotion(bodies,starts,dt,{buildings=[],trees=[],props
     const permitted=(s,x,y)=>canOccupy(s.body,{...s.body,x,y},s.person);
     if(!permitted(a,a.body.x+hit.x*depth*shareA,a.body.y+hit.y*depth*shareA)){shareA=0;shareB=fixed?0:1;}
     if(!fixed&&!permitted(b,b.body.x-hit.x*depth*shareB,b.body.y-hit.y*depth*shareB)){shareB=0;shareA=1;}
-    if(shareA&&permitted(a,a.body.x+hit.x*depth*shareA,a.body.y+hit.y*depth*shareA)){
+    const movedA=shareA&&permitted(a,a.body.x+hit.x*depth*shareA,a.body.y+hit.y*depth*shareA);
+    if(movedA){
       a.body.x+=hit.x*depth*shareA;a.body.y+=hit.y*depth*shareA;
     }
     if(shareB){b.body.x-=hit.x*depth*shareB;b.body.y-=hit.y*depth*shareB;}
     if(closing>0){
-      const impulse=closing*1.04/total;
+      const impulse=closing*(a.person&&b.person?1:1.04)/total;
       a.vx+=hit.x*impulse*invA;a.vy+=hit.y*impulse*invA;
       if(!fixed){b.vx-=hit.x*impulse*invB;b.vy-=hit.y*impulse*invB;}
       for(const s of fixed?[a]:[a,b])if(s.person){const speed=Math.hypot(s.vx,s.vy);if(speed>3){s.vx*=3/speed;s.vy*=3/speed;}}
     }
-    return true;
+    // A pair pinned against scenery has no remaining positional correction.
+    // Repeating an unchanged contact 32 times stalls a dense crowd and does
+    // not improve its separation. A closing velocity still needs one solve.
+    return !!movedA||shareB>0||closing>0;
   }
   for(let step=0;step<steps;step++){
     for(const s of states){
