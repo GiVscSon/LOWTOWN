@@ -6,8 +6,12 @@ export function surfaceTexture(kind){return surfaceTextures(kind).map;}
 
 export function surfaceMaterial(kind,color=0xffffff,cheap=false){
   const textures=surfaceTextures(kind),options={color,map:textures.map,side:THREE.DoubleSide};
-  const material=cheap?new THREE.MeshLambertMaterial(options):new THREE.MeshStandardMaterial({...options,roughness:kind==='asphalt'?.88:1,roughnessMap:textures.roughnessMap,normalMap:textures.normalMap,normalScale:new THREE.Vector2(.32,.32)});
+  const material=cheap?new THREE.MeshLambertMaterial(options):new THREE.MeshStandardMaterial({...options,roughness:kind==='asphalt'?.88:1,normalMap:textures.normalMap,normalScale:new THREE.Vector2(kind==='asphalt'?.14:.32,kind==='asphalt'?.14:.32)});
   material.onBeforeCompile=shader=>{
+    // Opaque street surfaces keep roughness in albedo alpha. One sample
+    // supplies both values; alpha remains opacity only for transparent props.
+    shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',THREE.ShaderChunk.map_fragment.replace('diffuseColor *= sampledDiffuseColor;','diffuseColor.rgb *= sampledDiffuseColor.rgb;'));
+    if(!cheap)shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>','float roughnessFactor=roughness*sampledDiffuseColor.a;');
     shader.vertexShader=shader.vertexShader.replace('#include <worldpos_vertex>',`#include <worldpos_vertex>
       vec4 surfacePosition=vec4(transformed,1.0);
       #ifdef USE_INSTANCING
@@ -23,11 +27,9 @@ export function surfaceMaterial(kind,color=0xffffff,cheap=false){
       #ifdef USE_NORMALMAP
         vNormalMapUv=vMapUv;
       #endif
-      #ifdef USE_ROUGHNESSMAP
-        vRoughnessMapUv=vMapUv;
-      #endif`);
+`);
   };
-  material.customProgramCacheKey=()=>`lowtown-surface-${kind}`;
+  material.customProgramCacheKey=()=>`lowtown-surface-packed-${kind}`;
   return material;
 }
 

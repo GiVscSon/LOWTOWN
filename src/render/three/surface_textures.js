@@ -9,7 +9,7 @@ const clamp=value=>Math.max(0,Math.min(255,Math.round(value)));
 // distances. Stains are broad; aggregate and mortar have their own scale.
 export function surfaceTextures(kind){
   if(textures.has(kind))return textures.get(kind);
-  const size=256,albedo=new Uint8Array(size*size*4),roughness=new Uint8Array(size*size*4),normal=new Uint8Array(size*size*4),height=new Float32Array(size*size);
+  const size=256,albedo=new Uint8Array(size*size*4),normal=new Uint8Array(size*size*4),height=new Float32Array(size*size);
   const tau=Math.PI*2;
   for(let y=0;y<size;y++)for(let x=0;x<size;x++){
     const noise=hash(x,y),u=x/size*tau,v=y/size*tau;
@@ -40,8 +40,8 @@ export function surfaceTextures(kind){
     }else if(kind==='roof'){
       shade=(x%32<1||y%32<1?141:185)+noise*29+stain*14;relief=noise*.07;
     }
-    const i=(y*size+x)*4;color(albedo,i,shade,shade*.995,shade*.975,255);
-    color(roughness,i,polish,polish,polish,255);height[y*size+x]=relief;
+    const i=(y*size+x)*4;color(albedo,i,shade,shade*.995,shade*.975,clamp(polish));
+    height[y*size+x]=relief;
   }
   for(let y=0;y<size;y++)for(let x=0;x<size;x++){
     const dx=height[y*size+(x+1)%size]-height[y*size+(x+size-1)%size],dy=height[((y+1)%size)*size+x]-height[((y+size-1)%size)*size+x];
@@ -50,6 +50,6 @@ export function surfaceTextures(kind){
   const make=(data,srgb=false)=>{const texture=new THREE.DataTexture(data,size,size,THREE.RGBAFormat);
     texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.magFilter=THREE.LinearFilter;texture.minFilter=THREE.LinearMipmapLinearFilter;
     texture.generateMipmaps=true;if(srgb)texture.colorSpace=THREE.SRGBColorSpace;texture.needsUpdate=true;return texture;};
-  const result={map:make(albedo,true),roughnessMap:make(roughness),normalMap:make(normal)};textures.set(kind,result);return result;
+  const result={map:make(albedo,true),normalMap:make(normal)};textures.set(kind,result);return result;
 }
 function color(data,i,r,g,b,a){data[i]=clamp(r);data[i+1]=clamp(g);data[i+2]=clamp(b);data[i+3]=a;}

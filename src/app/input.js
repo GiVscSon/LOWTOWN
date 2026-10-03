@@ -23,8 +23,12 @@ export function installAppInput(ctx) {
     if (paused && ctx.state.pauseStarted === null) ctx.state.pauseStarted = now;else if (!paused && ctx.state.pauseStarted !== null) {
       ctx.state.pausedDuration += now - ctx.state.pauseStarted;
       ctx.state.pauseStarted = null;
+      // Present the dismissed overlay before submitting the next world frame.
+      // Physics resumes immediately on its independent fixed clock.
+      ctx.lastGameRenderTime = now + 80;
     }
     ctx.clearGameInput();
+    ctx.env.window.__lowtownRenderPaused = paused;
     ctx.sound.setPaused(paused);
   };
   ctx.setupInputListeners = function setupInputListeners() {
