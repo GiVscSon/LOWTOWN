@@ -14,15 +14,21 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='5' fill='%2314161a'/%3E%3Cpath d='M9 7v18h15v-5H14V7z' fill='%23e8b84a'/%3E%3C/svg%3E">
   <script>
     window.__lowtownLastFrame = 0;
-    window.__lowtownFail = function(message) {
+    window.__lowtownFail = function(message, transient = false) {
       let box = document.getElementById('labError');
+      if (transient && box && box.dataset.transient !== 'true') return;
       if (!box) { box = document.createElement('div'); box.id = 'labError'; box.setAttribute('role','alert'); document.body.appendChild(box); }
+      box.dataset.transient = String(transient);
       box.textContent = 'Не удалось запустить игру: ' + message + '. Обновите страницу.';
+    };
+    window.__lowtownFrameReady = function() {
+      const box = document.getElementById('labError');
+      if (box && box.dataset.transient === 'true') box.remove();
     };
     window.addEventListener('error', function(e) { window.__lowtownFail(e.message || 'ошибка загрузки'); });
     window.addEventListener('unhandledrejection', function(e) { window.__lowtownFail(String(e.reason)); });
     window.addEventListener('load', function() { setInterval(function() {
-      if (!document.hidden && (!window.__lowtownLastFrame || performance.now()-window.__lowtownLastFrame>5000)) window.__lowtownFail('нет новых кадров');
+      if (!document.hidden && !window.__lowtownRenderPaused && (!window.__lowtownLastFrame || performance.now()-window.__lowtownLastFrame>5000)) window.__lowtownFail('нет новых кадров', true);
     },6000); });
   </script>
   <style>

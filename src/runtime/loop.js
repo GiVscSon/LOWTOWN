@@ -33,6 +33,7 @@ export function installRuntimeLoop(ctx){
   ctx.gameLoop=function gameLoop(now){
     if(ctx.simulationFailed)return;
     ctx.state.lastFrameTime=now;
+    ctx.env.window.__lowtownRenderPaused=ctx.isGamePaused()||ctx.qaManualSceneClock!==null;
     if(ctx.qaManualSceneClock!==null){
       ctx.env.window.__lowtownLastFrame=ctx.env.performance.now();
       ctx.env.requestAnimationFrame(ctx.gameLoop);return;
@@ -51,6 +52,7 @@ export function installRuntimeLoop(ctx){
     const start=ctx.perfEnabled?ctx.env.performance.now():0;
     try{
       ctx.renderWorld();ctx.driveLab?.afterFrame();
+      ctx.env.window.__lowtownFrameReady?.();
       ctx.env.window.__lowtownLastFrame=ctx.env.performance.now();
       if(ctx.perfEnabled){
         const cost=ctx.env.performance.now()-start;
