@@ -160,6 +160,11 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
     dashed([new THREE.Vector2(runway.x+50,runway.y+runway.h/2),new THREE.Vector2(runway.x+runway.w-50,runway.y+runway.h/2)],'#d6d7bd',3);
     for(let x=runway.x+24;x<runway.x+runway.w;x+=72)for(const side of [0,1])details.add(x,4,runway.y+side*runway.h,3,2,3,'#eedc97');
   }
+  for(const pad of world.helipads||[]){
+    groundBoxes.add(pad.x,1.4,pad.y,120,2,120,'#435657');
+    for(const side of [-1,1])groundBoxes.add(pad.x+side*15,2.5,pad.y,5,.3,45,'#dfcb80');
+    groundBoxes.add(pad.x,2.5,pad.y,30,.3,5,'#dfcb80');
+  }
   const walls=createBoxBatch(staticGroup,'#4b4540',1,undefined,surfaceMaterial('brick',0xffffff,lowCostMaterials)),windows=createBoxBatch(staticGroup,'#b99b56',1,new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({color:0xffffff,side:THREE.DoubleSide})),roofs=createBoxBatch(staticGroup,'#37434a',1,undefined,surfaceMaterial('roof',0xffffff,lowCostMaterials));
   const wallColors=['#715347','#615451','#6d5946','#40525c','#555c4b','#5b4b5a'];
   for(const [index,b] of (world.buildings||[]).entries()){

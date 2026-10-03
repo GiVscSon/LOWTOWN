@@ -1117,7 +1117,7 @@ function initTopology() {
     roads.splice(0,roads.length,...network.roads);bridges.splice(0,bridges.length,...network.bridges);
     for(const road of scenicRoads)road.points=road.points.map(([x,y])=>{const p=network.bend({x,y});return [p.x,p.y];});
     const paths=scenicRoads.map(r=>corridorRoad(r.points,r.width));
-    fitBuildingsToStreets(buildings,[...roads,...paths,...bridges],isPositionOnIslandLand,islands,parkZones);
+    fitBuildingsToStreets(buildings,[...roads,...paths,...bridges],isPositionOnIslandLand,islands,[...parkZones,...PLANE_RUNWAYS,...helipads.map(p=>({x:p.x-105,y:p.y-155,w:210,h:250}))]);
     bridgeRails.splice(0,bridgeRails.length,...bridgeRails.filter(rail=>bridges.some(b=>b.footway&&
       rail.x+rail.w>=b.x-14&&rail.x<=b.x+b.w+14&&rail.y+rail.h>=b.y-14&&rail.y<=b.y+b.h+14)));
     for(let i=parkObstacles.length-1;i>=0;i--)if(onStreetCollection(parkObstacles[i].x,parkObstacles[i].y,roads,45))parkObstacles.splice(i,1);
@@ -2806,7 +2806,15 @@ function stableVisualHash(a, b, c = 0) {
   return value - Math.floor(value);
 }
 
+function streetPaintVisible(x1,y1,x2=x1,y2=y1){
+  if((roam?.altitude||0)>30)return true;
+  const range=Math.max(canvas.width,canvas.height)*2.2+200;
+  return Math.max(x1,x2)>=player.x-range&&Math.min(x1,x2)<=player.x+range&&
+    Math.max(y1,y2)>=player.y-range&&Math.min(y1,y2)<=player.y+range;
+}
+
 function drawStreetCorridor(target,road,color,extra=0,scale=1,ox=0,oy=0){
+  if(target===ctx&&!streetPaintVisible(road.x,road.y,road.x+road.w,road.y+road.h))return;
   target.save();target.strokeStyle=color;target.lineWidth=(streetWidth(road)+extra)*scale;
   target.lineJoin='round';target.lineCap='round';target.beginPath();
   streetPoints(road).forEach(([x,y],i)=>i?target.lineTo(ox+x*scale,oy+y*scale):target.moveTo(ox+x*scale,oy+y*scale));
@@ -3457,7 +3465,7 @@ function initThreeRuntime(){
       roads,scenicRoads,bridges,bridgeRails,roadEnds,
       paint:roadPaintGeometry||(roadPaintGeometry=buildRoadPaintGeometry()),
       crosswalks:(roadPaintGeometry||(roadPaintGeometry=buildRoadPaintGeometry())).crosswalks||roadPaintGeometry.crosswalkJunctions.flatMap(j=>junctionCrosswalkStripes({y:j.y,h:j.h},{x:j.x,w:j.w},j.approaches)),
-      buildings,trees,runways:PLANE_RUNWAYS,parks:parkZones,piers,props:solidProps,lights:streetLights,stops:transitStopSigns(),billboards,cranes
+      buildings,trees,runways:PLANE_RUNWAYS,helipads,parks:parkZones,piers,props:solidProps,lights:streetLights,stops:transitStopSigns(),billboards,cranes
     };
     threeRenderer=createLowtownThreeRenderer({canvas:threeCanvas,world,forceFullMaterials:localBridgeQA&&/(?:\?|&)fullMaterials=1(?:&|$)/.test(LOWTOWN_QUERY)});
     canvas.classList?.add('renderer-hidden');
@@ -3626,14 +3634,15 @@ function renderWorld() {
   roadPaint.surfaces.filter(r=>!r.logicalId&&!r.points).forEach(drawWetRoadSurface);
   (roadPaint.bridgePaths||[]).forEach((bridgePath,index)=>drawSmoothBridgeDeck(bridgePath,index));
   ctx.strokeStyle=PALETTE.curb;ctx.lineWidth=2;ctx.beginPath();
-  for(const edge of roadPaint.curbs.filter(edge=>!edge.bridge)){ctx.moveTo(edge.x1,edge.y1);ctx.lineTo(edge.x2,edge.y2);}ctx.stroke();
+  for(const edge of roadPaint.curbs.filter(edge=>!edge.bridge&&streetPaintVisible(edge.x1,edge.y1,edge.x2,edge.y2))){ctx.moveTo(edge.x1,edge.y1);ctx.lineTo(edge.x2,edge.y2);}ctx.stroke();
   ctx.strokeStyle=PALETTE.roadMarkingYellow;ctx.lineWidth=2.5;ctx.setLineDash([16,20]);
-  for(const lane of roadPaint.lanes.filter(lane=>!lane.bridge)){ctx.lineDashOffset=-lane.phase;ctx.beginPath();ctx.moveTo(lane.x1,lane.y1);ctx.lineTo(lane.x2,lane.y2);ctx.stroke();}
+  for(const lane of roadPaint.lanes.filter(lane=>!lane.bridge&&streetPaintVisible(lane.x1,lane.y1,lane.x2,lane.y2))){ctx.lineDashOffset=-lane.phase;ctx.beginPath();ctx.moveTo(lane.x1,lane.y1);ctx.lineTo(lane.x2,lane.y2);ctx.stroke();}
   ctx.setLineDash([]);ctx.lineDashOffset=0;
   drawRoadTerminals(ctx,roadEnds);drawTransitStops();
   ctx.fillStyle='rgba(220,216,197,.48)';
-  for(const stripe of crosswalks){ctx.save();ctx.translate(stripe.x+stripe.w/2,stripe.y+stripe.h/2);
-    ctx.rotate(stripe.angle||0);ctx.fillRect(-stripe.w/2,-stripe.h/2,stripe.w,stripe.h);ctx.restore();}
+  const canvasCrosswalks=roadPaint.crosswalks||roadPaint.crosswalkJunctions.flatMap(j=>junctionCrosswalkStripes({y:j.y,h:j.h},{x:j.x,w:j.w},j.approaches));
+  for(const stripe of canvasCrosswalks){if(!streetPaintVisible(stripe.x,stripe.y))continue;ctx.save();ctx.translate(stripe.x+stripe.w/2,stripe.y+stripe.h/2);
+    ctx.rotate(-(stripe.angle||0));ctx.fillRect(-stripe.w/2,-stripe.h/2,stripe.w,stripe.h);ctx.restore();}
   for(const j of roadPaint.signals){
     ctx.fillRect(j.x-39,j.y+7,3,j.h/2-14);ctx.fillRect(j.x+j.w+36,j.y+j.h/2+7,3,j.h/2-14);
     ctx.fillRect(j.x+j.w/2+7,j.y+j.h+36,j.w/2-14,3);ctx.fillRect(j.x+7,j.y-39,j.w/2-14,3);
