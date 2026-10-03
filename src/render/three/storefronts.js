@@ -39,7 +39,8 @@ export function createStorefronts(scene,{details,pools,roadReflection,lit}){
   let count=0;
   return {add(b,{height,x,z},index){
     const angle=({north:Math.PI,south:0,east:Math.PI/2,west:-Math.PI/2})[b.streetFacing]||0,sideways=b.streetFacing==='east'||b.streetFacing==='west',length=sideways?b.h:b.w;
-    const nx=Math.sin(angle),nz=Math.cos(angle),tx=Math.cos(angle),tz=-Math.sin(angle),neon=b.neon||'#ffac46';
+    const pawn=/pawn/i.test(b.sign||''),bar=/bar|tavern|club/i.test(b.sign||'');
+    const nx=Math.sin(angle),nz=Math.cos(angle),tx=Math.cos(angle),tz=-Math.sin(angle),neon=pawn?'#f6bd54':bar?'#ff4128':b.neon||'#ffac46';
     const facade=(offset=0,depth=0)=>({x:x+nx*((sideways?b.w:b.h)/2+.7+depth)+tx*offset,z:z+nz*((sideways?b.w:b.h)/2+.7+depth)+tz*offset});
     if(b.w>90&&b.h>60){
       const apron=facade(0,6);forecourts.add(apron.x,1.8,apron.z,length,1,12,'#736e61',angle);
@@ -58,7 +59,6 @@ export function createStorefronts(scene,{details,pools,roadReflection,lit}){
     if(b.sign){const sign=mountedSign(b.sign,Math.min(length*.78,210),neon),p=facade(0,1.3);sign.position.set(p.x,36,p.z);sign.rotation.y=angle;scene.add(sign);}
     // Secondary neon identifies small businesses without renaming civic sites,
     // missions, or saved locations. Pawn shops get the reference's vertical sign.
-    const pawn=/pawn/i.test(b.sign||''),bar=/bar|tavern|club/i.test(b.sign||'');
     if(height>=48&&(pawn||bar||(b.archetype==='shop'&&!b.civicType&&index%5===0))){
       const label=pawn?'LOANS':bar?'BAR':'OPEN',p=facade(length*.4,4),sign=mountedSign(label,9,pawn||bar?'#ff4228':'#ffc15a',true);
       sign.position.set(p.x,Math.min(height-12,60),p.z);sign.rotation.y=angle;scene.add(sign);
