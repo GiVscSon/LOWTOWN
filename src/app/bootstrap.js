@@ -502,6 +502,7 @@ export function installAppBootstrap(ctx) {
       };
     }
     ctx.state.lastFrameTime = ctx.env.performance.now();
+    ctx.startSimulationLoop();
     ctx.env.requestAnimationFrame(ctx.gameLoop);
   };
 }

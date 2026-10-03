@@ -14,6 +14,7 @@ export function installAppInput(ctx) {
     Object.keys(ctx.state.keys).forEach(key => ctx.state.keys[key] = false);
     ctx.env.document.querySelectorAll('.btn-drive').forEach(button => button.classList.remove('active'));
     ctx.accumulator = 0;
+    ctx.lastSimulationTime = ctx.env.performance.now();
     ctx.state.lastFrameTime = ctx.env.performance.now();
   };
   ctx.syncGamePause = function syncGamePause() {

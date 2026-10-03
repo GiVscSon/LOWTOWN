@@ -1,46 +1,55 @@
-// One shared runtime context owns state; this system has no hidden globals.
+// Simulation owns a fixed clock. A slow GPU or a render FPS cap must not
+// slow traffic, controls, weather or aircraft climbing.
 export function installRuntimeLoop(ctx){
-ctx.gameLoop = function gameLoop(now) {
-  if (ctx.qaManualSceneClock !== null) {
-    ctx.env.window.__lowtownLastFrame = ctx.env.performance.now();
-    ctx.env.requestAnimationFrame(ctx.gameLoop);
-    return;
-  }
-  const framePerfStart = ctx.perfEnabled ? ctx.env.performance.now() : 0;
-  const dt = ctx.env.Math.max(0, ctx.env.Math.min(0.1, (now - ctx.state.lastFrameTime) / 1000));
-  ctx.state.lastFrameTime = now;
-  if (ctx.isGamePaused()) ctx.accumulator = 0;else ctx.accumulator += dt;
-  const frameLimit = ctx.isGamePaused() || ctx.env.document.hidden ? 15 : ctx.threeRenderer?.graphics?.fps ?? 60;
-  const interval = frameLimit ? 1000 / frameLimit : 0;
-  if (now - ctx.lastGameRenderTime < interval - .5) {
-    ctx.env.requestAnimationFrame(ctx.gameLoop);
-    return;
-  }
-  ctx.lastGameRenderTime = interval && Number.isFinite(ctx.lastGameRenderTime) ? now - (now - ctx.lastGameRenderTime) % interval : now;
-  try {
-    const logicPerfStart = ctx.perfEnabled ? ctx.env.performance.now() : 0;
-    while (ctx.accumulator >= 1 / 60) {
-      ctx.driveLab?.beforeStep();
-      ctx.updatePhysics(1 / 60);
-      ctx.driveLab?.afterStep();
-      ctx.accumulator -= 1 / 60;
-    }
-    const logicPerfEnd = ctx.perfEnabled ? ctx.env.performance.now() : 0;
-    const renderPerfStart = ctx.perfEnabled ? ctx.env.performance.now() : 0;
-    ctx.renderWorld();
-    const renderPerfEnd = ctx.perfEnabled ? ctx.env.performance.now() : 0;
-    ctx.driveLab?.afterFrame();
-    ctx.env.window.__lowtownLastFrame = ctx.env.performance.now();
-    if (ctx.perfEnabled) {
-      ctx.pushPerfSample(ctx.perfSamples.logic, logicPerfEnd - logicPerfStart);
-      ctx.pushPerfSample(ctx.perfSamples.render, renderPerfEnd - renderPerfStart);
-      ctx.pushPerfSample(ctx.perfSamples.frame, ctx.env.performance.now() - framePerfStart);
-    }
-  } catch (error) {
+  function fail(error){
+    ctx.simulationFailed=true;
     ctx.env.window.__lowtownFail?.(error.message);
     ctx.driveLab?.fail(error.message);
-    return;
   }
-  ctx.env.requestAnimationFrame(ctx.gameLoop);
-};
+  ctx.advanceSimulation=function advanceSimulation(now){
+    if(ctx.qaManualSceneClock!==null||ctx.simulationFailed)return;
+    // Retain delayed ticks instead of making the world run in slow motion.
+    // Bound a suspended process to five seconds and work to one second per
+    // callback; any remaining backlog continues on the next timer tick.
+    const dt=Math.max(0,Math.min(5,(now-ctx.lastSimulationTime)/1000));
+    ctx.lastSimulationTime=now;
+    if(ctx.isGamePaused()||ctx.env.document.hidden){ctx.accumulator=0;return;}
+    ctx.accumulator=Math.min(5,ctx.accumulator+dt);
+    const start=ctx.perfEnabled?ctx.env.performance.now():0;
+    try{
+      let steps=0;
+      while(ctx.accumulator+1e-9>=1/60&&steps++<60){
+        ctx.driveLab?.beforeStep();ctx.updatePhysics(1/60);ctx.driveLab?.afterStep();
+        ctx.accumulator=Math.max(0,ctx.accumulator-1/60);
+      }
+      if(ctx.perfEnabled)ctx.pushPerfSample(ctx.perfSamples.logic,ctx.env.performance.now()-start);
+    }catch(error){fail(error);}
+  };
+  ctx.startSimulationLoop=function startSimulationLoop(){
+    if(ctx.simulationTimer!==undefined)return;
+    ctx.lastSimulationTime=ctx.env.performance.now();
+    ctx.simulationTimer=ctx.env.setInterval(()=>ctx.advanceSimulation(ctx.env.performance.now()),1000/60);
+  };
+  ctx.gameLoop=function gameLoop(now){
+    if(ctx.simulationFailed)return;
+    ctx.state.lastFrameTime=now;
+    if(ctx.qaManualSceneClock!==null){
+      ctx.env.window.__lowtownLastFrame=ctx.env.performance.now();
+      ctx.env.requestAnimationFrame(ctx.gameLoop);return;
+    }
+    const frameLimit=ctx.isGamePaused()||ctx.env.document.hidden?15:ctx.threeRenderer?.graphics?.fps??60;
+    const interval=frameLimit?1000/frameLimit:0;
+    if(now-ctx.lastGameRenderTime<interval-.5){ctx.env.requestAnimationFrame(ctx.gameLoop);return;}
+    ctx.lastGameRenderTime=interval&&Number.isFinite(ctx.lastGameRenderTime)?now-(now-ctx.lastGameRenderTime)%interval:now;
+    const start=ctx.perfEnabled?ctx.env.performance.now():0;
+    try{
+      ctx.renderWorld();ctx.driveLab?.afterFrame();
+      ctx.env.window.__lowtownLastFrame=ctx.env.performance.now();
+      if(ctx.perfEnabled){
+        const cost=ctx.env.performance.now()-start;
+        ctx.pushPerfSample(ctx.perfSamples.render,cost);ctx.pushPerfSample(ctx.perfSamples.frame,cost);
+      }
+    }catch(error){fail(error);return;}
+    ctx.env.requestAnimationFrame(ctx.gameLoop);
+  };
 }

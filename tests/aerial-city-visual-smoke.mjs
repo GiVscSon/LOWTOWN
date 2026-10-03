@@ -79,7 +79,7 @@ async function turnRight() {
 
 try {
   await waitForPreview();
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({ headless: true,executablePath:process.env.LOWTOWN_CHROMIUM||undefined });
   page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1 });
   page.on('pageerror', error => errors.push(`pageerror: ${error.message}`));
   page.on('console', message => {
@@ -118,11 +118,11 @@ try {
 
   await page.locator('#threeCanvas').click({ position: { x: 500, y: 450 } });
   await page.keyboard.press('e');
-  await page.waitForFunction(() => document.querySelector('#toastMsg')?.textContent?.includes('Пешком'), null, { timeout: 5000 });
+  // A software GPU can present the next frame after a short toast expires.
+  // Check the persistent world state while still using real keyboard input.
+  await page.waitForFunction(() => window.__lowtownCityQA.snapshot().player.mode==='foot', null, { timeout: 5000 });
   await page.keyboard.press('e');
-  await page.waitForTimeout(150);
-  const boardingToast = await page.locator('#toastMsg').textContent().catch(() => '');
-  assert(boardingToast.includes('Вертолёт'), `could not board the nearby helicopter: ${boardingToast || 'no boarding message'}`);
+  await page.waitForFunction(() => window.__lowtownCityQA.snapshot().player.mode==='helicopter', null, { timeout: 5000 });
   await page.waitForFunction(() => /\d+ м/.test(document.querySelector('#hudGear')?.textContent || ''), null, { timeout: 5000 });
   await page.keyboard.press('q');
   await hold('w');

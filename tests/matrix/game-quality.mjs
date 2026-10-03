@@ -1,3 +1,4 @@
+import './simulation-clock.mjs';
 import assert from 'node:assert/strict';
 import {mkdirSync,writeFileSync} from 'node:fs';
 import {runtimeCity} from '../helpers/runtime-city.mjs';
