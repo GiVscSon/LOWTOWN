@@ -1,6 +1,6 @@
-import { createAIScoreModel } from '../src/game/ai_score_model.js';
-import { createAIManeuverPlanner, choosePassingSide } from '../src/game/ai_maneuver_planner.js';
-import { createAIWorldModel } from '../src/game/ai_world_model.js';
+import { createAIScoreModel } from '../src/labs/legacy/ai_score_model.js';
+import { createAIManeuverPlanner, choosePassingSide } from '../src/labs/legacy/ai_maneuver_planner.js';
+import { createAIWorldModel } from '../src/labs/legacy/ai_world_model.js';
 
 const model=createAIScoreModel();
 const before=model.status().weights.safety;

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { destinationPoint } from '../src/game/city_semantics.js';
+import { destinationPoint } from '../src/labs/legacy/city_semantics.js';
 
 const RUN_MS=30000;
 const server=spawn('npx',['vite','--host','127.0.0.1','--port','4173'],{stdio:'inherit',shell:true});

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createPlayerCharacter, PLAYER_MODES } from '../src/game/character_physics.js';
+import { createPlayerCharacter, PLAYER_MODES } from '../src/labs/legacy/character_physics.js';
 
 const car = { x: 100, y: 100, a: 0 };
 const player = createPlayerCharacter({ x: 100, y: 100, heading: 0 });

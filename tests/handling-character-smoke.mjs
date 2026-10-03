@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { createVehicleState } from '../src/game/vehicle_state.js';
-import { resolveTransportPhysics, listTransportProfiles } from '../src/game/transport_profiles.js';
-import { stepCarPhysics } from '../src/game/car_physics.js';
+import { createVehicleState } from '../src/labs/legacy/vehicle_state.js';
+import { resolveTransportPhysics, listTransportProfiles } from '../src/labs/legacy/transport_profiles.js';
+import { stepCarPhysics } from '../src/labs/legacy/car_physics.js';
 
 const cars=listTransportProfiles('CAR');
 assert(cars.length>=6,'LOWTOWN must expose the core car roster');

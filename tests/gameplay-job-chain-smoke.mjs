@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createMissionSystem } from '../src/game/missions.js';
+import { createMissionSystem } from '../src/labs/legacy/missions.js';
 
 const world={mission:{x:0,y:0,radius:70}};
 const mission=createMissionSystem(world);

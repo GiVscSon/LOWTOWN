@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-import { createExplorationMemory } from '../src/game/exploration_memory.js';
-import { createDestinationManager } from '../src/game/destination_manager.js';
-import { createRouteDiversity } from '../src/game/route_diversity.js';
-import { createExperimentHistory } from '../src/game/experiment_history.js';
+import { createExplorationMemory } from '../src/labs/legacy/exploration_memory.js';
+import { createDestinationManager } from '../src/labs/legacy/destination_manager.js';
+import { createRouteDiversity } from '../src/labs/legacy/route_diversity.js';
+import { createExperimentHistory } from '../src/labs/legacy/experiment_history.js';
 
 const nodes = Array.from({ length: 8 }, (_, i) => ({
   id: i,

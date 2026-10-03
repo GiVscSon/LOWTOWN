@@ -63,7 +63,7 @@ try{
   await page.screenshot({path:`${directory}/mobile-street.png`});
   report.stats=await page.evaluate(()=>window.__lowtownThreeStats);
   assert.equal(report.stats.contextLost,false);assert(report.stats.triangles<220000,'nearby static geometry should be culled by district');
-  assert.equal(report.stats.lowCostMaterials,report.stats.software);
+  assert.equal(report.stats.lowCostMaterials,report.stats.graphics.lighting==='simple');
   // CI has a software GPU; exercise the hardware/PBR shader path as well.
   await page.goto(origin+'?cityQA=1&fullMaterials=1',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>window.__lowtownThreeStats?.frames>=5,null,{timeout:30000});

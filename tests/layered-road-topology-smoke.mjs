@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { buildLayeredRoadTopology, layeredRoadSegments, nearestLayeredRoadPoint, ROAD_LEVELS } from '../src/game/road_topology.js';
-import { CITY_ROADS, buildCityGraph } from '../src/game/city_semantics.js';
+import { buildLayeredRoadTopology, layeredRoadSegments, nearestLayeredRoadPoint, ROAD_LEVELS } from '../src/labs/legacy/road_topology.js';
+import { CITY_ROADS, buildCityGraph } from '../src/labs/legacy/city_semantics.js';
 
 const nodes=buildLayeredRoadTopology();
 const lines=layeredRoadSegments(nodes);

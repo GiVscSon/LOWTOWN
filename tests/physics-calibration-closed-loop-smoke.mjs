@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { calibrateSamples, applyPhysicsCalibration } from '../src/game/physics_calibration.js';
+import { calibrateSamples, applyPhysicsCalibration } from '../src/labs/legacy/physics_calibration.js';
 
 const samples=[];
 for(let i=0;i<60;i++)samples.push({vehicleId:'sedan',accelerationError:4+(i%3)*.1,steeringError:.5+(i%2)*.02});

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { generateScenarios } from '../src/game/scenario_generator.js';
-import { runScenarioBatch, scoreBlackBox } from '../src/game/scenario_feedback.js';
+import { generateScenarios } from '../src/labs/legacy/scenario_generator.js';
+import { runScenarioBatch, scoreBlackBox } from '../src/labs/legacy/scenario_feedback.js';
 
 function syntheticReport(i){
   const hard=i%17===0?7:0;

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { advanceRouteActor, createRoadGraph, planStopRoute } from '../src/game/street_network.js';
+import { advanceRouteActor, createRoadGraph, planStopRoute } from '../src/world/street_network.js';
 
 const roads=[
   {x:0,y:0,w:100,h:20,dir:'h'}, {x:80,y:0,w:20,h:100,dir:'v'},

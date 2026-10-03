@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import {mkdirSync,writeFileSync} from 'node:fs';
-import {streetSurfaceGeometry} from '../src/game/street_surface.js';
-import {createVehicleMesh,projectedVehicleFaces,drawStreetVehicle} from '../src/game/street_vehicle.js';
-import {onStreetCollection} from '../src/game/street_corridors.js';
+import {streetSurfaceGeometry} from '../src/world/street_surface.js';
+import {createVehicleMesh,projectedVehicleFaces,drawStreetVehicle} from '../src/render/shared/street_vehicle.js';
+import {onStreetCollection} from '../src/world/street_corridors.js';
 import {runtimeCity} from './helpers/runtime-city.mjs';
 const contains=(surfaces,x,y)=>onStreetCollection(x,y,surfaces);
 function audit(paint){

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createAIDriver } from '../src/game/ai_driver.js';
+import { createAIDriver } from '../src/labs/legacy/ai_driver.js';
 
 const n0 = { id: 'A', x: 0, y: 0, links: [] };
 const n1 = { id: 'B', x: 100, y: 0, links: [] };

@@ -20,6 +20,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - name: Runtime, terrain, contact and graphics matrix
+        run: npm run test:quality-matrix
       - name: Three.js and PWA contract
         run: npm run test:three-pwa-contract
       - name: Supported streets, walking contacts and camera presets

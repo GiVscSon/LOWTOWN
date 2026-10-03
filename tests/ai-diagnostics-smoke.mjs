@@ -1,4 +1,4 @@
-import { createAIDiagnostics } from '../src/game/ai_diagnostics.js';
+import { createAIDiagnostics } from '../src/labs/legacy/ai_diagnostics.js';
 
 const d = createAIDiagnostics();
 d.inspect({

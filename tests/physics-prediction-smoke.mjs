@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { createTransportController } from '../src/game/transport_controller.js';
-import { predictVehicle } from '../src/game/physics_prediction.js';
+import { createTransportController } from '../src/labs/legacy/transport_controller.js';
+import { predictVehicle } from '../src/labs/legacy/physics_prediction.js';
 
 for(const vehicleId of ['sedan','coupe','truck','police']){
   const transport=createTransportController(vehicleId,{x:0,y:0,a:0,vx:0,vy:0});

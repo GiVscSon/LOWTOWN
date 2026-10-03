@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 const URL = process.env.LOWTOWN_PAGES_URL || 'http://127.0.0.1:4173/';
 const EXPECTED_TITLE = 'LOWTOWN — приватный тест-драйв';
 const errors = [];
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true,executablePath:process.env.LOWTOWN_CHROMIUM||undefined });
 
 try {
   const page = await browser.newPage({ viewport: { width: 1365, height: 768 } });

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { buildRoadNetwork, roadSegments, snapToRoad, ROAD_WIDTH } from '../src/game/road_authority.js';
-import { isLand } from '../src/game/islands.js';
-import { vehicleWorldBlocked, nearestRoadDistanceForVehicle } from '../src/game/vehicle_collision.js';
+import { buildRoadNetwork, roadSegments, snapToRoad, ROAD_WIDTH } from '../src/labs/legacy/road_authority.js';
+import { isLand } from '../src/labs/legacy/islands.js';
+import { vehicleWorldBlocked, nearestRoadDistanceForVehicle } from '../src/labs/legacy/vehicle_collision.js';
 
 const nodes=buildRoadNetwork();
 const lines=roadSegments(nodes);

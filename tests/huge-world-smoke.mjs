@@ -1,20 +1,23 @@
-import * as authoredWorld from '../src/game/authored_archipelago.js';
-import { PLANE_RUNWAYS as LEGACY_RUNWAYS } from '../src/game/free_roam.js';
-import * as streetNetwork from '../src/game/street_network.js';
+import {attachRuntime} from './helpers/runtime-vm.mjs';
+import {createWalkSurface} from '../src/world/walk_surface.js';
+import {createSceneryIndex} from '../src/simulation/solid_contacts.js';
+import * as authoredWorld from '../src/world/archipelago.js';
+import { PLANE_RUNWAYS as LEGACY_RUNWAYS } from '../src/simulation/free_roam.js';
+import * as streetNetwork from '../src/world/street_network.js';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import { pointInCoast, pointInBeach, coastPoints, BEACH_WIDTH } from '../src/game/coastline.js';
-import * as ocean from '../src/game/ocean_chunks.js';
-import * as surfaces from '../src/game/surface_physics.js';
-import * as incidents from '../src/game/city_incidents.js';
+import { pointInCoast, pointInBeach, coastPoints, BEACH_WIDTH } from '../src/world/coastline.js';
+import * as ocean from '../src/world/ocean_chunks.js';
+import * as surfaces from '../src/simulation/surfaces.js';
+import * as incidents from '../src/simulation/incidents.js';
 
 const noop=()=>{};
 const element={style:{},classList:{add:noop,remove:noop},appendChild:noop,addEventListener:noop,getContext:()=>({}),remove:noop};
 const sandbox={...authoredWorld,LEGACY_RUNWAYS,...streetNetwork,...ocean,...surfaces,...incidents,console,Math,performance:{now:()=>0},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,pointInCoast,pointInBeach,coastPoints,BEACH_WIDTH};
 vm.createContext(sandbox);
-const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
-vm.runInContext(source+`
+Object.assign(sandbox,{createWalkSurface,createSceneryIndex});
+attachRuntime(sandbox,{legacyStreets:true});
+vm.runInContext(`
 initTopology();
 const overlap=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
 const motor=bridges.filter(b=>!b.footway);

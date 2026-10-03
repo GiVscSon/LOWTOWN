@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { runtimeCity } from './helpers/runtime-city.mjs';
-import { roadPath } from '../src/game/street_network.js';
-import { createFreeRoam } from '../src/game/free_roam.js';
-import { chassis, contact } from '../src/game/solid_contacts.js';
+import { roadPath } from '../src/world/street_network.js';
+import { createFreeRoam } from '../src/simulation/free_roam.js';
+import { chassis, contact } from '../src/simulation/solid_contacts.js';
 
 const graph=[{x:0,y:0,edges:new Set([1,2])},{x:100,y:100,edges:new Set([0,3])},
   {x:5,y:0,edges:new Set([0,3])},{x:10,y:0,edges:new Set([1,2])}];

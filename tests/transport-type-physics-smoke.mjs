@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { TRANSPORT_TYPES } from '../src/game/transport_physics.js';
-import { getTypePhysics, normalizeTypeInput, typeTelemetry } from '../src/game/transport_type_physics.js';
+import { TRANSPORT_TYPES } from '../src/labs/legacy/transport_physics.js';
+import { getTypePhysics, normalizeTypeInput, typeTelemetry } from '../src/labs/legacy/transport_type_physics.js';
 
 const car=getTypePhysics(TRANSPORT_TYPES.CAR);
 const boat=getTypePhysics(TRANSPORT_TYPES.BOAT);

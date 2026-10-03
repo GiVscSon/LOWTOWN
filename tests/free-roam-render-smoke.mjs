@@ -1,19 +1,21 @@
-import * as authoredWorld from '../src/game/authored_archipelago.js';
-import { PLANE_RUNWAYS as LEGACY_RUNWAYS } from '../src/game/free_roam.js';
-import * as emergencyPassing from '../src/game/emergency_passing.js';
-import * as streetNetwork from '../src/game/street_network.js';
+import {attachRuntime} from './helpers/runtime-vm.mjs';
+import {createWalkSurface} from '../src/world/walk_surface.js';
+import {createSceneryIndex} from '../src/simulation/solid_contacts.js';
+import * as authoredWorld from '../src/world/archipelago.js';
+import { PLANE_RUNWAYS as LEGACY_RUNWAYS } from '../src/simulation/free_roam.js';
+import * as emergencyPassing from '../src/simulation/emergency_passing.js';
+import * as streetNetwork from '../src/world/street_network.js';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import * as core from '../src/game/test_drive_core.js';
-import * as contacts from '../src/game/solid_contacts.js';
-import * as coast from '../src/game/coastline.js';
-import * as roamModule from '../src/game/free_roam.js';
-import * as architecture from '../src/game/architecture.js';
-import * as trafficTurns from '../src/game/traffic_turns.js';
-import * as ocean from '../src/game/ocean_chunks.js';
-import * as surfaces from '../src/game/surface_physics.js';
-import * as incidents from '../src/game/city_incidents.js';
+import * as core from '../src/simulation/vehicle_dynamics.js';
+import * as contacts from '../src/simulation/solid_contacts.js';
+import * as coast from '../src/world/coastline.js';
+import * as roamModule from '../src/simulation/free_roam.js';
+import * as architecture from '../src/render/canvas/architecture.js';
+import * as trafficTurns from '../src/simulation/traffic_turns.js';
+import * as ocean from '../src/world/ocean_chunks.js';
+import * as surfaces from '../src/simulation/surfaces.js';
+import * as incidents from '../src/simulation/incidents.js';
 let depth=0,draws=0;const mapLabels=[];
 const noop=()=>{};
 const context=new Proxy({save(){depth++;},restore(){depth--;assert(depth>=0);},fillText(value){mapLabels.push(String(value));},createRadialGradient(){return {addColorStop:noop};},createLinearGradient(){return {addColorStop:noop};}}, {get(target,key){return key in target?target[key]:(...args)=>{for(const arg of args)if(typeof arg==='number')assert(Number.isFinite(arg),`Non-finite ${key}`);draws++;};},set(target,key,value){target[key]=value;return true;}});
@@ -21,8 +23,9 @@ const element=()=>({width:900,height:700,style:{},classList:{add:noop,remove:noo
 const sandbox={...authoredWorld,LEGACY_RUNWAYS,...emergencyPassing,...streetNetwork,...ocean,...surfaces,...incidents,assert,console,Math,mapLabels,depth,draws,performance:{now:()=>100},document:{readyState:'loading',getElementById:element,createElement:element,querySelectorAll:()=>[],addEventListener:noop},window:{innerWidth:1100,innerHeight:800,addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,...core,...contacts,...coast,...roamModule,...architecture,...trafficTurns};
 Object.defineProperties(sandbox,{depth:{get:()=>depth},draws:{get:()=>draws}});
 vm.createContext(sandbox);
-const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
-vm.runInContext(source+`\ninitTopology();
+Object.assign(sandbox,{createWalkSurface,createSceneryIndex});
+attachRuntime(sandbox,{legacyStreets:true});
+vm.runInContext(`\ninitTopology();
 const expectedFacilityTypes={
   'EASTGATE FIRE & RESCUE':'firestation','NORTHSIDE CLINIC':'hospital',
   'CINDER FIRE STATION':'firestation','KINGSWAY AIRFIELD':'airfield','SKYFREIGHT 90':'airfield',

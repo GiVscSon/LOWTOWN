@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { acceptCalibration } from '../src/game/calibration_acceptance.js';
+import { acceptCalibration } from '../src/labs/legacy/calibration_acceptance.js';
 
 const before=[];const after=[];
 for(let i=0;i<40;i++){

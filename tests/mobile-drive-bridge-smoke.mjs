@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {createMobileDriveBridge} from '../src/game/mobile_drive_bridge.js';
+import {createMobileDriveBridge} from '../src/labs/legacy/mobile_drive_bridge.js';
 let ai=false,reset=false;
 const bridge=createMobileDriveBridge({onAIToggle:()=>{ai=!ai;return ai;},onReset:()=>{reset=true;}});
 bridge.setInput({throttle:1,steer:-.7,brake:0});

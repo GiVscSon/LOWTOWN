@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createGameplayLoop, GAMEPLAY_PHASES } from '../src/game/gameplay_loop.js';
+import { createGameplayLoop, GAMEPLAY_PHASES } from '../src/labs/legacy/gameplay_loop.js';
 let activeEvent=null,missionStage=0;
 const mission={state:()=>({id:'DROP',reward:250,started:missionStage>0,complete:false,target:{x:100,y:0},route:['A','B']}),update:p=>{if(p.x>=100&&missionStage===0){missionStage=2;return true}return false},next:()=>{missionStage=0},reset:()=>{missionStage=0}};
 const loop=createGameplayLoop({missions:mission,events:{state:()=>activeEvent},traffic:{cars:[1,2]},people:{people:[1,2,3]},player:{state:{x:0,y:0}}});

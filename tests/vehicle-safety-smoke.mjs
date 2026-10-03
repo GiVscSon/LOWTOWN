@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { stoppingDistance, safeFollowingGap, collisionSafety, actuatorStep, applyActuatorDelay } from '../src/game/vehicle_safety.js';
+import { stoppingDistance, safeFollowingGap, collisionSafety, actuatorStep, applyActuatorDelay } from '../src/labs/legacy/vehicle_safety.js';
 
 assert(Math.abs(stoppingDistance(20,10,.5)-30)<1e-9);
 assert(stoppingDistance(30,10,.5)>stoppingDistance(20,10,.5));

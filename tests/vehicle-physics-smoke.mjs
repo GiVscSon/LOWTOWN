@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createVehicleState, vehicleStep, vehicleSpeed, VEHICLE_PHYSICS } from '../src/game/vehicle_physics.js';
+import { createVehicleState, vehicleStep, vehicleSpeed, VEHICLE_PHYSICS } from '../src/labs/legacy/vehicle_physics.js';
 
 const car=createVehicleState();
 vehicleStep(car,1,{throttle:1});

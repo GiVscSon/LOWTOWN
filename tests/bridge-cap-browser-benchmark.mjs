@@ -9,7 +9,7 @@ const WARMUP_MS=1200;
 const SAMPLE_FRAMES=40;
 const ORDER=['round','butt','butt','round'];
 const server=spawn('npx',['vite','--host','127.0.0.1','--port',PORT],{stdio:'inherit',shell:true});
-const browser=await chromium.launch({headless:true});
+const browser=await chromium.launch({headless:true,executablePath:process.env.LOWTOWN_CHROMIUM||undefined});
 mkdirSync('test-results',{recursive:true});
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-import { createAIDriver } from '../src/game/ai_driver.js';
-import { createTransportController } from '../src/game/transport_controller.js';
-import { TRANSPORT_TYPES } from '../src/game/transport_constants.js';
-import { resolveTransportPhysics } from '../src/game/transport_profiles.js';
+import { createAIDriver } from '../src/labs/legacy/ai_driver.js';
+import { createTransportController } from '../src/labs/legacy/transport_controller.js';
+import { TRANSPORT_TYPES } from '../src/labs/legacy/transport_constants.js';
+import { resolveTransportPhysics } from '../src/labs/legacy/transport_profiles.js';
 
 const GRID=160;
 const nodes=[];

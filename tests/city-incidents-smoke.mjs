@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createCityIncidentDirector, updateCrowdReactions } from '../src/game/city_incidents.js';
+import { createCityIncidentDirector, updateCrowdReactions } from '../src/simulation/incidents.js';
 
 const people = [
   { id: 1, x: 10, y: 0 },

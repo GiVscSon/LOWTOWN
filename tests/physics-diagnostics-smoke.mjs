@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createPhysicsDiagnostics, diagnosePhysicsSample } from '../src/game/physics_diagnostics.js';
+import { createPhysicsDiagnostics, diagnosePhysicsSample } from '../src/labs/legacy/physics_diagnostics.js';
 
 const physics={mass:1500,engineForce:450,brakeForce:780,steeringRate:1.9,maxForwardSpeed:435};
 const box=createPhysicsDiagnostics();

@@ -11,7 +11,7 @@ try{
  page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
  await page.goto(origin+'tests/fixtures/refined-transport.html');await page.waitForFunction(()=>window.gallery);
  for(const type of ['taxi','coupe','police','wagon','van','bus','truck','bike','armoredPolice','nationalGuard','fireEngine','ambulance','plane','helicopter','speedboat','tug']){
-  for(const angle of [0,Math.PI/2,Math.PI,Math.PI*1.5]){const stats=await page.evaluate(({type,angle})=>window.gallery(type,angle),{type,angle});assert(stats.triangles<1900);assert(stats.calls<=5);report.models[type]=stats;}
+  for(const angle of [0,Math.PI/2,Math.PI,Math.PI*1.5]){const stats=await page.evaluate(({type,angle})=>window.gallery(type,angle),{type,angle});assert(stats.triangles<1900);assert(stats.calls<=(['plane','helicopter','speedboat','tug'].includes(type)?5:12),'animated wheels and hinged doors exceeded the draw budget');report.models[type]=stats;}
   await page.evaluate(type=>window.gallery(type,0),type);await page.screenshot({path:`${directory}/model-${type}.png`});
  }
  report.apartment=await page.evaluate(()=>window.apartment());assert(report.apartment.triangles<5000);await page.screenshot({path:`${directory}/apartment.png`});

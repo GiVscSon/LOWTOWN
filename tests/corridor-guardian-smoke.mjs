@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createCorridorGuardian } from '../src/game/corridor_guardian.js';
+import { createCorridorGuardian } from '../src/labs/legacy/corridor_guardian.js';
 const g=createCorridorGuardian();
 const normal=g.apply({steer:.2,throttle:1,brake:0},{crossTrack:30});
 assert.equal(normal.steer,.2);

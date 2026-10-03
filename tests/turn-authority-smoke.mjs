@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createTrajectoryLab } from '../src/game/trajectory_lab.js';
+import { createTrajectoryLab } from '../src/labs/legacy/trajectory_lab.js';
 
 const simulate = (car, horizon, steer, throttle, brake) => ({
   safe: true,

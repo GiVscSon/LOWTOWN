@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { buildCityGraph } from '../src/game/city_semantics.js';
-import { buildJunctionGraph, proximityOnlyEdges } from '../src/game/city_graph_junctions.js';
+import { buildCityGraph } from '../src/labs/legacy/city_semantics.js';
+import { buildJunctionGraph, proximityOnlyEdges } from '../src/labs/legacy/city_graph_junctions.js';
 
 const explicit = buildJunctionGraph();
 const legacy = buildCityGraph();

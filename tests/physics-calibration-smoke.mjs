@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildPhysicsErrorProfile, applyPhysicsCalibration, mergeCalibrationProfiles } from '../src/game/physics_calibration.js';
+import { buildPhysicsErrorProfile, applyPhysicsCalibration, mergeCalibrationProfiles } from '../src/labs/legacy/physics_calibration.js';
 
 const report={vehicles:{sedan:{samples:120,meanAccelerationError:3.2,meanSteeringError:.4,speedLimitViolations:0},truck:{samples:240,meanAccelerationError:-6,meanSteeringError:-1.2,speedLimitViolations:2}}};
 const profile=buildPhysicsErrorProfile(report);

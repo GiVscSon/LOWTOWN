@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {mkdirSync,writeFileSync} from 'node:fs';
 import {runtimeCity} from './helpers/runtime-city.mjs';
-import {roadPath,nextWalkingGoal} from '../src/game/street_network.js';
+import {roadPath,nextWalkingGoal} from '../src/world/street_network.js';
 
 mkdirSync('artifacts/movement',{recursive:true});
 
@@ -18,7 +18,7 @@ assert.equal(walker.routeDirection,1);nextWalkingGoal(walker);assert(walker.paus
 const crowd=runtimeCity(19);
 const people=JSON.parse(crowd.run(`{
   roads.length=0;bridges.length=0;buildings.length=0;trees.length=0;solidProps.length=0;
-  trafficCars.length=0;parkedCars.length=0;pedestrians.length=0;isPositionOnSolidGround=()=>true;
+  trafficCars.length=0;parkedCars.length=0;pedestrians.length=0;isPositionOnSolidGround=()=>true;getWalkSurface=()=>()=>true;
   Object.assign(player,{x:10000,y:10000,speed:0});
   const route={points:Array.from({length:101},(_,i)=>({x:i*8,y:0})),kind:'sidewalk',loop:false};
   const p={x:80,y:0,route,routeIndex:10,routeDirection:-1,reaction:'calm',pause:0,activityTimer:999,socialCooldown:999};

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createCityDirector } from '../src/game/city_director.js';
+import { createCityDirector } from '../src/labs/legacy/city_director.js';
 const nodes=[];
 for(let y=0;y<6;y++) for(let x=0;x<6;x++) nodes.push({id:`${x}:${y}`,x:x*160,y:y*160,links:[]});
 for(const n of nodes){const [x,y]=n.id.split(':').map(Number);for(const m of nodes){const [mx,my]=m.id.split(':').map(Number);if(Math.abs(mx-x)+Math.abs(my-y)===1)n.links.push(m);}}

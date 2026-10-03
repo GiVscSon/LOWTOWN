@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildWorldGeometryDiagnostic } from '../src/game/world_geometry_diagnostics.js';
+import { buildWorldGeometryDiagnostic } from '../src/labs/legacy/world_geometry_diagnostics.js';
 
 const report = buildWorldGeometryDiagnostic();
 assert.ok(report.counts.roads > 0, 'diagnostic must inspect city roads');

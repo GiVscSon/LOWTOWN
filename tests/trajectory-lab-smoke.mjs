@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createTrajectoryLab } from '../src/game/trajectory_lab.js';
+import { createTrajectoryLab } from '../src/labs/legacy/trajectory_lab.js';
 
 const wrap = a => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
 const simulate = (car, horizon, steer, throttle, brake) => {

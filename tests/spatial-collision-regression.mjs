@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import {createSpatialIndex} from '../src/game/spatial_index.js';
-import {solveVehicleMotion,captureMotion,contact,chassis} from '../src/game/solid_contacts.js';
+import {createSpatialIndex} from '../src/simulation/spatial_index.js';
+import {solveVehicleMotion,captureMotion,contact,chassis} from '../src/simulation/solid_contacts.js';
 
 // Compare broad-phase candidates with an independent exhaustive overlap search,
 // including negative cells, touching edges and very long narrow bridge rails.

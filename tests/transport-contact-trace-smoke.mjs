@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { createTransportController } from '../src/game/transport_controller.js';
-import { createAIDriver } from '../src/game/ai_driver.js';
+import { createTransportController } from '../src/labs/legacy/transport_controller.js';
+import { createAIDriver } from '../src/labs/legacy/ai_driver.js';
 
 function directTruck(){
   const t=createTransportController('truck',{x:0,y:0,a:0});

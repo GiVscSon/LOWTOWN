@@ -6,11 +6,11 @@ import {
   destinationPoint,
   shortestRoute,
   roadById
-} from '../src/game/city_semantics.js';
-import { BRIDGES, isLand } from '../src/game/islands.js';
-import { WORLD } from '../src/game/world.js';
-import { buildRoadNetwork, roadSegments as authorityRoadSegments } from '../src/game/road_authority.js';
-import { vehicleWorldBlocked } from '../src/game/vehicle_collision.js';
+} from '../src/labs/legacy/city_semantics.js';
+import { BRIDGES, isLand } from '../src/labs/legacy/islands.js';
+import { WORLD } from '../src/labs/legacy/world.js';
+import { buildRoadNetwork, roadSegments as authorityRoadSegments } from '../src/labs/legacy/road_authority.js';
+import { vehicleWorldBlocked } from '../src/labs/legacy/vehicle_collision.js';
 import {
   roadSegments,
   allRoadSegments,
@@ -25,7 +25,7 @@ import {
   sidewalkOffset as geometrySidewalkOffset,
   buildGeometryAuthority,
   buildingIntersectsRoad
-} from '../src/game/road_geometry.js';
+} from '../src/labs/legacy/road_geometry.js';
 
 const EPS = 0.001;
 const origin = { x: -120, y: 0 };

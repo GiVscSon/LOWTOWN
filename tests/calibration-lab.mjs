@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { calibrateSamples } from '../src/game/physics_calibration.js';
+import { calibrateSamples } from '../src/labs/legacy/physics_calibration.js';
 
 const VEHICLES=['sedan','coupe','truck','police'];
 const scenarios=['STRAIGHT_ACCEL','BRAKING','CORNER_90','SHARP_TURN','OBSTACLE','SLOW_TRAFFIC','ONCOMING','OVERTAKE','EMERGENCY_BRAKE','RECOVERY','STUCK','HIGH_SPEED','SERIES_OF_TURNS','COLLISION_MARGIN','MULTI_TRAFFIC','LONG_RUN','BRAKE_TURN','LANE_RESTORE','PREDICTION','STOPPING'];

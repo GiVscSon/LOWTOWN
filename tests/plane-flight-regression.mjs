@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createFreeRoam, isPlaneRunway } from '../src/game/free_roam.js';
+import { createFreeRoam, isPlaneRunway } from '../src/simulation/free_roam.js';
 
 const notices=[];
 const player={x:0,y:0,angle:0,speed:0,width:48,height:24,hp:100};

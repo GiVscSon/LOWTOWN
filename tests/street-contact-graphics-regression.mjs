@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import {captureMotion,solveVehicleMotion,contact} from '../src/game/solid_contacts.js';
+import {captureMotion,solveVehicleMotion,contact} from '../src/simulation/solid_contacts.js';
 import {runtimeCity} from './helpers/runtime-city.mjs';
-import {ribbonGeometry,createBoxBatch} from '../src/three/geometry.js';
-import {CAMERA_PRESETS,cameraFraming} from '../src/three/camera.js';
-import {landVehicleGeometry} from '../src/three/vehicles.js';
+import {ribbonGeometry,createBoxBatch} from '../src/render/three/geometry.js';
+import {CAMERA_PRESETS,cameraFraming} from '../src/render/three/camera.js';
+import {landVehicleGeometry} from '../src/render/three/vehicles.js';
 
 // Sweep a walking player through a stationary resident, including a long
 // frame and sustained input. Neither may swap sides or trigger car injuries.

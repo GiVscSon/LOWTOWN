@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import {landVehicleGeometry,createTransportVisual} from '../src/three/vehicles.js';
-import {roundedBridgePoints,ribbonGeometry} from '../src/three/geometry.js';
+import {landVehicleGeometry,createTransportVisual} from '../src/render/three/vehicles.js';
+import {roundedBridgePoints,ribbonGeometry} from '../src/render/three/geometry.js';
 import {pwaIcon} from '../scripts/pwa-icons.mjs';
 import {runtimeCity} from './helpers/runtime-city.mjs';
-import {isletWalkways} from '../src/game/authored_archipelago.js';
+import {isletWalkways} from '../src/world/archipelago.js';
 const models=['sedan','coupe','sports','wagon','taxi','van','bus','truck','bike','police','armoredPolice','nationalGuard','fireEngine','ambulance'];
 const shapes=new Set();
 for(const type of models){

@@ -1,4 +1,4 @@
-import { generateScenarios } from '../src/game/scenario_generator.js';
+import { generateScenarios } from '../src/labs/legacy/scenario_generator.js';
 import { scoreRun, aggregateScenarioResults } from './scenario-lab.mjs';
 
 const scenarios=generateScenarios({seed:20260913,count:1000});

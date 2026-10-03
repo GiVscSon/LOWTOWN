@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { OCEAN_CHUNK_SIZE, oceanChunkAt, visibleOceanChunks } from '../src/game/ocean_chunks.js';
+import { OCEAN_CHUNK_SIZE, oceanChunkAt, visibleOceanChunks } from '../src/world/ocean_chunks.js';
 
 assert.equal(OCEAN_CHUNK_SIZE, 1200);
 const farChunks = [

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createFreeWillDriver } from '../src/game/free_will_driver.js';
+import { createFreeWillDriver } from '../src/labs/legacy/free_will_driver.js';
 
 const nodes=[];
 for(let y=0;y<7;y++) for(let x=0;x<7;x++) nodes.push({id:`${x}:${y}`,x:x*160,y:y*160,links:[]});

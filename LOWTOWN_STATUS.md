@@ -1,23 +1,15 @@
-# LOWTOWN
+# LOWTOWN — текущее состояние
 
-## Vertical prototype 0.1
+Обновлено 3 октября 2026 года.
 
-- GitHub read/write access verified.
-- Vite project is present and configured with `npm run build`.
-- Canvas-based isometric night city is playable.
-- Car driving, follow camera, mission marker and job completion are implemented.
-- World data is separated into `src/game/world.js`.
-- Autonomous AI driver uses route planning, multi-horizon prediction, traffic prediction, tactical overtaking, avoidance and recovery.
-- Autonomous smoke tests run headless in CI and publish telemetry artifacts.
-- A black-box flight recorder captures the run timeline, decisions, hazards, near misses, contacts, recoveries and context immediately before important events.
-- Black-box analysis converts observed failures into findings such as late avoidance, harsh braking, steering oscillation and recovery load.
-- CI build and autonomous validation are configured in `.github/workflows/build.yml`.
+Игра использует Three.js, органическую дорожную сеть, 16 городских островов, 11 малых островов и 24 автомобильных моста. Доступны пешее движение, наземный транспорт, лодки, авиация, полиция, экстренные службы, меню и установка PWA.
 
-## Next gameplay layer
+Runtime разделён на системы мира, симуляции, отрисовки и интерфейса. Неиспользуемые файлы удалены; исследовательские контроллеры сохранены в `src/labs/legacy`. Тесты города импортируют рабочий runtime.
 
-Expand autonomous exploration memory and district diversity, then use black-box findings to tune driving policy. Continue with richer traffic interactions, police, mission chains and persistent world state.
+Добавлены артикулированный персонаж, двери, колёса, погодные дворники, повреждения кузова, трещины, дым, стоп-сигналы и след лодки. Уличные фонари и светофоры используют согласованные визуальные позиции и коллайдеры. Разрешение и эффекты выбираются в меню и сохраняются независимо от прогресса.
 
-## CI
+В одинаковом сценарии нативного браузерного runtime медиана симуляции снизилась с 8,27 до 4,94 мс на шаг. Измерение включает один Canvas-кадр на 120 шагов; оно не является обещанием FPS устройства. Полный PBR на программном GPU отдельно проверен функционально. Производительность реального телефона нужно измерять на его GPU.
 
-- Layout fix is on `main`.
-- This status-only commit exists solely to retrigger the full CI validation after the world layout correction.
+Следующие архитектурные задачи: игровые события вместо прямых вызовов UI из симуляции, единый реестр сущностей и дополнительная миграция сохранений. Настоящая трёхмерная физика ещё требует отдельной проверки мостов и уровней высоты.
+
+Подробности: [архитектурный отчёт](docs/ENGINE_ARCHITECTURE_REVIEW_2026-10-03.md), [структура и запуск](README.md).

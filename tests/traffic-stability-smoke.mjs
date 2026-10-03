@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 globalThis.Image=class{constructor(){this.complete=false;this.naturalWidth=0;}set src(v){this._src=v;}};
 globalThis.location={search:''};
-const {createTrafficSystem}=await import('../src/game/traffic.js');
+const {createTrafficSystem}=await import('../src/labs/legacy/traffic.js');
 
 const a={id:'A',x:0,y:0,roadId:'r',links:[]};
 const b={id:'B',x:160,y:0,roadId:'r',links:[]};

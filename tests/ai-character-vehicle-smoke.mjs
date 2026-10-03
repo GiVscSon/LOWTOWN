@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { createTransportController } from '../src/game/transport_controller.js';
-import { createAICharacterVehicle, AI_CHARACTER_STATES } from '../src/game/ai_character_vehicle.js';
-import { DRIVER_EXIT_STATES } from '../src/game/driver_exit_diagnostic.js';
+import { createTransportController } from '../src/labs/legacy/transport_controller.js';
+import { createAICharacterVehicle, AI_CHARACTER_STATES } from '../src/labs/legacy/ai_character_vehicle.js';
+import { DRIVER_EXIT_STATES } from '../src/labs/legacy/driver_exit_diagnostic.js';
 
 function makeAI(){
   const nodes=[];for(let x=0;x<=640;x+=160)for(let y=0;y<=640;y+=160)nodes.push({x,y,id:nodes.length,links:[]});

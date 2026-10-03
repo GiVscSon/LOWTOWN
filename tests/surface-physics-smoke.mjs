@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { applySurfacePhysics, classifySurface, surfaceMovement, sampleVehicleSurface, surfaceTelemetry, SURFACE_TYPES } from '../src/game/surface_physics.js';
+import { applySurfacePhysics, classifySurface, surfaceMovement, sampleVehicleSurface, surfaceTelemetry, SURFACE_TYPES } from '../src/simulation/surfaces.js';
 
 const landAt=(x,y)=>x>=0&&x<700&&y>=0&&y<300;
 const world={

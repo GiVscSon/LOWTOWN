@@ -241,6 +241,32 @@
             <button type="button" data-camera="overview" aria-pressed="false">Обзор</button>
           </div>
         </fieldset>
+        <fieldset class="menu-setting" id="menuGraphicsSettings">
+          <legend>Графика</legend>
+          <div class="menu-graphics-grid">
+            <label>Качество<select data-graphics="preset" id="menuGraphicsPreset">
+              <option value="performance">Быстродействие</option><option value="balanced">Сбалансированное</option><option value="high">Высокое</option><option value="custom">Свои настройки</option>
+            </select></label>
+            <label>Чёткость<select data-graphics="resolution" id="menuResolution">
+              <option value="0.75">Экономная · 75%</option><option value="1">Обычная · 100%</option><option value="1.25">Чёткая · 125%</option><option value="1.5">Высокая · 150%</option><option value="2">Максимальная · 200%</option>
+            </select></label>
+            <label>Частота кадров<select data-graphics="fps" id="menuFps">
+              <option value="30">30 кадров/с</option><option value="60">60 кадров/с</option><option value="0">Без ограничения</option>
+            </select></label>
+            <label>Дальность обзора<select data-graphics="distance" id="menuDistance">
+              <option value="near">Ближняя</option><option value="normal">Обычная</option><option value="far">Дальняя</option>
+            </select></label>
+            <label>Освещение<select data-graphics="lighting" id="menuLighting">
+              <option value="simple">Лёгкое</option><option value="detailed">Подробное</option>
+            </select></label>
+          </div>
+          <div class="menu-graphics-checks">
+            <label><input type="checkbox" data-graphics="shadows">Тени</label>
+            <label><input type="checkbox" data-graphics="reflections">Отражения</label>
+            <label><input type="checkbox" data-graphics="rain">Дождь в кадре</label>
+          </div>
+          <p>«Быстродействие» уменьшает эффекты и дальность обзора. Чёткость выбирается отдельно и сохраняется. Чем выше разрешение, тем больше нагрузка.</p>
+        </fieldset>
         <div class="menu-setting">
           <label class="menu-volume-label" for="menuVolume">Звуки и радио <output id="menuVolumeValue" for="menuVolume">100%</output></label>
           <input id="menuVolume" type="range" min="0" max="100" step="5" value="100">
@@ -293,7 +319,7 @@
       <button class="btn-top" id="btnRepairCar" style="padding: 10px; justify-content: center; background: rgba(74, 222, 128, 0.15); border-color: var(--accent-green); color: var(--accent-green); font-weight:800;">ПОЛНЫЙ РЕМОНТ И СБРОС РОЗЫСКА ($80)</button>
     </div>
   </div>
-  <script type="module" src="./src/pwa.js"></script>
+  <script type="module" src="./src/app/pwa.js"></script>
   <script type="module" src="./src/main.js"></script>
 <div id="custodyOverlay" role="status" aria-live="polite" style="display:none"></div>
 </body>

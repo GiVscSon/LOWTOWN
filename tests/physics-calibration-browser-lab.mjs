@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { generateScenarios } from '../src/game/scenario_generator.js';
-import { diagnosePhysicsSample } from '../src/game/physics_diagnostics.js';
-import { calibrateSamples } from '../src/game/physics_calibration.js';
-import { acceptCalibration } from '../src/game/calibration_acceptance.js';
+import { generateScenarios } from '../src/labs/legacy/scenario_generator.js';
+import { diagnosePhysicsSample } from '../src/labs/legacy/physics_diagnostics.js';
+import { calibrateSamples } from '../src/labs/legacy/physics_calibration.js';
+import { acceptCalibration } from '../src/labs/legacy/calibration_acceptance.js';
 
 const VEHICLES=['sedan','coupe','truck','police'];
 const COUNT=Number(process.env.LOWTOWN_CALIBRATION_SCENARIOS||8);

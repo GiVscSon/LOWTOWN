@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { circleContact, resolveWallContact, collisionTelemetry } from '../src/game/collision_physics.js';
+import { circleContact, resolveWallContact, collisionTelemetry } from '../src/labs/legacy/collision_physics.js';
 
 const wall={x:0,y:0,vx:-20,vy:4,mass:1500};
 const wallHit=resolveWallContact(wall,1,0);

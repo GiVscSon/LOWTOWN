@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createTransportController } from '../src/game/transport_controller.js';
+import { createTransportController } from '../src/labs/legacy/transport_controller.js';
 
 const car=createTransportController('sedan',{x:-120,y:-360,a:0});
 const start={x:car.state.x,y:car.state.y};

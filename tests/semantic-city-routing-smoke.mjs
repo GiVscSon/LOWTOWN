@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { CITY_ROADS, CITY_DISTRICTS, CITY_DESTINATIONS, buildCityGraph, destinationPoint, pedestrianRoute, vehicleRoute } from '../src/game/city_semantics.js';
+import { CITY_ROADS, CITY_DISTRICTS, CITY_DESTINATIONS, buildCityGraph, destinationPoint, pedestrianRoute, vehicleRoute } from '../src/labs/legacy/city_semantics.js';
 
 assert.ok(CITY_ROADS.length >= 8);
 assert.ok(CITY_DISTRICTS.length >= 4);
