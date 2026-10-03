@@ -39,10 +39,10 @@ for(const deck of walkways){
   }
 }
 for(const bridge of paint.bridgePaths){
-  const geometry=ribbonGeometry(roundedBridgePoints(bridge.path,bridge.width),bridge.width),position=geometry.getAttribute('position');
+  const geometry=ribbonGeometry(bridge.organic?bridge.path.map(p=>new THREE.Vector2(p.x,p.y)):roundedBridgePoints(bridge.path,bridge.width),bridge.width),position=geometry.getAttribute('position');
   for(let i=0;i<position.count;i++){
     const x=position.getX(i),y=position.getZ(i);
-    assert(paint.surfaces.some(surface=>x>=surface.x-.1&&x<=surface.x+surface.w+.1&&y>=surface.y-.1&&y<=surface.y+surface.h+.1),'visible bridge edge extends over unsupported water: '+JSON.stringify({bridge:bridge.id,x,y}));
+    assert(city.run(`isPositionOnSolidGround(${x},${y})`),'visible bridge edge extends over unsupported water: '+JSON.stringify({bridge:bridge.id,x,y}));
   }
 }
 console.log('PASS 18 distinct Three transport models, finite normals, constant-width curved bridges and install icons');

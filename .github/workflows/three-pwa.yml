@@ -35,6 +35,7 @@ jobs:
       - run: npm run test:three-pwa-contract
       - run: node tests/three-city-geometry.mjs
       - run: npm run test:street-graphics
+      - run: npm run test:organic-streets
       - run: npx playwright install --with-deps chromium
       - name: Three.js live rendering and PWA offline restart
         run: npm run test:three-pwa-browser

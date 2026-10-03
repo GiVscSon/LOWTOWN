@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import {mkdirSync,writeFileSync} from 'node:fs';
 import {runtimeCity} from './helpers/runtime-city.mjs';
 
-const city=runtimeCity(73);
+// Recorded passing cases use the street coordinates they were captured on.
+const city=runtimeCity(73,{legacyStreets:true});
 city.run(`trafficCars.length=0;parkedCars.length=0;pedestrians.length=0;policeCars.length=0;
 incidentPoliceCars.length=0;incidentResponseVehicles.length=0;Object.assign(player,{x:10000,y:11000});`);
 const results=[];
@@ -67,7 +68,7 @@ const loop=JSON.parse(city.run(`
 assert(loop.passes>0&&loop.returned&&loop.suppressed&&!loop.unsafe,JSON.stringify(loop));
 // Exercise yielding through the real shared physics loop, not a second copy
 // of the traffic rule. Record contacts before the solver could hide them.
-const integratedCity=runtimeCity(91);
+const integratedCity=runtimeCity(91,{legacyStreets:true});
 const yielding=JSON.parse(integratedCity.run(`
  trafficCars.length=0;parkedCars.length=0;pedestrians.length=0;policeCars.length=0;
  incidentPoliceCars.length=0;incidentResponseVehicles.length=0;cityIncidentDirector=null;

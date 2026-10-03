@@ -13,8 +13,10 @@ import * as traffic from '../../src/game/traffic_turns.js';
 import * as ocean from '../../src/game/ocean_chunks.js';
 import * as surfaces from '../../src/game/surface_physics.js';
 import * as incidents from '../../src/game/city_incidents.js';
+import * as organic from '../../src/game/organic_streets.js';
+import * as corridors from '../../src/game/street_corridors.js';
 
-export function runtimeCity(seed = 19) {
+export function runtimeCity(seed = 19,{legacyStreets=false}={}) {
   let clock = 0, randomState = seed;
   const math = Object.create(Math);
   math.random = () => ((randomState = (Math.imul(randomState, 1664525) + 1013904223) >>> 0) / 4294967296);
@@ -26,8 +28,9 @@ export function runtimeCity(seed = 19) {
       querySelectorAll: () => [], addEventListener: noop }, window: { addEventListener: noop },
     localStorage: { getItem: () => null, setItem: noop }, setTimeout: noop, setInterval: noop,
     requestAnimationFrame: noop, ...street, ...core, ...contacts, ...emergencyPassing, ...coast, ...roaming,
-    ...traffic, ...ocean, ...surfaces, ...incidents });
-  const source = readFileSync(new URL('../../src/main.js', import.meta.url), 'utf8').replace(/^import .*;\n/gm, '');
+    ...traffic, ...ocean, ...surfaces, ...incidents, ...organic, ...corridors });
+  let source = readFileSync(new URL('../../src/main.js', import.meta.url), 'utf8').replace(/^import .*;\n/gm, '');
+  if(legacyStreets)context.organicStreetNetwork=undefined;
   vm.runInContext(`${source}\ninitTopology();`, context);
   return { run: code => vm.runInContext(code, context), tick: dt => { clock += dt * 1000; } };
 }

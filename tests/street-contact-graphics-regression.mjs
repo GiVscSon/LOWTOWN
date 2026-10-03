@@ -43,14 +43,13 @@ for(let frame=0;frame<30;frame++){
 const city=runtimeCity(73);
 const audit=JSON.parse(city.run(`JSON.stringify({
   roads:roads.length,bridges:bridges.length,paths:scenicRoads.length,
-  badRoads:roads.filter(r=>Array.from({length:41},(_,i)=>i/40).some(t=>
-    ![-.48,0,.48].every(edge=>isPositionOnSolidGround(
-      r.x+r.w*(r.dir==='h'?t:.5+edge),r.y+r.h*(r.dir==='v'?t:.5+edge))))),
-  badEnds:scenicRoads.filter(r=>[r.points[0],r.points.at(-1)].some(([x,y])=>
-    !roads.some(s=>x>=s.x&&x<=s.x+s.w&&y>=s.y&&y<=s.y+s.h))),
+  badRoads:roads.filter(r=>streetPoints(r).some((p,i,points)=>{
+    const a=points[Math.max(0,i-1)],b=points[Math.min(points.length-1,i+1)],angle=Math.atan2(b[1]-a[1],b[0]-a[0]);
+    return ![-.48,0,.48].every(edge=>isPositionOnSolidGround(p[0]-Math.sin(angle)*streetWidth(r)*edge,p[1]+Math.cos(angle)*streetWidth(r)*edge));
+  })),
+  badEnds:scenicRoads.filter(r=>[r.points[0],r.points.at(-1)].some(([x,y])=>!onStreetCollection(x,y,roads))),
   scenic:scenicRoads.map(r=>({points:r.points,width:r.width,district:r.districtId})),
-  badBridges:bridges.filter(r=>Array.from({length:41},(_,i)=>i/40).some(t=>
-    !isPositionOnSolidGround(r.x+r.w*(r.dir==='h'?t:.5),r.y+r.h*(r.dir==='v'?t:.5))))
+  badBridges:bridges.filter(r=>streetPoints(r).some(([x,y])=>!isPositionOnSolidGround(x,y)))
 })`));
 assert.equal(audit.badRoads.length,0,'road carriageway extends over water');
 assert.equal(audit.badEnds.length,0,'waterfront paths terminate without joining a street');

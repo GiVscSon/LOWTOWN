@@ -34,8 +34,8 @@ for(let i=0;i<districts.length;i++)for(let j=i+1;j<districts.length;j++){
 const city=runtimeCity(73);
 const report=JSON.parse(city.run(`JSON.stringify((()=>{
  const overlap=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
- const propsOnRoad=solidProps.filter(p=>roads.some(r=>overlap({x:p.x-(p.width||12)/2,y:p.y-(p.height||12)/2,w:p.width||12,h:p.height||12},r)));
- const blockingRails=bridgeRails.filter(rail=>roads.some(r=>overlap(rail,r)));
+ const propsOnRoad=solidProps.filter(p=>!rectangleClearOfStreets({x:p.x-(p.width||12)/2,y:p.y-(p.height||12)/2,w:p.width||12,h:p.height||12},roads));
+ const blockingRails=bridgeRails.filter(rail=>!rectangleClearOfStreets(rail,roads));
  const streetSceneryOnRoad=[...trees,...breakableProps,...streetLights,...billboards,...cranes].filter(p=>{
   const w=p.width||p.w||(streetLights.includes(p)?6:billboards.includes(p)?80:20),h=p.height||p.h||(streetLights.includes(p)?6:billboards.includes(p)?12:20);
   return [[0,0],[-w/2,-h/2],[w/2,-h/2],[-w/2,h/2],[w/2,h/2]].some(([dx,dy])=>onRoadSurface(p.x+dx,p.y+dy,roads,bridges,scenicRoads,roadEnds));
@@ -59,7 +59,7 @@ const report=JSON.parse(city.run(`JSON.stringify((()=>{
  });
  return {width:WORLD_W,height:WORLD_H,islands:islands.length,islets:islets.length,bridges:bridges.length,
   roadBridges:new Set(bridges.filter(b=>!b.footway).map(b=>b.logicalId||b.id)).size,bridgeDecks:bridges.filter(b=>!b.footway).length,footways:footways.length,
-  disconnectedNodes:roadGraph.filter(n=>!roadPath(roadGraph,roadGraph[0],n).length).length,
+  disconnectedNodes:(()=>{const seen=new Set([0]),queue=[0];for(let i=0;i<queue.length;i++)for(const id of roadGraph[queue[i]].edges)if(!seen.has(id)){seen.add(id);queue.push(id);}return roadGraph.length-seen.size;})(),
   propsOnRoad,blockingRails,streetSceneryOnRoad,duplicateRoads,stackedLines,blockedWalks,unsafeFleet,stunts:stuntZones.length,
   fleetCount:fleet.length,runways:PLANE_RUNWAYS.every(r=>[[0,0],[r.w,0],[0,r.h],[r.w,r.h]].every(([dx,dy])=>isPositionOnSolidGround(r.x+dx,r.y+dy)))};
 })())`));
@@ -77,7 +77,7 @@ for(const d of districts){
  const old=city.run(`migrateWorld2Point({x:${d.x},y:${d.y}})`);
  const dx=old.x-d.x,dy=old.y-d.y,prior={x:d.x+d.w/2-dx,y:d.y+d.h/2-dy};
  const restored=JSON.parse(city.run(`{localStorage.getItem=()=>JSON.stringify({worldVersion:2,cash:0,x:${prior.x},y:${prior.y}});loadProgress();JSON.stringify({x:player.x,y:player.y,cash:state.cash});}`));
- assert(Math.abs(restored.x-(d.x+d.w/2))<.001&&Math.abs(restored.y-(d.y+d.h/2))<.001,JSON.stringify({id:d.id,restored}));assert.equal(restored.cash,0);
+ assert(city.run(`onRoadSurface(${restored.x},${restored.y},roads,bridges,[],roadEnds)&&districtAt(${restored.x},${restored.y}).id==='${d.id}'`),JSON.stringify({id:d.id,restored}));assert.equal(restored.cash,0);
 }
 const expected=worldPoint({x:6200,y:4200});
 const migration=JSON.parse(city.run(`{
@@ -87,7 +87,7 @@ const migration=JSON.parse(city.run(`{
  localStorage.getItem=()=>JSON.stringify(saved);loadProgress();
  JSON.stringify({migrated,saved,stable:player.x===saved.x&&player.y===saved.y});
 }`));
-assert.equal(migration.migrated.x,expected.x);assert.equal(migration.migrated.y,expected.y);
+assert(city.run(`onRoadSurface(${migration.migrated.x},${migration.migrated.y},roads,bridges,[],roadEnds)`),'migrated save must reach the new street surface');assert(Math.hypot(migration.migrated.x-expected.x,migration.migrated.y-expected.y)<500);
 assert.equal(migration.migrated.cash,913);assert(migration.migrated.turbo&&migration.stable);assert.equal(migration.saved.worldVersion,3);
 mkdirSync('artifacts/authored-world',{recursive:true});
 writeFileSync('artifacts/authored-world/report.json',JSON.stringify({...report,minCoastGap:Math.min(...gaps),maxCoastGap:Math.max(...gaps),migration},null,2));

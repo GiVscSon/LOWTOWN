@@ -38,7 +38,8 @@ const people=JSON.parse(crowd.run(`{
 assert(people.exited&&people.resumed,JSON.stringify(people));assert.equal(people.reentries,0);
 assert.equal(people.wrongHeading,0,'moving spectators must face their actual direction of travel');
 
-const pursuit=runtimeCity(37);
+// Replay the original straight-street geometry for this recorded scenario.
+const pursuit=runtimeCity(37,{legacyStreets:true});
 const police=JSON.parse(pursuit.run(`{
   const a=roadGraph.find(a=>[...a.edges].some(i=>roadGraph[i].y===a.y&&roadGraph[i].x>a.x+700&&
     policeFootprintOnRoad({x:a.x+(roadGraph[i].x-a.x)*.25,y:a.y,angle:0,width:48,height:24})));
@@ -56,7 +57,8 @@ const police=JSON.parse(pursuit.run(`{
 assert(police.progress>police.available*.7,JSON.stringify(police));assert(police.backtrack<2);
 assert(police.lateral<5,JSON.stringify(police));
 
-const traffic=runtimeCity(73);
+// Replay the original straight-street geometry for this recorded scenario.
+const traffic=runtimeCity(73,{legacyStreets:true});
 const yielding=JSON.parse(traffic.run(`{
   trafficCars.length=0;parkedCars.length=0;pedestrians.length=0;policeCars.length=0;
   Object.assign(player,{x:10000,y:11000});
@@ -85,7 +87,8 @@ const yielding=JSON.parse(traffic.run(`{
 }`));
 assert(yielding.clearsIntersection&&yielding.clearsJunctionWhileYielding&&yielding.movedAside&&yielding.rejoined&&yielding.stableBusYield,JSON.stringify(yielding));
 
-const turns=runtimeCity(19);
+// Replay the original straight-street geometry for this recorded scenario.
+const turns=runtimeCity(19,{legacyStreets:true});
 assert(turns.run(`{
   trafficCars.length=0;parkedCars.length=0;pedestrians.length=0;policeCars.length=0;
   incidentPoliceCars.length=0;incidentResponseVehicles.length=0;emergencyPassingGroundClear=()=>true;
@@ -113,7 +116,8 @@ assert(returnTurn.reversed&&returnTurn.completed&&returnTurn.x>2300,JSON.stringi
 assert.equal(returnTurn.contacts,0,'a blocked return turn must make space before rotating');
 
 // Replay the browser deadlock: a tilted yielding bus between two responders.
-const junction=runtimeCity(73);
+// Replay the original straight-street geometry for this recorded scenario.
+const junction=runtimeCity(73,{legacyStreets:true});
 const junctionYield=JSON.parse(junction.run(`{
  trafficCars.length=0;parkedCars.length=0;pedestrians.length=0;policeCars.length=0;incidentPoliceCars.length=0;incidentResponseVehicles.length=0;cityIncidentDirector=null;
  Object.assign(player,{x:17000,y:17000,speed:0});state.invulnTimer=999999;

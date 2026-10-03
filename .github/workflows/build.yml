@@ -24,6 +24,8 @@ jobs:
         run: npm run test:three-pwa-contract
       - name: Supported streets, walking contacts and camera presets
         run: npm run test:street-graphics
+      - name: Curved road graph, new building lots and elevated bridge structures
+        run: npm run test:organic-streets
       - name: Original SVG transport views
         run: npm run test:transport-svg
       - name: Swept vehicle contacts, pushing and pedestrian reactions

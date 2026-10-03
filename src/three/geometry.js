@@ -13,10 +13,14 @@ export function roundedBridgePoints(points,width){
   }
   result.push(new THREE.Vector2(points.at(-1).x,points.at(-1).y));return result;
 }
+export function ribbonTangent(points,index){
+  const p=points[index],incoming=p.clone().sub(points[Math.max(0,index-1)]).normalize(),outgoing=points[Math.min(points.length-1,index+1)].clone().sub(p).normalize();
+  const tangent=incoming.add(outgoing);return tangent.lengthSq()>1e-8?tangent.normalize():new THREE.Vector2(1,0);
+}
 export function ribbonGeometry(points,width,elevation=3.6){
   const vertices=[],indices=[];
   for(let i=0;i<points.length;i++){
-    const previous=points[Math.max(0,i-1)],next=points[Math.min(points.length-1,i+1)],tangent=next.clone().sub(previous).normalize();
+    const tangent=ribbonTangent(points,i);
     const nx=-tangent.y*width/2,ny=tangent.x*width/2,p=points[i];
     vertices.push(p.x+nx,elevation,p.y+ny,p.x-nx,elevation,p.y-ny);
     if(i){const a=(i-1)*2,b=i*2;indices.push(a,b,a+1,a+1,b,b+1);}
@@ -28,6 +32,12 @@ export function createBoxBatch(scene,color,roughness=.85,geometry=new THREE.BoxG
   const items=[];
   return {
     add(x,y,z,w,h,d,paint=color,angle=0){items.push({x,y,z,w,h,d,paint,angle});},
+    beam(a,b,h,d=h,paint=color){
+      const direction=b.clone().sub(a),length=direction.length();if(length<.01)return;
+      const center=a.clone().add(b).multiplyScalar(.5);
+      items.push({x:center.x,y:center.y,z:center.z,w:length,h,d,paint,angle:0,
+        rotation:new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1,0,0),direction.normalize())});
+    },
     flush(){
       if(!items.length)return null;
       const paintMaterial=material||new THREE.MeshStandardMaterial({color:0xffffff,roughness,vertexColors:false});
@@ -43,7 +53,8 @@ export function createBoxBatch(scene,color,roughness=.85,geometry=new THREE.BoxG
       for(const cell of cells.values()){
         const mesh=new THREE.InstancedMesh(geometry,paintMaterial,cell.length);
         cell.forEach((item,index)=>{
-          rotation.setFromAxisAngle(axis,item.angle);matrix.compose(new THREE.Vector3(item.x,item.y,item.z),rotation,new THREE.Vector3(item.w,item.h,item.d));
+          if(item.rotation)rotation.copy(item.rotation);else rotation.setFromAxisAngle(axis,item.angle);
+          matrix.compose(new THREE.Vector3(item.x,item.y,item.z),rotation,new THREE.Vector3(item.w,item.h,item.d));
           mesh.setMatrixAt(index,matrix);mesh.setColorAt(index,new THREE.Color(item.paint));
         });
         mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();scene.add(mesh);first??=mesh;

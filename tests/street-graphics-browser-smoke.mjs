@@ -72,6 +72,21 @@ try{
   report.fullMaterials=await page.evaluate(()=>window.__lowtownThreeStats);
   assert.equal(report.fullMaterials.lowCostMaterials,false);
   await page.screenshot({path:`${directory}/mobile-full-materials.png`});
+  report.raisedBridges=[];
+  await page.setViewportSize({width:1280,height:800});
+  for(const index of [0,7,17]){
+    for(const foot of [false,true]){
+      const result=await page.evaluate(({index,foot})=>{
+        const point=window.__lowtownCityQA.viewBridgeSpan(index,.5,foot,false);return {point,stats:window.__lowtownThreeStats};
+      },{index,foot});
+      assert(result.point.height>50);
+      assert(Math.abs(result.stats.player.groundElevation-result.point.height+3.6)<.01);
+      assert(Math.abs(result.stats.player.visualY-result.point.height)<1);
+      report.raisedBridges.push({index,foot,...result});
+    }
+    await page.evaluate(index=>window.__lowtownCityQA.viewBridgeSpan(index,.5,false,true),index);
+    await page.screenshot({path:`${directory}/raised-bridge-${index}.png`});
+  }
   assert.deepEqual(errors,[],'graphics generated browser or shader errors');
   writeFileSync(`${directory}/report.json`,JSON.stringify(report,null,2));
   console.log('STREET_GRAPHICS_BROWSER_OK',JSON.stringify({cameras:report.cameras,stats:report.stats,contactHp:resident.hp}));
