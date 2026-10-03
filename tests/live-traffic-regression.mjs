@@ -17,8 +17,9 @@ import * as incidents from '../src/simulation/incidents.js';
 import { projectIso, velocityForHeading, stepLandVehicle, routeInput } from '../src/simulation/vehicle_dynamics.js';
 const noop=()=>{};
 const element={style:{},classList:{add:noop,remove:noop},appendChild:noop,remove:noop,addEventListener:noop,getContext:()=>({})};
-let clock=0;
-const sandbox={...authoredWorld,LEGACY_RUNWAYS,VEHICLES,...emergencyPassing,...streetNetwork,...ocean,...surfaces,...incidents,Math,console,advanceClock:()=>clock+=1000/60,performance:{now:()=>clock},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,resolveContact,resolveScenery,contact,chassis,captureMotion,solveVehicleMotion,createSpatialIndex,advanceTrafficCar,resolveTrafficPair,coastPoints,pointInCoast,pointInBeach,BEACH_WIDTH,projectIso,velocityForHeading, stepLandVehicle,routeInput};
+let clock=0,seed=Number(process.env.LOWTOWN_TEST_SEED||19);
+const math=Object.create(Math);math.random=()=>((seed=Math.imul(seed,1664525)+1013904223>>>0)/4294967296);
+const sandbox={...authoredWorld,LEGACY_RUNWAYS,VEHICLES,...emergencyPassing,...streetNetwork,...ocean,...surfaces,...incidents,Math:math,console,advanceClock:()=>clock+=1000/60,performance:{now:()=>clock},document:{readyState:'loading',getElementById:()=>({...element}),createElement:()=>({...element}),querySelectorAll:()=>[],addEventListener:noop},window:{addEventListener:noop},localStorage:{getItem:()=>null,setItem:noop},setTimeout:noop,setInterval:noop,requestAnimationFrame:noop,resolveContact,resolveScenery,contact,chassis,captureMotion,solveVehicleMotion,createSpatialIndex,advanceTrafficCar,resolveTrafficPair,coastPoints,pointInCoast,pointInBeach,BEACH_WIDTH,projectIso,velocityForHeading, stepLandVehicle,routeInput};
 vm.createContext(sandbox);
 Object.assign(sandbox,{createWalkSurface,createSceneryIndex});
 attachRuntime(sandbox,{legacyStreets:true});
@@ -46,17 +47,26 @@ Object.assign(player,{x:target.x-Math.cos(target.angle)*60,y:target.y-Math.sin(t
 state.invulnTimer=0;
 for(let tick=0;tick<12;tick++){advanceClock();updatePhysics(1/60);}
 const impactDamage=100-player.hp;
-Object.assign(player,{x:target.x+65,y:target.y,angle:target.angle,speed:0,vx:0,vy:0,hp:100});
+// A controlled following lane checks braking. Arbitrary target.x+65 could
+// put the player inside another car, crossing lane or a new lamp collider.
+const savedTraffic=trafficCars.slice();trafficCars.length=0;
+const follower={type:'sedan',model:'sedan',x:1500,y:1200,angle:0,width:48,height:24,mass:1500,
+ speed:2,cruiseSpeed:2,vx:2,vy:0,isTraffic:true,axis:'x',minX:400,maxX:2350,laneCenter:1220};
+trafficCars.push(follower);policeCars.length=0;incidentPoliceCars.length=0;incidentResponseVehicles.length=0;
+cityIncidentDirector.finish();cityIncidentDirector.state.cooldown=99999;
+Object.assign(player,{x:1600,y:1200,angle:0,speed:0,vx:0,vy:0,contactVx:0,contactVy:0,hp:100});
 state.wanted=0;state.invulnTimer=0;
 for(let tick=0;tick<90;tick++){advanceClock();updatePhysics(1/60);}
 
+const stationaryDamage=100-player.hp,stationaryWanted=state.wanted,followingStopped=follower.speed<.05&&follower.x<1555;
+trafficCars.splice(0,trafficCars.length,...savedTraffic);
 const motionByType=Object.fromEntries([...new Set(trafficCars.map(c=>c.type))].map(type=>{
   const indices=trafficCars.flatMap((c,i)=>c.type===type?[i]:[]);
   return [type,{count:indices.length,moving:indices.filter(i=>travel[i]>20).length,
     minTravel:Math.min(...indices.map(i=>travel[i])),maxTravel:Math.max(...indices.map(i=>travel[i])),
     dwellFrames:indices.reduce((sum,i)=>sum+dwell[i],0),turnFrames:indices.reduce((sum,i)=>sum+carTurns[i],0)}];
 }));
-this.result={cars:trafficCars.length,motionByType,maxJump,water,invalid,turns,offRoad,pedBlocked,impactDamage,stationaryDamage:100-player.hp,stationaryWanted:state.wanted};
+this.result={cars:trafficCars.length,motionByType,maxJump,water,invalid,turns,offRoad,pedBlocked,impactDamage,stationaryDamage,stationaryWanted,followingStopped};
 `,sandbox);
 console.log(sandbox.result);
 assert(sandbox.result.cars>=50);
@@ -67,6 +77,7 @@ assert.equal(sandbox.result.water,0,'traffic left solid ground');
 assert.equal(sandbox.result.offRoad,0,'traffic left the road surface');
 assert.equal(sandbox.result.pedBlocked,0,'pedestrian entered solid scenery');
 assert(sandbox.result.impactDamage>0,'player and traffic contact did not cause damage');
+assert(sandbox.result.followingStopped,'following traffic failed to stop before the idle player');
 assert.equal(sandbox.result.stationaryDamage,0,'idle player took damage from traffic');
 assert.equal(sandbox.result.stationaryWanted,0,'idle player was blamed for traffic contact');
 for(const [type,motion] of Object.entries(sandbox.result.motionByType))assert(motion.moving>0,`${type}: entire class failed to move`);
