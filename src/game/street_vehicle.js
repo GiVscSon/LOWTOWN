@@ -1,201 +1,115 @@
-// Original continuous-heading, model-space vehicle meshes. Height is projected
-// vertically in world space, so windows and equipment stay attached in turns.
+import {addLoft,addBox,faceNormal} from './vehicle_shapes.js';
 const GLASS='#263b46',TRIM='#232b30',CHROME='#abb6b4';
 const cache=new Map();
-// The canvas camera looks along the isometric diagonal.  Keep this test in
-// one place so the body, glass overlays and service equipment agree about
-// which surface is facing the player while a vehicle rotates.
-function projectedNormal(normal,angle=0){
-  const cs=Math.cos(angle),sn=Math.sin(angle),[nx,ny,nz]=normal;
-  return [nx*cs-ny*sn,nx*sn+ny*cs,nz];
-}
-function projectedVisibility(normal,angle=0){
-  const [rx,ry,nz]=projectedNormal(normal,angle);
-  return rx+ry+nz;
-}
-const normal=points=>{
-  const a=points[0],b=points[1],c=points[2],u=b.map((n,i)=>n-a[i]),v=c.map((n,i)=>n-a[i]);
-  return [u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];
-};
-function shade(color,amount){
-  const match=/^#([\da-f]{6})$/i.exec(color);if(!match)return color;
-  const n=parseInt(match[1],16);
-  return `rgb(${[n>>16,(n>>8)&255,n&255].map(v=>Math.round(Math.min(255,v*amount+(amount>1?12:0)))).join(',')})`;
-}
+function projectedNormal(normal,angle=0){const cs=Math.cos(angle),sn=Math.sin(angle),[nx,ny,nz]=normal;return [nx*cs-ny*sn,nx*sn+ny*cs,nz];}
+function projectedVisibility(normal,angle=0){const [rx,ry,nz]=projectedNormal(normal,angle);return rx+ry+nz;}
+function shade(color,amount){const match=/^#([\da-f]{6})$/i.exec(color);if(!match)return color;const n=parseInt(match[1],16);return `rgb(${[n>>16,(n>>8)&255,n&255].map(v=>Math.round(Math.min(255,v*amount+(amount>1?12:0)))).join(',')})`;}
 export function createVehicleMesh(type='sedan',length=48,breadth=24,color='#e09a3e',police=false){
-  const faces=[],w=length,h=breadth;
+  const faces=[],w=length,h=breadth,scale=h/24;
   const tactical=type==='armoredPolice',guard=type==='nationalGuard',fire=type==='fireEngine',ems=type==='ambulance';
-  const service=police||tactical||guard||fire||ems||type==='police';
+  const patrol=(police||type==='police')&&!tactical&&!guard,service=patrol||tactical||guard||fire||ems;
   const tall=['van','bus','truck','armoredPolice','nationalGuard','fireEngine','ambulance'].includes(type);
-  const paint=guard?'#798365':tactical?'#60717a':fire?'#c34d3c':ems?'#e5e1cf':police||type==='police'?'#e5e5d9':type==='taxi'?'#e5b344':color;
-  const face=(points,fill,trim=true)=>faces.push({points,normal:normal(points),fill,trim});
-  const prism=(bottom,top,z0,z1,fill,sideFill=fill)=>{
-    for(let i=0;i<bottom.length;i++){const j=(i+1)%bottom.length;face([[...bottom[i],z0],[...bottom[j],z0],[...top[j],z1],[...top[i],z1]],sideFill);}
-    face(top.map(p=>[...p,z1]),fill);
-  };
-  const rect=(x,y,l,b)=>[[x,y],[x+l,y],[x+l,y+b],[x,y+b]];
-  const box=(x,y,l,b,z0,z1,fill)=>{const shape=rect(x,y,l,b);prism(shape,shape,z0,z1,fill);};
-  const sidePanel=(x,l,z0,z1,fill)=>{
-    for(const side of [-1,1]){
-      const pts=[[x,side*h*.472,z0],[x+l,side*h*.472,z0],[x+l,side*h*.472,z1],[x,side*h*.472,z1]];
-      if(side>0)pts.reverse();face(pts,fill,false);
-    }
-  };
+  const sport=type==='sports',coupe=type==='coupe';
+  const paint=guard?'#788361':tactical?'#5e7179':fire?'#b63d32':ems?'#e9e5d7':patrol?'#e4e6df':type==='taxi'?'#e9b72e':color;
+  const face=(points,fill,surface='paint')=>{const n=faceNormal(points);if(Math.hypot(...n)>1e-8)faces.push({points,normal:n,fill,surface,trim:false});};
+  const box=(x,y,l,b,z0,z1,fill,surface='paint')=>addBox(faces,x,y,l,b,z0,z1,fill,surface);
+  const radius=(type==='bike'?4.2:tall?4.6:4)*scale,axles=type==='bike'?[-w*.34,w*.34]:guard?[-w*.32,-w*.14,w*.30]:[-w*.29,w*.29];
+  const bodyZ=(sport?8.5:coupe?9:9.5)*scale+(tall?1*scale:0);
+  let windshield;
   if(type==='bike'){
-    box(-w*.29,-h*.17,w*.58,h*.34,3,8,TRIM);
-    const shape=[[-w*.16,-h*.28],[w*.28,-h*.23],[w*.4,0],[w*.28,h*.23],[-w*.16,h*.28]];
-    prism(shape,shape,6,11,paint);
-    box(-w*.32,-h*.23,w*.25,h*.46,8,10,'#393a37');
-    box(w*.24,-h*.48,2,h*.96,10,11,CHROME);
-    // A seated rider: jacket, arms and helmet, separate from the tank.
-    box(-w*.12,-h*.25,w*.17,h*.5,10,18,'#73745e');
-    box(-w*.08,-h*.19,w*.15,h*.38,18,21,'#e0d2b5');
-    box(0,-h*.35,w*.24,2,13,14,'#73745e');box(0,h*.18,w*.24,2,13,14,'#73745e');
+    const tank=[[-.22,.2,7],[-.14,.3,10],[.08,.29,11],[.25,.13,8]].map(([x,b,z])=>Array.from({length:8},(_,i)=>{const a=i*Math.PI/4;return [x*w,Math.cos(a)*h*b,z+Math.sin(a)*h*.17];}));
+    addLoft(faces,tank,paint);box(-w*.32,-h*.2,w*.27,h*.4,8,10,TRIM,'rubber');
+    box(-w*.25,-.7,w*.53,1.4,3,5,CHROME,'chrome');box(w*.22,-h*.46,1,h*.92,11,12,CHROME,'chrome');
+    box(-w*.09,-h*.21,w*.19,h*.42,10,17,'#666854');
+    const helmet=[[-w*.11,1.6,18],[-w*.05,2.5,20],[w*.015,1.8,21]].map(([x,r,z])=>Array.from({length:8},(_,i)=>[x,Math.cos(i*Math.PI/4)*r,z+Math.sin(i*Math.PI/4)*r]));addLoft(faces,helmet,'#d0c6b0');
+    for(const side of [-1,1])box(0,side*h*.21,w*.22,1.5,13,14,'#666854');
   }else{
-    const shape=[[-w*.5,-h*.33],[-w*.44,-h*.47],[w*.36,-h*.47],[w*.5,-h*.31],[w*.5,h*.31],[w*.36,h*.47],[-w*.44,h*.47],[-w*.5,h*.33]];
-    const bodyZ=type==='sports'||type==='coupe'?6:8;
-    const shoulder=shape.map(([x,y])=>[x*.985,y*.96]);
-    prism(shape,shoulder,3,bodyZ,paint);
-    box(-w*.51,-h*.31,2,h*.62,3.5,5.3,CHROME);box(w*.48,-h*.3,2,h*.6,3.5,5.3,CHROME);
-    sidePanel(-w*.35,w*.7,4,5.5,service?(fire||ems?'#ead6a0':guard?'#596247':'#354753'):TRIM);
-    let back=-w*.24,front=w*.19,roofBack=-w*.17,roofFront=w*.07,roofZ=14;
-    if(type==='coupe'||type==='sports'){back=-w*.18;front=w*.17;roofBack=-w*.07;roofFront=w*.03;roofZ=type==='sports'?10.5:12;}
-    if(type==='wagon'){back=-w*.4;roofBack=-w*.34;}
-    if(tall){back=-w*.43;front=w*.35;roofBack=-w*.41;roofFront=w*.25;roofZ=type==='bus'?23:20;}
-    if(type==='truck'||guard||fire){back=w*.07;roofBack=w*.09;roofZ=20;}
-    const bottom=rect(back,-h*.43,front-back,h*.86),top=rect(roofBack,-h*.34,roofFront-roofBack,h*.68);
-    prism(bottom,top,bodyZ,roofZ,paint,GLASS);
-    if(!tall){
-      // Dark seals frame the sloped glass, with narrow reflected sky streaks
-      // and a rear demister. Every piece belongs to the same continuous mesh.
-      const glassPatch=(end,u0,u1,v0,v1,fill)=>{
-        const baseX=end?front:back,roofX=end?roofFront:roofBack,epsilon=end?.035:-.035;
-        const p=(u,v)=>[baseX+(roofX-baseX)*v+epsilon,(u-.5)*h*(.86-.18*v),bodyZ+(roofZ-bodyZ)*v+.025];
-        const pts=[p(u0,v0),p(u1,v0),p(u1,v1),p(u0,v1)];if(!end)pts.reverse();face(pts,fill,false);
-      };
-      for(const end of [false,true]){
-        glassPatch(end,0,1,.01,.06,TRIM);glassPatch(end,0,1,.94,.99,TRIM);
-        glassPatch(end,.015,.045,.06,.94,TRIM);glassPatch(end,.955,.985,.06,.94,TRIM);
-        glassPatch(end,.08,.46,.12,.18,'#17252c');
-        glassPatch(end,.53,.87,.16,.19,'#81918f');
-        if(!end)for(let row=0;row<5;row++)glassPatch(false,.07,.93,.28+row*.11,.289+row*.11,'#55625e');
-      }
-      // A restrained dark sunroof and its seal are especially visible in the
-      // close camera, instead of an unbroken flat roof slab.
-      if(type==='coupe'||type==='sports'||type==='sedan'){
-        const roofLength=roofFront-roofBack;
-        box(roofBack+roofLength*.2,-h*.21,roofLength*.55,h*.42,roofZ+.025,roofZ+.1,TRIM);
-        box(roofBack+roofLength*.23,-h*.185,roofLength*.49,h*.37,roofZ+.1,roofZ+.14,'#34474c');
-      }
-      sidePanel(-w*.34,w*.69,bodyZ-.7,bodyZ-.45,shade(paint,1.22));
-      // Door seams, handles, fuel flap and a lower sill highlight.
-      const doors=type==='coupe'||type==='sports'?[back,front]:[back,(back+front)/2,front];
-      for(const side of [-1,1]){
-        const y=side*h*.474;
-        const panel=(x,z,l,height,fill)=>{const pts=[[x,y,z],[x+l,y,z],[x+l,y,z+height],[x,y,z+height]];if(side>0)pts.reverse();face(pts,fill,false);};
-        for(const x of doors){panel(x,4.9,.16,bodyZ-5,TRIM);panel(x-2.5,bodyZ-1.6,1.8,.5,CHROME);}
-        panel(-w*.41,bodyZ-2.1,w*.065,1.3,shade(paint,.7));
-        panel(-w*.36,3.5,w*.7,.32,'#79807b');
-      }
-      box(-w*.506,-h*.14,.45,h*.28,3.7,5.4,'#c3c4ad');
-      box(-w*.513,-h*.1,.16,h*.2,4,5,'#3a4549');
-      box(w*.498,-h*.35,.5,h*.7,3,3.6,TRIM);
-      for(const side of [-1,1]){
-        box(-w*.505,side<0?-h*.38:h*.26,.7,h*.12,5.4,6.4,'#d89232');
-        box(w*.487,side<0?-h*.36:h*.26,.7,h*.1,4.5,5.3,'#dca450');
-        // Twin small exhaust tips and a front fog lamp bezel.
-        if(side<0)box(-w*.535,-h*.27,1.9,1,2.7,3.6,CHROME);
-        box(w*.495,side<0?-h*.28:h*.2,.5,h*.08,3.7,4.4,'#b9bbab');
-      }
+    // Real wheel openings are cut into the lower silhouette, with a rounded
+    // shoulder and tapered nose/boot. All models retain their collision size.
+    const archRadius=radius*1.1,stations=new Set([-.5*w,-.475*w,-.43*w,-.12*w,.12*w,.43*w,.475*w,.5*w]);
+    for(const axle of axles)for(const t of [-1,-.7,0,.7,1])stations.add(axle+archRadius*t);
+    const ringAt=x=>{
+      const end=Math.max(0,(Math.abs(x)/w-.43)/.07),width=h*(.49-.095*end),top=bodyZ-(x>0?1.2:.65)*scale*end;
+      let low=3*scale;for(const axle of axles){const dx=x-axle;if(Math.abs(dx)<archRadius)low=Math.max(low,radius+Math.sqrt(archRadius**2-dx**2));}
+      const shoulder=Math.max(low+.22*scale,top-.9*scale);
+      return [[x,-width*.67,2.8*scale],[x,-width,low],[x,-width,shoulder],[x,-width*.83,top],[x,width*.83,top],[x,width,shoulder],[x,width,low],[x,width*.67,2.8*scale]];
+    };
+    addLoft(faces,[...stations].sort((a,b)=>a-b).map(ringAt),paint);
+    let back=-w*.29,front=w*.2,roofBack=-w*.18,roofFront=w*.055,roofZ=15*scale;
+    if(coupe||sport){back=-w*.32;front=w*.19;roofBack=-w*.18;roofFront=w*.05;roofZ=(sport?12.7:13.8)*scale;}
+    if(type==='wagon'){back=-w*.43;roofBack=-w*.37;roofZ=15.8*scale;}
+    if(tall){back=-w*.45;front=w*.36;roofBack=-w*.415;roofFront=w*.27;roofZ=(type==='bus'?21:19)*scale;}
+    if(type==='truck'||guard||fire){back=w*.055;roofBack=w*.075;roofFront=w*.27;roofZ=18.5*scale;}
+    const cabinStations=[[back,bodyZ+.18*scale,.415],[roofBack,roofZ-.35*scale,.34],[(roofBack+roofFront)/2,roofZ,.335],[roofFront,roofZ-.35*scale,.34],[front,bodyZ+.18*scale,.415]];
+    const cabinRing=([x,z,width])=>[[x,-h*.423,bodyZ],[x,-h*width,z-.55*scale],[x,-h*(width-.035),z],[x,h*(width-.035),z],[x,h*width,z-.55*scale],[x,h*.423,bodyZ]];
+    const rings=cabinStations.map(cabinRing);
+    addLoft(faces,rings,paint,{caps:false,fill:(station,band)=>{
+      const glass=(band===0||band===4)||(band>=1&&band<=3&&(station===0||station===3));
+      const opaque=tall&&type!=='bus'&&station<2;
+      return {fill:glass&&!opaque?GLASS:paint,surface:glass&&!opaque?'glass':'paint'};
+    }});
+    // Glass seals and door pillars lie on the sloping cabin sides.
+    const interpolate=(x)=>{let i=0;while(i<3&&x>cabinStations[i+1][0])i++;const a=cabinStations[i],b=cabinStations[i+1],t=Math.max(0,Math.min(1,(x-a[0])/(b[0]-a[0])));return [a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];};
+    const sidePatch=(x0,x1,v0,v1,fill,surface='paint')=>{for(const side of [-1,1]){const point=(x,v)=>{const [roof,breadth]=interpolate(x);return [x,side*(h*(.423+(breadth-.423)*v)+.045*scale),bodyZ+(roof-.55*scale-bodyZ)*v];};const pts=[point(x0,v0),point(x1,v0),point(x1,v1),point(x0,v1)];if(side>0)pts.reverse();face(pts,fill,surface);}};
+    sidePatch(back+.25*scale,front-.25*scale,0,.08,TRIM,'rubber');sidePatch(roofBack,roofFront,.94,1,paint);
+    const pillars=coupe||sport?[back+.5*scale,front-1*scale]:type==='bus'?Array.from({length:7},(_,i)=>back+(front-back)*(i+1)/8):[back+1*scale,(roofBack+roofFront)/2,front-1*scale];
+    for(const x of pillars)sidePatch(x-.5*scale,x+.5*scale,.07,.97,paint);
+    const glassPoints=[rings[3][1],rings[3][4],rings[4][5],rings[4][0]];
+    windshield={points:glassPoints,normal:[1,0,1]};
+    for(const station of [0,3]){
+      const left=station===3?rings[3][1]:rings[1][1],right=station===3?rings[3][4]:rings[1][4],baseLeft=station===3?rings[4][0]:rings[0][0],baseRight=station===3?rings[4][5]:rings[0][5];
+      const point=(u,v)=>left.map((n,i)=>n+(right[i]-n)*u+((baseLeft[i]+(baseRight[i]-baseLeft[i])*u)-(n+(right[i]-n)*u))*v+(i===2?.06*scale:0));
+      const patch=(u0,u1,v0,v1,fill)=>{const pts=[point(u0,v0),point(u1,v0),point(u1,v1),point(u0,v1)];if(station===0)pts.reverse();face(pts,fill,'rubber');};
+      patch(0,.025,0,1,TRIM);patch(.975,1,0,1,TRIM);patch(0,1,0,.045,TRIM);patch(0,1,.955,1,TRIM);
+      if(station===3){patch(.10,.45,.81,.825,TRIM);patch(.55,.90,.81,.825,TRIM);}else for(let line=0;line<4;line++)patch(.06,.94,.25+line*.14,.259+line*.14,'#677775');
     }
-    // Narrow pillars follow the tapered window planes rather than floating on top.
-    for(const side of [-1,1]){
-      const pts=[[back,side*h*.431,bodyZ],[back+2,side*h*.431,bodyZ],[roofBack+2,side*h*.341,roofZ],[roofBack,side*h*.341,roofZ]];
-      if(side>0)pts.reverse();face(pts,paint,false);
-      const mid=(back+front)/2,roofMid=(roofBack+roofFront)/2;
-      const pillar=[[mid-1,side*h*.431,bodyZ],[mid+1,side*h*.431,bodyZ],[roofMid+1,side*h*.341,roofZ],[roofMid-1,side*h*.341,roofZ]];
-      if(side>0)pillar.reverse();face(pillar,paint,false);
-      box(front-3,side>0?h*.46:-h*.54,3,h*.08,bodyZ,bodyZ+2,paint);
+
+    // Fine belt lines, panel seams, handles and mirrors replace thick slabs.
+    const sidePanel=(x,l,z0,z1,fill,surface='paint')=>{
+      const breaks=[x,...[...stations].filter(t=>t>x&&t<x+l).sort((a,b)=>a-b),x+l];
+      const low=t=>{let bottom=z0;for(const axle of axles){const dx=t-axle;if(Math.abs(dx)<archRadius)bottom=Math.max(bottom,radius+Math.sqrt(archRadius**2-dx**2)+.05*scale);}return Math.min(z1,bottom);};
+      for(const side of [-1,1])for(let i=0;i<breaks.length-1;i++){const a=breaks[i],b=breaks[i+1];if(low(a)>=z1&&low(b)>=z1)continue;const points=[[a,side*h*.491,low(a)],[b,side*h*.491,low(b)],[b,side*h*.491,z1],[a,side*h*.491,z1]];if(side>0)points.reverse();face(points,fill,surface);}
+    };
+    sidePanel(-w*.405,w*.81,bodyZ-1.9*scale,bodyZ-1.15*scale,patrol?'#254e87':TRIM,patrol?'paint':'rubber');
+    if(patrol)sidePanel(-w*.405,w*.81,bodyZ-3.5*scale,bodyZ-1.15*scale,'#254e87');
+    for(const x of (coupe||sport?[back+.02*w,front]:[back+.02*w,(back+front)/2,front])){sidePanel(x,.11*scale,4.2*scale,bodyZ-1.9*scale,TRIM);sidePanel(x-2.4*scale,2*scale,bodyZ-.9*scale,bodyZ-.5*scale,CHROME,'chrome');}
+    for(const side of [-1,1])box(front-2*scale,side>0?h*.45:-h*.54,2.5*scale,h*.09,bodyZ+.4*scale,bodyZ+1.4*scale,paint);
+    // Slim rounded bumpers follow the tapered ends of the shell.
+    for(const end of [-1,1]){
+      const bumper=[end*w*.492,end*w*.515].map(x=>{const z=4.1*scale;return [[x,-h*.32,z-.6*scale],[x,-h*.375,z],[x,-h*.32,z+.65*scale],[x,h*.32,z+.65*scale],[x,h*.375,z],[x,h*.32,z-.6*scale]];});
+      if(end<0)bumper.reverse();addLoft(faces,bumper,CHROME,{surface:'chrome'});
+      const x=end*w*.501,plate=[[x,-h*.115,3.3*scale],[x,h*.115,3.3*scale],[x,h*.115,4.5*scale],[x,-h*.115,4.5*scale]];if(end<0)plate.reverse();face(plate,'#b8bcb2');
+      for(const side of [-1,1]){const y0=side<0?-h*.335:h*.16,points=[[x,y0,5.4*scale],[x,y0+h*.175,5.4*scale],[x,y0+h*.175,7.3*scale],[x,y0,7.3*scale]];if(end<0)points.reverse();face(points,end>0?'#fff0b7':'tail','lamp');}
+      if(end>0){face([[x,-h*.14,5*scale],[x,h*.14,5*scale],[x,h*.14,7.4*scale],[x,-h*.14,7.4*scale]],TRIM,'rubber');for(let i=0;i<3;i++)face([[x+.04,-h*.13,(5.4+i*.55)*scale],[x+.04,h*.13,(5.4+i*.55)*scale],[x+.04,h*.13,(5.55+i*.55)*scale],[x+.04,-h*.13,(5.55+i*.55)*scale]],CHROME,'chrome');}
     }
-    // Hood and boot have restrained seams and raised central highlights.
-    const patrol=(police||type==='police')&&!tactical&&!guard;
-    box(front+1,-h*.29,Math.max(1,w*.45-front),h*.58,bodyZ+.02,bodyZ+.12,patrol?'#3e5364':shade(paint,1.08));
-    if(!tall)box(-w*.41,-h*.27,Math.max(1,back+w*.4),h*.54,bodyZ+.02,bodyZ+.12,patrol?'#3e5364':shade(paint,1.05));
-    if(['van','ambulance','bus','armoredPolice'].includes(type))for(const side of [-1,1]){
-      const panel=(a,b,v0,v1,fill)=>{
-        const point=(u,v)=>[back+(front-back)*u+(roofBack-back+(roofFront-roofBack-front+back)*u)*v,side*h*(.431-.09*v),bodyZ+(roofZ-bodyZ)*v];
-        const pts=[point(a,v0),point(b,v0),point(b,v1),point(a,v1)];if(side>0)pts.reverse();face(pts,fill,false);
-      };
-      // Cargo bodies are opaque. Bus window bays have separate pillars and sills.
-      if(type!=='bus')panel(.02,.55,.02,.98,paint);
-      else{panel(0,1,0,.24,paint);for(let i=1;i<7;i++)panel(i/7-.012,i/7+.012,.24,.98,paint);}
-    }
-    if(type==='taxi')for(const side of [-1,1])for(let i=0;i<10;i++){
-      const x=-w*.33+i*w*.062,pts=[[x,side*h*.473,5.7],[x+w*.03,side*h*.473,5.7],[x+w*.03,side*h*.473,7],[x,side*h*.473,7]];
-      if(side>0)pts.reverse();face(pts,i%2?TRIM:'#eee0ad',false);
-    }
-    if(type==='truck'||guard){
-      box(-w*.44,-h*.43,w*.47,h*.86,8,18,guard?'#5f7152':'#988f76');
-      for(let i=0;i<5;i++)box(-w*.42+i*w*.085,-h*.435,1,h*.87,18,18.3,guard?'#899175':'#b4aa8e');
-    }
-    if(fire){
-      box(-w*.45,-h*.44,w*.48,h*.88,8,18,paint);
-      for(const side of [-1,1])for(let i=0;i<3;i++){
-        const x=-w*.42+i*w*.14,pts=[[x,side*h*.445,9],[x+w*.12,side*h*.445,9],[x+w*.12,side*h*.445,16],[x,side*h*.445,16]];
-        if(side>0)pts.reverse();face(pts,'#aab5b4');
-      }
-      for(const side of [-1,1])box(-w*.42,side*h*.14,w*.44,1.4,18,19.2,CHROME);
-      for(let i=0;i<7;i++)box(-w*.4+i*w*.058,-h*.14,1,h*.28,18,19,CHROME);
-    }
-    if(ems){
-      for(const side of [-1,1]){
-        const x=-w*.25,y=side*h*.385,z=15,pts=[[x-3,y,z-1],[x-1,y,z-1],[x-1,y,z-3],[x+1,y,z-3],[x+1,y,z-1],[x+3,y,z-1],[x+3,y,z+1],[x+1,y,z+1],[x+1,y,z+3],[x-1,y,z+3],[x-1,y,z+1],[x-3,y,z+1]];
-        if(side>0)pts.reverse();face(pts,'#db5f47',false);
-      }
-    }
-    if(type==='bus'){
-      // Roof air unit and a route box give buses a distinct long silhouette.
-      box(-w*.22,-h*.22,w*.28,h*.44,roofZ,roofZ+2,'#c5c7b8');
-      box(w*.24,-h*.28,3,h*.56,roofZ-3,roofZ,'#d9ba74');
-    }
-    if(type==='taxi')box(-3,-3,9,6,roofZ,roofZ+2,'#f2d383');
-    if(type==='sports'){
-      box(-w*.4,-h*.3,1.5,h*.6,bodyZ,bodyZ+2,TRIM);
-      box(-w*.44,-h*.36,w*.12,h*.72,bodyZ+2,bodyZ+3,paint);
-    }
-    if(service){
-      const x=(roofBack+roofFront)/2-2;
-      box(x,-h*.28,4,h*.56,roofZ,roofZ+1.4,TRIM);
-      box(x,-h*.27,4,h*.23,roofZ+1.4,roofZ+3,'sirenRed');
-      box(x,h*.04,4,h*.23,roofZ+1.4,roofZ+3,fire?'sirenAmber':'sirenBlue');
-    }
-    // Lamps live on the bumper faces. No oversized floating headlight tiles.
-    for(const side of [-1,1]){
-      box(w*.485,side<0?-h*.3:h*.16,1,h*.14,5,7,'#fff0b7');
-      box(-w*.505,side<0?-h*.3:h*.16,1,h*.14,5,7,'tail');
-    }
-    box(w*.496,-h*.13,.5,h*.26,4,6,TRIM);
+    // Hood shut lines and a narrow sky reflection stay flush to the sheet metal.
+    for(const side of [-1,1])face([[front+scale,side*h*.285,bodyZ+.035*scale],[w*.425,side*h*.285,bodyZ+.035*scale],[w*.425,side*h*.292,bodyZ+.035*scale],[front+scale,side*h*.292,bodyZ+.035*scale]],TRIM);
+    if(type==='taxi'){for(let i=0;i<18;i++)sidePanel(-w*.38+i*w*.043,w*.0215,bodyZ-2.3*scale,bodyZ-1.3*scale,i%2?TRIM:'#e9dfac');box(-2.5*scale,-2.5*scale,6*scale,5*scale,roofZ,roofZ+1.6*scale,'#edca56');face([[-2.51*scale,-2.5*scale,roofZ+.3*scale],[-2.51*scale,2.5*scale,roofZ+.3*scale],[-2.51*scale,2.5*scale,roofZ+1.3*scale],[-2.51*scale,-2.5*scale,roofZ+1.3*scale]],TRIM);}
+    if(type==='truck'||guard||fire){box(-w*.44,-h*.425,w*.47,h*.85,bodyZ,(type==='truck'?24:17.5)*scale,guard?'#5f7152':fire?paint:'#b5b4a7');for(const side of [-1,1]){for(let i=0;i<4;i++)box(-w*.415+i*w*.11,side*h*.428,fire?w*.09:.65*scale,.25*scale,11*scale,(type==='truck'?23:16)*scale,fire?'#aab5b4':guard?'#839074':'#a2a294');}}
+    if(ems){box(-w*.44,-h*.435,w*.48,h*.87,bodyZ,25*scale,paint);for(const side of [-1,1])box(-w*.43,side*h*.437,w*.46,.12*scale,13*scale,14.5*scale,'#bc493b');}
+    if(ems)for(const side of [-1,1]){const x=-w*.22,y=side*h*.439,z=20*scale;const pts=[[-3,-1],[-1,-1],[-1,-3],[1,-3],[1,-1],[3,-1],[3,1],[1,1],[1,3],[-1,3],[-1,1],[-3,1]].map(([a,b])=>[x+a*scale,y,z+b*scale]);if(side>0)pts.reverse();face(pts,'#db5f47');}
+    if(tactical)box(-w*.17,-h*.20,w*.19,h*.4,roofZ,roofZ+.8*scale,TRIM);
+    if(fire){for(const side of [-1,1])box(-w*.42,side*h*.16,w*.43,.8*scale,18*scale,19*scale,CHROME,'chrome');for(let i=0;i<7;i++)box(-w*.40+i*w*.057,-h*.16,.8*scale,h*.32,18*scale,18.6*scale,CHROME,'chrome');}
+    if(type==='wagon'){for(const side of [-1,1])box(roofBack,-side*h*.23,roofFront-roofBack,.65*scale,roofZ+.15*scale,roofZ+.65*scale,TRIM);for(const x of [roofBack+w*.06,roofFront-w*.04])box(x,-h*.23,.55*scale,h*.46,roofZ+.15*scale,roofZ+.65*scale,CHROME,'chrome');}
+    if(type==='bus')box(-w*.2,-h*.2,w*.28,h*.4,roofZ,roofZ+1.5*scale,'#b8b9a9');
+    if(sport)box(-w*.43,-h*.34,w*.08,h*.68,bodyZ+1.3*scale,bodyZ+1.9*scale,paint);
+    if(service){const x=(roofBack+roofFront)/2-1.7*scale;box(x,-h*.28,3.4*scale,h*.56,roofZ,roofZ+.65*scale,TRIM);box(x,-h*.27,3.4*scale,h*.23,roofZ+.65*scale,roofZ+2*scale,'sirenRed','lamp');box(x,h*.04,3.4*scale,h*.23,roofZ+.65*scale,roofZ+2*scale,fire?'sirenAmber':'sirenBlue','lamp');}
+    if(patrol){for(const side of [-1,1])box(w*.512,side*h*.12,1*scale,1*scale,3.6*scale,8*scale,TRIM);box(w*.514,-h*.12,1*scale,h*.28,7*scale,7.8*scale,TRIM);}
   }
-  // Faceted cylindrical tyres: their end caps and tread cull like the body.
-  const radius=type==='bike'?4.2:tall?5:4,axles=type==='bike'?[-w*.34,w*.34]:[-w*.3,w*.29];
+  // Rounded tyre shoulders and circular alloy rims. Only the visible outer
+  // wheel face needs spokes; the inner cap remains a simple dark disc.
   for(const x of axles)for(const side of type==='bike'?[0]:[-1,1]){
-    const y=side*h*.46,half=type==='bike'?h*.17:2.1,rings=[];
-    for(const cy of [y-half,y+half])rings.push(Array.from({length:12},(_,i)=>[x+Math.cos(i*Math.PI/6)*radius,cy,radius+Math.sin(i*Math.PI/6)*radius]));
-    for(let i=0;i<12;i++)face([rings[0][i],rings[1][i],rings[1][(i+1)%12],rings[0][(i+1)%12]],'#1d2428',false);
-    face(rings[0],TRIM);face([...rings[1]].reverse(),TRIM);
-    for(const cy of [y-half-.02,y+half+.02]){
-      const hub=Array.from({length:12},(_,i)=>[x+Math.cos(i*Math.PI/6)*radius*.7,cy,radius+Math.sin(i*Math.PI/6)*radius*.7]);
-      if(cy>y)hub.reverse();face(hub,CHROME,false);
-      const outer=cy+(cy>y?.02:-.02),recess=Array.from({length:12},(_,i)=>[x+Math.cos(i*Math.PI/6)*radius*.58,outer,radius+Math.sin(i*Math.PI/6)*radius*.58]);
-      if(cy>y)recess.reverse();face(recess,'#333b3e',false);
-      for(let spoke=0;spoke<5;spoke++){
-        const angle=spoke*Math.PI*2/5,point=(r,a)=>[x+Math.cos(a)*radius*r,outer+(cy>y?.02:-.02),radius+Math.sin(a)*radius*r];
-        const pts=[point(.17,angle-.32),point(.62,angle-.12),point(.62,angle+.12),point(.17,angle+.32)];
-        if(cy>y)pts.reverse();face(pts,'#b9c2bf',false);
-      }
-    }
+    const y=side*h*.456,half=(type==='bike'?h*.16:1.65*scale),segments=16;
+    const rings=[[-half,.9],[-half*.65,1],[half*.65,1],[half,.9]].map(([offset,r])=>Array.from({length:segments},(_,i)=>{const a=i*Math.PI*2/segments;return [x+Math.cos(a)*radius*r,y+offset,radius+Math.sin(a)*radius*r];}));
+    // Loft helper runs along x; tyre winding is explicitly outward here.
+    addLoft(faces,rings,'#1d2428',{surface:'rubber'});
+    const outer=side>=0?y+half+.025*scale:y-half-.025*scale;
+    let discLayer=0;const disc=(r,fill)=>{const cy=outer+(side>=0?1:-1)*discLayer++*.025*scale;const points=Array.from({length:segments},(_,i)=>{const a=i*Math.PI*2/segments;return [x+Math.cos(a)*radius*r,cy,radius+Math.sin(a)*radius*r];});if(side>=0)points.reverse();face(points,fill,fill===CHROME?'chrome':'rubber');};
+    disc(.72,CHROME);disc(.6,'#333b3e');
+    for(let spoke=0;spoke<5;spoke++){const angle=spoke*Math.PI*2/5,p=(r,a)=>[x+Math.cos(a)*radius*r,outer+(side>=0?.04:-.04)*scale,radius+Math.sin(a)*radius*r];const points=[p(.16,angle-.38),p(.66,angle-.10),p(.66,angle+.10),p(.16,angle+.38)];if(side>=0)points.reverse();face(points,CHROME,'chrome');}
+    disc(.18,CHROME);
   }
-  return {type,length,breadth,faces,windshield:faces.find(f=>f.fill===GLASS&&f.normal[0]>0&&Math.abs(f.normal[1])<.01)};
+  return {type,length,breadth,faces,windshield};
 }
 export function projectedVehicleFaces(mesh,angle=0,lift=0,time=0,vehicle={}){
   const cs=Math.cos(angle),sn=Math.sin(angle),flash=Math.sin(time*12)>0;

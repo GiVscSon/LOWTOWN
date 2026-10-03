@@ -15,6 +15,10 @@ on:
       - src/three/**
       - src/game/game_menu.*
       - src/game/street_surface.js
+      - src/game/street_vehicle.js
+      - src/game/vehicle_shapes.js
+      - tests/refined-transport*.mjs
+      - tests/fixtures/refined-transport.html
       - tests/crosswalk-markings-regression.mjs
       - scripts/pwa-icons.mjs
       - vite.config.js
@@ -38,10 +42,13 @@ jobs:
       - run: npm run build
       - run: npm run test:three-pwa-contract
       - run: node tests/three-city-geometry.mjs
+      - run: npm run test:refined-transport
       - run: npm run test:street-graphics
       - run: npm run test:organic-streets
       - run: node tests/crosswalk-markings-regression.mjs
       - run: npx playwright install --with-deps chromium
+      - name: Refined transport and building gallery
+        run: npm run test:refined-transport-browser
       - name: Three.js live rendering and PWA offline restart
         run: npm run test:three-pwa-browser
       - name: Pause menu, persistent settings and mobile controls
@@ -68,6 +75,14 @@ jobs:
         with:
           name: lowtown-street-graphics
           path: artifacts/street-graphics/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload transport and facade screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lowtown-refined-transport
+          path: artifacts/refined-transport/
           if-no-files-found: ignore
           retention-days: 14
       - name: Upload menu screenshots

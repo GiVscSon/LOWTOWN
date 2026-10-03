@@ -1,3 +1,4 @@
+import {createBuildingArchitecture} from './buildings.js';
 import * as THREE from 'three';
 import {createTransportVisual,updateTransportVisual} from './vehicles.js';
 import {createBoxBatch,ribbonGeometry} from './geometry.js';
@@ -165,24 +166,10 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
     for(const side of [-1,1])groundBoxes.add(pad.x+side*15,2.5,pad.y,5,.3,45,'#dfcb80');
     groundBoxes.add(pad.x,2.5,pad.y,30,.3,5,'#dfcb80');
   }
-  const walls=createBoxBatch(staticGroup,'#4b4540',1,undefined,surfaceMaterial('brick',0xffffff,lowCostMaterials)),windows=createBoxBatch(staticGroup,'#b99b56',1,new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({color:0xffffff,side:THREE.DoubleSide})),roofs=createBoxBatch(staticGroup,'#37434a',1,undefined,surfaceMaterial('roof',0xffffff,lowCostMaterials));
-  const wallColors=['#715347','#615451','#6d5946','#40525c','#555c4b','#5b4b5a'];
+  const architecture=createBuildingArchitecture(staticGroup,lowCostMaterials),{windows}=architecture;
   for(const [index,b] of (world.buildings||[]).entries()){
-    const height=(b.floors??(2+index%5))*24,x=b.x+b.w/2,z=b.y+b.h/2;
-    walls.add(x,height/2+3,z,b.w,height,b.h,wallColors[index%wallColors.length]);roofs.add(x,height+4,z,b.w+2,2,b.h+2,'#39444b');
+    const {height,x,z}=architecture.add(b,index);
     staticShadows.add(x+height*.16,3.24,z+height*.1,b.w+height*.32,1,b.h+height*.2);
-    roofs.add(x,height+6,z-b.h/2,b.w+4,5,3,'#566066');roofs.add(x,height+6,z+b.h/2,b.w+4,5,3,'#566066');
-    roofs.add(x-b.w/2,height+6,z,3,5,b.h,'#566066');roofs.add(x+b.w/2,height+6,z,3,5,b.h,'#566066');
-    for(let floor=0;floor<height/24;floor++)for(const side of [0,1])for(const direction of [-1,1]){
-      const length=side?b.h:b.w;
-      for(let offset=16;offset<length-10;offset+=32){const lit=(offset+floor*17+index*11)%13>4,color=lit?(floor===0?'#f2be71':'#c79653'):'#15222b';
-        const wx=side?(direction>0?b.x+b.w+.4:b.x-.4):b.x+offset,wz=side?b.y+offset:(direction>0?b.y+b.h+.4:b.y-.4),angle=side?direction*Math.PI/2:(direction>0?0:Math.PI);
-        windows.add(wx,7+floor*24,wz,16,2,1,'#9c8a72',angle);
-        windows.add(wx,14+floor*24,wz,14,14,1,'#11171b',angle);
-        windows.add(wx+(side?direction*.04:0),14+floor*24,wz+(side?0:direction*.04),10,10,1,color,angle);
-        windows.add(wx+(side?direction*.06:0),14+floor*24,wz+(side?0:direction*.06),1,10,1,'#554a3b',angle);}
-    }
-    if(b.w>90&&b.h>60)roofs.add(x-10,height+9,z-8,Math.min(28,b.w*.15),8,Math.min(18,b.h*.15),'#66716d');
     const neon=b.neon||'#efaa56',angle=({north:Math.PI,south:0,east:Math.PI/2,west:-Math.PI/2})[b.streetFacing]||0;
     const sideways=b.streetFacing==='east'||b.streetFacing==='west',length=sideways?b.h:b.w;
     const nx=Math.sin(angle),nz=Math.cos(angle),tx=Math.cos(angle),tz=-Math.sin(angle);
@@ -220,7 +207,7 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
     pools.add(lamp.x+5,3.3,lamp.y,115,1,130,'#ff942e');roadReflection(lamp.x,lamp.y);}
   for(const board of world.billboards||[]){details.add(board.x,32,board.y,4,64,4,'#606a61');const sign=mountedSign(board.text,95);sign.position.set(board.x,62,board.y);staticGroup.add(sign);}
   for(const crane of world.cranes||[]){details.add(crane.x,65,crane.y,5,130,5,'#b88845');details.add(crane.x+crane.reach/2,130,crane.y,Math.abs(crane.reach),5,5,'#b88845');}
-  groundBoxes.flush();paving.flush();asphalt.flush();timber.flush();reflectors.flush();staticShadows.flush();pools.flush();reflections.flush();details.flush();walls.flush();windows.flush();roofs.flush();const crowns=foliage.flush();
+  groundBoxes.flush();paving.flush();asphalt.flush();timber.flush();reflectors.flush();staticShadows.flush();pools.flush();reflections.flush();details.flush();architecture.flush();const crowns=foliage.flush();
   if(crowns)crowns.material.onBeforeCompile=shader=>{
     shader.uniforms.windTime={value:0};shader.uniforms.windStrength={value:0};crowns.material.userData.shader=shader;
     shader.vertexShader='uniform float windTime;uniform float windStrength;\n'+shader.vertexShader;
@@ -262,7 +249,7 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
     }
     const p=frame.player,altitude=Math.max(0,frame.altitude||0),foot=frame.mode==='foot',live=new Set();
     const drawVehicle=(key,vehicle,lift=0)=>{
-      live.add(key);const type=vehicle.model||vehicle.type||'sedan',stamp=`${type}:${vehicle.width}:${vehicle.height}:${vehicle.color}`;let entry=actors.get(key);
+      live.add(key);const type=vehicle.model||vehicle.type||'sedan',stamp=`${type}:${vehicle.width}:${vehicle.height}:${vehicle.color}:${!!vehicle.medical}:${!!vehicle.isPolice}`;let entry=actors.get(key);
       if(!entry||entry.stamp!==stamp){if(entry)scene.remove(entry.group);entry={group:createTransportVisual(vehicle),stamp};actors.set(key,entry);scene.add(entry.group);}
       const water=vehicle.kind==='water'||['tug','speedboat'].includes(type),airborne=lift>12;
       const rise=water||airborne?0:groundRise(vehicle.x,vehicle.y),heading=vehicle.angle||0,length=vehicle.width||48;

@@ -54,7 +54,9 @@
     "test:street-graphics": "node tests/street-contact-graphics-regression.mjs",
     "test:street-graphics-browser": "node tests/street-graphics-browser-smoke.mjs",
     "test:organic-streets": "node tests/organic-streets-regression.mjs",
-    "test:menu-browser": "node tests/game-menu-browser-smoke.mjs"
+    "test:menu-browser": "node tests/game-menu-browser-smoke.mjs",
+    "test:refined-transport": "node tests/refined-transport-regression.mjs",
+    "test:refined-transport-browser": "node tests/refined-transport-browser.mjs"
   },
   "dependencies": {
     "@sentry/browser": "^10.25.0",
