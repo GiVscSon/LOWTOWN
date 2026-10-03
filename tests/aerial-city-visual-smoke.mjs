@@ -49,7 +49,7 @@ async function screenshot(name) {
   assert(canvas.width >= Math.min(640,viewport.width*.5) && canvas.height >= Math.min(360,viewport.height*.5), `adaptive game canvas size is too small: ${JSON.stringify(canvas)}`);
   if(canvas.renderer==='three')assert(canvas.frames>=2,`Three.js renderer is not advancing: ${JSON.stringify(canvas)}`);
   const path = `${artifactDir}/${name}.png`;
-  await page.screenshot({ path });
+  await page.screenshot({ path,timeout:90000 });
   shots.push({ name, path, canvas });
 }
 
@@ -149,6 +149,9 @@ try {
   // The flight above verifies real controls. Stable survey positions then make
   // every district visible and comparable, rather than inferring whole-city
   // coverage from four timed legs which can end over open water.
+  // Controls above run on the real clock. Survey captures keep a single full
+  // quality frame instead of submitting continuous 11 MP work to software GL.
+  await page.evaluate(()=>window.__lowtownCityQA.advanceScene(0));
   await page.setViewportSize({width:2800,height:1800});
   const districts=await page.evaluate(()=>window.__lowtownCityQA.districts());
   assert.equal(districts.length,16);

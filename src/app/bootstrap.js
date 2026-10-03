@@ -288,6 +288,7 @@ export function installAppBootstrap(ctx) {
         viewDistrict(id) {
           const island = ctx.islands.find(i => i.id === id);
           if (!island || ctx.roam.profile.kind !== 'air' || ctx.roam.altitude < 180) throw new Error('Survey requires an airborne aircraft');
+          ctx.qaManualSceneClock ??= ctx.env.performance.now();
           Object.assign(ctx.player, {
             x: island.x + island.w / 2,
             y: island.y + island.h / 2,
@@ -297,6 +298,7 @@ export function installAppBootstrap(ctx) {
           });
           Object.keys(ctx.state.keys).forEach(key => ctx.state.keys[key] = false);
           ctx.state.wanted = 0;
+          ctx.threeRenderer.setCameraPreset(ctx.threeRenderer.cameraPreset);
           ctx.renderWorld();
           return {
             id,
