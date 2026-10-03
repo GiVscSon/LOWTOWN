@@ -53,7 +53,8 @@
     "test:three-pwa-browser": "node tests/three-pwa-browser-smoke.mjs",
     "test:street-graphics": "node tests/street-contact-graphics-regression.mjs",
     "test:street-graphics-browser": "node tests/street-graphics-browser-smoke.mjs",
-    "test:organic-streets": "node tests/organic-streets-regression.mjs"
+    "test:organic-streets": "node tests/organic-streets-regression.mjs",
+    "test:menu-browser": "node tests/game-menu-browser-smoke.mjs"
   },
   "dependencies": {
     "@sentry/browser": "^10.25.0",

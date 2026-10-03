@@ -5,9 +5,10 @@ const route = [
 ].map(worldPoint);
 const routeLegs = route.length - 1;
 
-export function createDriveLab({player,state,canvas,buildings,trafficCars,policeCars,routeInput,roam,responseActors=[]}) {
+export function createDriveLab({player,state,canvas,buildings,trafficCars,policeCars,routeInput,roam,responseActors=[],visible=true}) {
   const panel = document.createElement('section');
   panel.id = 'driveLab';
+  panel.hidden = !visible;
   panel.innerHTML = `<div class="lab-heading"><h1>LOWTOWN</h1><button id="labToggle" class="secondary" aria-label="Свернуть панель">−</button></div><small>PRIVATE TEST DRIVE · 1994</small>
     <div class="lab-actions"><button id="labRun">Автотест</button><button class="secondary" id="labReset">На старт</button></div>
     <div id="labStatus" role="status">Свободная поездка</div><div id="labMetrics"></div>
