@@ -26,7 +26,7 @@ for(const [action,fields] of Object.entries(fixtures))for(const time of [0,.2,.7
   const person={x:0,y:0,animationTime:time,...fields},pose=characterPose(person);assert.equal(pose.action,action);
   batch.update([person],()=>0);assert.equal(batch.actions[action],1);assert.equal(scene.children.length,objectCount,'animation allocated another scene object');
   for(const mesh of [...Object.values(batch.batches),...Object.values(batch.held),...Object.values(batch.personal)])for(let i=0;i<mesh.count;i++){mesh.getMatrixAt(i,m);assert(m.elements.every(Number.isFinite));assert(Math.abs(m.determinant()-1)<1e-5);}
-  if(person.inWater){batch.batches.head.getMatrixAt(0,m);const face=new THREE.Vector3(2,20.8,0).applyMatrix4(m);assert(face.y>-7&&face.y<0,'swimming face must stay above the actual water surface');assert.equal(batch.held.pistol.count,0);}
+  if(person.inWater){batch.batches.head.getMatrixAt(0,m);const face=new THREE.Vector3(2,20.8,0).applyMatrix4(m);assert(face.y>-7&&face.y<0,'swimming face must stay above the actual water surface');assert(Math.hypot(face.x-person.x,face.z-person.y)<12,'swimming body moved outside its physical water-ripple footprint');assert.equal(batch.held.pistol.count,0);}
   report.poses.push({action,time});
 }
 batch.update([{x:0,y:0,activity:'coffee'}],()=>0);assert.equal(batch.personal.cup.count,1);batch.update([{x:0,y:0,gait:1}],()=>0);assert.equal(batch.personal.cup.count,0,'cup persisted after the activity');

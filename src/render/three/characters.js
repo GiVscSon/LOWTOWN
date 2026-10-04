@@ -101,7 +101,8 @@ export function createCharacterBatch(scene,capacity=512,material=new THREE.MeshL
       actions[pose.action]=(actions[pose.action]||0)+1;
       q.setFromAxisAngle(up,-(p.heading??p.angle??0));
       q.multiply(localQ.setFromAxisAngle(sideAxis,pose.rootPitch)).multiply(localQ.setFromAxisAngle(forwardAxis,pose.rootRoll));
-      root.compose(pos.set(p.x,characterBaseHeight(p,surface(p.x,p.y),pose),p.y),q,size);
+      const heading=p.heading??p.angle??0;
+      root.compose(pos.set(p.x+Math.cos(heading)*pose.waterOffset,characterBaseHeight(p,surface(p.x,p.y),pose),p.y+Math.sin(heading)*pose.waterOffset),q,size);
       put('torso',i,Math.sin(pose.torsoPitch)*10,10*(1-Math.cos(pose.torsoPitch)),0,pose.torsoPitch,p.shirt||'#99906d',pose.torsoYaw);
       for(const [name,paint] of [['head',p.skin||'#c8a582'],['hair',p.hair||'#302b28'],['face',null]])put(name,i,Math.sin(pose.headPitch)*18.4,18.4*(1-Math.cos(pose.headPitch)),0,pose.headPitch,paint,pose.headYaw);
       for(const side of [-1,1]){

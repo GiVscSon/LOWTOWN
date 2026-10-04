@@ -72,7 +72,7 @@ export function characterPose(p) {
     headPitch: reloading || ['reading','checkingPhone','checkingTimetable'].includes(social) ? -.12 : 0, arms, legs, weaponPitch,
     item: social === 'coffee' ? 'cup' : social === 'reading' ? 'book' : social === 'checkingPhone' || social === 'checkingTimetable' ? 'phone' : p.activity === 'shopping' && !gun ? 'bag' : null,
     bob: swimming ? Math.sin(swimPhase) * .35 : Math.abs(Math.sin(phase)) * .3 * gait - landing * 1.3,
-    waterBase: -5.4 - 20.8 * Math.cos(swimPitch) + 2 * Math.sin(-swimPitch), down, gettingUp};
+    waterBase: -5.4 - 20.8 * Math.cos(swimPitch) + 2 * Math.sin(-swimPitch), waterOffset:swimming?-12*Math.sin(-swimPitch):0, down, gettingUp};
 }
 
 export function presentedCharacters(player, people, foot) {
