@@ -148,10 +148,10 @@ for(let row=0;row<3;row++)for(let col=0;col<4;col++){
   assert(distance>4,'random drive failed to move from its sampled location');
   travelSamples.push({row,col,surface:player.surface,distance:+distance.toFixed(1)});
 }
-const peopleOnLand=pedestrians.every(p=>Number.isFinite(p.x)&&Number.isFinite(p.y)&&isPositionOnSolidGround(p.x,p.y));
-assert(peopleOnLand,'pedestrian route update moved a person off the world surface');
+const peopleOnLandOrSwimming=pedestrians.every(p=>Number.isFinite(p.x)&&Number.isFinite(p.y)&&(p.inWater?!getWalkSurface()(p.x,p.y):getWalkSurface()(p.x,p.y))&&!isPedestrianSceneryBlocked(p.x,p.y,0,!!p.inWater));
+assert(peopleOnLandOrSwimming,'pedestrian route update moved a person off the world surface');
 assert(travelSamples.length>=9,'random drive samples did not cover enough city regions; seed='+seed+' samples='+travelSamples.length);
 assert(new Set(travelSamples.map(p=>p.col)).size===4&&new Set(travelSamples.map(p=>p.row)).size===3,'random drive samples must reach the full city span; seed='+seed);
-this.randomTravelAudit={seed,samples:travelSamples.length,regions:travelSamples,people:pedestrians.length,peopleOnLand};
+this.randomTravelAudit={seed,samples:travelSamples.length,regions:travelSamples,people:pedestrians.length,peopleOnLandOrSwimming};
 console.log('PASS: facility classification and routes, actual rendering, event response, and randomized travel across the road network',JSON.stringify({facilities:this.facilityRouteAudit,nonRoadFacilities:this.nonRoadFacilities,travel:this.randomTravelAudit}));
 `,sandbox);

@@ -27,7 +27,7 @@ for(let i=0;i<160;i++)movePedestrian(walker,3,0);
 const routeAssigned=pedestrians.filter(p=>p.route?.points?.length>=5).length;
 const beforeWalk=pedestrians.map(p=>({x:p.x,y:p.y}));
 pedestrians.forEach(p=>{p.pause=0;p.fleeTimer=0;p.goal=null;});
-for(let i=0;i<240;i++)updatePedestrians(1/60);
+for(let i=0;i<240;i++){updatePedestrians(1/60);stepWaterInteraction(1/60);}
 const walkingNpcCount=pedestrians.filter((p,i)=>Math.hypot(p.x-beforeWalk[i].x,p.y-beforeWalk[i].y)>2).length;
 this.report={
   parks:parkZones.length,
@@ -38,7 +38,7 @@ this.report={
   walkerBlocked:isPedestrianBlocked(walker.x,walker.y),
   routeAssigned,
   walkingNpcCount,
-  npcInsideObstacle:pedestrians.filter(p=>isPedestrianBlocked(p.x,p.y)).length,
+  npcInsideObstacle:pedestrians.filter(p=>isPedestrianBlocked(p.x,p.y,!!p.inWater)).length,
   scaleStable:walker.visualScale===initialScale,
   configuredScales:pedestrians.every(p=>Number.isFinite(p.visualScale))
 };`,sandbox);
@@ -53,5 +53,5 @@ assert.equal(sandbox.report.scaleStable,true,'walking changed pedestrian scale')
 assert.equal(sandbox.report.configuredScales,true,'pedestrian identity scale is missing');
 assert.ok(sandbox.report.routeAssigned>=100,'most city pedestrians should use authored sidewalk and park paths');
 assert.ok(sandbox.report.walkingNpcCount>=70,'pedestrians should make visible progress on their routes');
-assert.equal(sandbox.report.npcInsideObstacle,0,'an NPC entered a building, tree, car or water');
+assert.equal(sandbox.report.npcInsideObstacle,0,'an NPC entered a building, tree or car');
 console.log('PEDESTRIAN_WORLD_OK',JSON.stringify(sandbox.report));

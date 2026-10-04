@@ -10,8 +10,8 @@ ctx.pedestrianCarBlocked = function pedestrianCarBlocked(x, y, c) {
     sn = ctx.env.Math.sin(c.angle || 0);
   return ctx.env.Math.abs(dx * cs + dy * sn) < (c.width || 48) / 2 + 5 && ctx.env.Math.abs(-dx * sn + dy * cs) < (c.height || 24) / 2 + 5;
 };
-ctx.isPedestrianBlocked = function isPedestrianBlocked(x, y) {
-  if (ctx.isPedestrianSceneryBlocked(x, y)) return true;
+ctx.isPedestrianBlocked = function isPedestrianBlocked(x, y, allowWater=false) {
+  if (ctx.isPedestrianSceneryBlocked(x, y,0,allowWater)) return true;
   return ctx.parkedCars.some(c => ctx.pedestrianCarBlocked(x, y, c)) || (ctx.roam?.fleet || []).some(c => c.kind !== 'water' && ctx.pedestrianCarBlocked(x, y, c)) || ctx.trafficCars.some(c => ctx.pedestrianCarBlocked(x, y, c)) || ctx.policeCars.some(c => ctx.pedestrianCarBlocked(x, y, c)) || ctx.incidentPoliceCars.some(c => ctx.pedestrianCarBlocked(x, y, c)) || ctx.incidentResponseVehicles.some(c => ctx.pedestrianCarBlocked(x, y, c)) || ctx.roam?.mode !== 'foot' && !(ctx.roam?.altitude > 12) && ctx.pedestrianCarBlocked(x, y, ctx.player);
 };
 ctx.movePedestrian = function movePedestrian(p, dx, dy) {
@@ -118,14 +118,6 @@ ctx.updatePedestrians = function updatePedestrians(dt) {
   ctx.pedestrianSceneryIndex = ctx.getCityScenery().pedestrians;
   const cars = [...ctx.trafficCars, ...ctx.policeCars, ...ctx.incidentPoliceCars, ...ctx.incidentResponseVehicles, ...(ctx.roam?.mode !== 'foot' && !(ctx.roam?.altitude > 12) ? [ctx.player] : [])];
   ctx.pedestrians.forEach((p, index) => {
-    if(p.beachRoute||p.inWater){
-      const goal=p.beachRoute?.[p.beachRouteIndex||0]||p.waterSafe||ctx.nearestSafeSpawn(p.x,p.y),dx=goal.x-p.x,dy=goal.y-p.y,d=ctx.env.Math.hypot(dx,dy)||1;
-      const move=ctx.env.Math.min(d,dt*(p.inWater?28:34));
-      const x=p.x+dx/d*move,y=p.y+dy/d*move;
-      if(!ctx.isPedestrianSceneryBlocked(x,y,0,true)){p.x=x;p.y=y;p.heading=ctx.env.Math.atan2(dy,dx);p.gait=1;p.walkPhase=(p.walkPhase||0)+move*.23;}
-      if(d<8&&p.beachRoute)p.beachRouteIndex=((p.beachRouteIndex||0)+1)%p.beachRoute.length;
-      return;
-    }
     if (p.homeY === undefined) {
       p.homeY = p.y;
       p.homeX = p.x;
@@ -147,6 +139,16 @@ ctx.updatePedestrians = function updatePedestrians(dt) {
       return;
     }
     if(p.combatTimer>0){p.gait=0;return;}
+    if(p.beachRoute||p.inWater){
+      const goal=p.beachRoute?.[p.beachRouteIndex||0]||p.waterSafe||ctx.nearestSafeSpawn(p.x,p.y),dx=goal.x-p.x,dy=goal.y-p.y,d=ctx.env.Math.hypot(dx,dy)||1;
+      const move=ctx.env.Math.min(d,dt*(p.inWater?28:34));
+      const x=p.x+dx/d*move,y=p.y+dy/d*move;
+      if(!ctx.isPedestrianBlocked(x,y,true)){p.x=x;p.y=y;p.heading=ctx.env.Math.atan2(dy,dx);p.gait=1;p.walkPhase=(p.walkPhase||0)+move*.23;}
+      if(d<8&&p.beachRoute)p.beachRouteIndex=((p.beachRouteIndex||0)+1)%p.beachRoute.length;
+      p.activity=p.waterIntent?'beachSwimming':'beachWalking';
+      return;
+    }
+
     p.pause = ctx.env.Math.max(0, p.pause - dt);
     p.routeRecoveryCooldown = ctx.env.Math.max(0, (p.routeRecoveryCooldown || 0) - dt);
     const panicking = p.reaction === 'fleeing' || p.fleeTimer > 0 || p.eventFleeTimer > 0 || !!p.avoidZone;

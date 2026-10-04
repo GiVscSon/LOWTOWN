@@ -1,7 +1,8 @@
 import {corridorContains} from './street_corridors.js';
 
-// Open parapets only at a landward road entrance, including service driveways.
+// Open parapets at road entrances and actual supported boardwalk connections.
 export function bridgeRailOpenAt(bridge,x,y){
+  if(bridge.railFootways?.some(walk=>corridorContains(x,y,walk,12)))return true;
   if(!bridge.railAccess?.length)return false;
   const start=bridge.path[0],end=bridge.path.at(-1);
   return Math.min(Math.hypot(x-start.x,y-start.y),Math.hypot(x-end.x,y-end.y))<240&&bridge.railAccess.some(road=>corridorContains(x,y,road,12));

@@ -12,6 +12,8 @@ import {captureMotion} from '../../src/simulation/solid_contacts.js';
 
 const {runtime}=runtimeCity(731),c=runtime.context,report={water:[],weapons:[],bridges:[],beaches:{},models:{}};
 assert.equal(c.beachZones.length,3);assert.equal(c.pedestrians.filter(p=>p.beachRoute).length,30);
+assert(c.pedestrians.filter(p=>p.beachRoute).every(p=>Number.isFinite(p.visualScale)&&p.route.points.length>=5&&p.route.points===p.beachRoute));
+assert(c.bridgeRails.every(r=>r.footway),'obsolete motor bridge rail survived organic remapping');
 for(const beach of c.beachZones){assert(beach.w>=800&&beach.h>=300);assert(c.getWalkSurface()(beach.x+beach.w/2,beach.y+beach.h/2));}
 report.beaches={count:3,residents:30,swimmers:c.pedestrians.filter(p=>p.waterIntent).length};
 const dynamicTypes=['bench','bin','phone','bollard','planter','bikeRack','mailbox','parasol'];
@@ -37,6 +39,7 @@ function scene(){
   Object.keys(c.state.keys).forEach(key=>c.state.keys[key]=false);c.state.isMenuOpen=false;c.showToast=()=>{};c.raiseWantedFromCrime=()=>{};c.ambientVents=[];
 }
 for(const hz of [30,60,120]){
+  scene();const beachWalker={x:150,y:100,width:9,height:9,hp:100,beachRoute:[{x:150,y:100},{x:185,y:100}],beachRouteIndex:1,knockdownTimer:1,stance:'down'};c.pedestrians.push(beachWalker);for(let i=0;i<hz*2;i++)runtime.step(1/hz);assert.equal(beachWalker.knockdownTimer,0);assert.notEqual(beachWalker.stance,'down');assert(beachWalker.x>160,'beach resident did not recover movement after a collision');
   scene();c.roam.resetToFoot(190,100);c.state.keys.right=true;
   for(let i=0;i<hz;i++)runtime.step(1/hz);
   assert(c.player.inWater&&c.player.x>210,'shore movement was blocked or instantly snapped back');assert.equal(c.player.jumpHeight,0);assert(c.player.swimPhase>0);assert(c.effects.particles.some(p=>p.life>0&&p.kind==='ripple'&&p.baseY===-7));

@@ -654,14 +654,14 @@ ctx.initTopology = function initTopology() {
   // Bridges
   ctx.bridges.forEach(br => {
     if (br.dir === 'v') {
-      ctx.bridgeRails.push({
+      ctx.bridgeRails.push({bridgeId:br.id,footway:!!br.footway,
         x: br.x - 12,
         y: br.y,
         w: 14,
         h: br.h,
         axis: 'x'
       });
-      ctx.bridgeRails.push({
+      ctx.bridgeRails.push({bridgeId:br.id,footway:!!br.footway,
         x: br.x + br.w - 2,
         y: br.y,
         w: 14,
@@ -669,14 +669,14 @@ ctx.initTopology = function initTopology() {
         axis: 'x'
       });
     } else {
-      ctx.bridgeRails.push({
+      ctx.bridgeRails.push({bridgeId:br.id,footway:!!br.footway,
         x: br.x,
         y: br.y - 12,
         w: br.w,
         h: 14,
         axis: 'y'
       });
-      ctx.bridgeRails.push({
+      ctx.bridgeRails.push({bridgeId:br.id,footway:!!br.footway,
         x: br.x,
         y: br.y + br.h - 2,
         w: br.w,
@@ -1960,25 +1960,25 @@ ctx.initTopology = function initTopology() {
       });
     }
     if (typeof organicStreetNetwork === 'function' && !bridge.footway) continue;
-    if (bridge.dir === 'v') ctx.bridgeRails.push({
+    if (bridge.dir === 'v') ctx.bridgeRails.push({bridgeId:bridge.id,footway:!!bridge.footway,
       x: bridge.x - 12,
       y: bridge.y,
       w: 14,
       h: bridge.h,
       axis: 'x'
-    }, {
+    }, {bridgeId:bridge.id,footway:!!bridge.footway,
       x: bridge.x + bridge.w - 2,
       y: bridge.y,
       w: 14,
       h: bridge.h,
       axis: 'x'
-    });else ctx.bridgeRails.push({
+    });else ctx.bridgeRails.push({bridgeId:bridge.id,footway:!!bridge.footway,
       x: bridge.x,
       y: bridge.y - 12,
       w: bridge.w,
       h: 14,
       axis: 'y'
-    }, {
+    }, {bridgeId:bridge.id,footway:!!bridge.footway,
       x: bridge.x,
       y: bridge.y + bridge.h - 2,
       w: bridge.w,
@@ -2006,7 +2006,7 @@ ctx.initTopology = function initTopology() {
       w: 210,
       h: 250
     }))]);
-    ctx.bridgeRails.splice(0, ctx.bridgeRails.length, ...ctx.bridgeRails.filter(rail => ctx.bridges.some(b => b.footway && rail.x + rail.w >= b.x - 14 && rail.x <= b.x + b.w + 14 && rail.y + rail.h >= b.y - 14 && rail.y <= b.y + b.h + 14)));
+    ctx.bridgeRails.splice(0, ctx.bridgeRails.length, ...ctx.bridgeRails.filter(rail => rail.footway));
     for (let i = ctx.parkObstacles.length - 1; i >= 0; i--) if (onStreetCollection(ctx.parkObstacles[i].x, ctx.parkObstacles[i].y, ctx.roads, 45)) ctx.parkObstacles.splice(i, 1);
   }
   const openRails = [];
@@ -2016,7 +2016,7 @@ ctx.initTopology = function initTopology() {
       length = vertical ? rail.h : rail.w;
     const fixed = vertical ? rail.x + rail.w / 2 : rail.y + rail.h / 2;
     if (ctx.roads.some(r => r.points)) {
-      const motor = [...ctx.roads, ...ctx.bridges.filter(b => !b.footway)],
+      const motor = [...ctx.roads, ...ctx.bridges.filter(b => !b.footway || b.dir !== (vertical?'v':'h'))],
         steps = ctx.env.Math.ceil(length / 4);
       let from = null;
       for (let i = 0; i <= steps; i++) {

@@ -24,8 +24,9 @@ export function populateBeaches(ctx){
         if(ctx.isPedestrianSceneryBlocked(px,py))continue;
         const sea={x:px,y:y-80},sand={x:px,y:py};
         const swimmer=n<2;
+        const route=swimmer?[sand,{x:px,y:(py+sea.y)/2},sea,{x:px,y:(py+sea.y)/2},sand]:[sand,{x:px+30,y:py+12},{x:px+60,y:py+25},{x:px+5,y:py+30},{x:px-50,y:py+35}];
         ctx.pedestrians.push({x:px,y:py,hp:100,width:9,height:9,beachId:beach.id,districtId:id,
-          beachRoute:swimmer?[sand,sea,sand]:[sand,{x:px+60,y:py+25},{x:px-50,y:py+35}],beachRouteIndex:1,route:{districtId:id,points:[sand,swimmer?sea:{x:px+60,y:py+25},sand]},
+          beachRoute:route,beachRouteIndex:1,route:{districtId:id,kind:"beach",points:route},visualScale:.88+n%4*.035,
           shirt:['#ba7959','#608aa0','#aeae81','#8a6690'][n%4],pants:'#394a59',skin:n%2?'#ad7b58':'#d4b291',hair:n%3?'#342c26':'#786b4d',
           walkPhase:n,gait:1,waterSafe:sand,activity:swimmer?'beachSwimming':'beachWalking',waterIntent:swimmer,
           dailyStops:[{kind:'beachWalk',x:px,y:py},{kind:swimmer?'swimming':'sunbathing',x:px,y:swimmer?sea.y:py+30}]});
