@@ -1,3 +1,4 @@
+import {bodyHeight} from './body_physics.js';
 import {streetPoints,streetWidth} from '../world/street_corridors.js';
 import { resolveScenery, resolveContact, contact, chassis } from './solid_contacts.js';
 import { drawStreetVehicle } from '../render/shared/street_vehicle.js';
@@ -88,8 +89,8 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
       if(!bodyClear(x,y)||(!ignoreWater&&!solid(x,y)))return false;
     }return true;
   };
-  const footClear=(x,y)=>(layout.footBlocked?!layout.footBlocked(x,y):footSupport(x,y)&&bodyClear(x,y))&&
-    ![...fleet,...parked,...dynamicActors()].some(c=>contact({x,y,angle:0,length:9,breadth:9},chassis(c)));
+  const footClear=(x,y)=>(layout.footBlocked?!layout.footBlocked(x,y,player.jumpHeight||0):footSupport(x,y)&&bodyClear(x,y))&&
+    ![...fleet,...parked,...dynamicActors()].some(c=>c.intact!==false&&(player.jumpHeight||0)<bodyHeight(c)&&contact({x,y,angle:0,length:9,breadth:9},chassis(c)));
   function recoverFootSupport(){
     if(footSupport(player.x,player.y)){lastFootGround={x:player.x,y:player.y};return;}
     if(lastFootGround&&footClear(lastFootGround.x,lastFootGround.y))Object.assign(player,lastFootGround);
@@ -106,7 +107,9 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
   const vehicleClear=(x,y)=>solid(x,y)&&!buildings.some(b=>x>b.x-12&&x<b.x+b.w+12&&y>b.y-12&&y<b.y+b.h+12)&&
     !obstacles.some(o=>Math.abs(x-o.x)<(o.width||12)*.5+12&&Math.abs(y-o.y)<(o.height||12)*.5+12)&&
     ![...fleet,...parked,...dynamicActors()].some(c=>contact({x,y,angle:0,length:16,breadth:16},chassis(c)));
+  const resetActions=()=>Object.assign(player,{jumpHeight:0,jumpVelocity:0,jumpHeld:false,jumpRequested:false,attackRequested:false,attackTime:0,attackHeld:false,attackCooldown:0,landed:false});
   function interact() {
+    if(mode==='foot'&&player.jumpHeight>0)return notify('Приземлитесь перед посадкой');
     if(mode!=='foot') {
       if(Math.abs(player.speed)>.5||altitude>1) return notify('Остановитесь и приземлитесь перед выходом');
       let exit;
@@ -117,11 +120,12 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
       if(!exit)return notify('Нет безопасного выхода: подъедьте к берегу или свободному месту');
       const doorSide=Math.sign(-(exit.x-player.x)*Math.sin(player.angle)+(exit.y-player.y)*Math.cos(player.angle))||1;
       fleet.push({...VEHICLES[mode],type:mode,x:player.x,y:player.y,angle:player.angle,color:player.bodyColor||VEHICLES[mode].color,hp:player.hp,damage:player.damage?{...player.damage}:undefined,speed:0,doorSide,doorActionAt:performance.now()/1000});
-      Object.assign(player,exit,{entityType:'pedestrian',hp:personHp,damage:undefined,width:9,height:9,mass:70,speed:0,vx:0,vy:0,contactVx:0,contactVy:0,walkPhase:0,gait:0});lastFootGround=exit;mode='foot'; notify('Пешком · E — сесть в ближайший транспорт'); return;
+      Object.assign(player,exit,{entityType:'pedestrian',hp:personHp,damage:undefined,width:9,height:9,mass:70,speed:0,vx:0,vy:0,contactVx:0,contactVy:0,walkPhase:0,gait:0});lastFootGround=exit;mode='foot';resetActions(); notify('Пешком · E — сесть в ближайший транспорт'); return;
     }
     const candidates=[...fleet,...parked].filter(c=>Math.hypot(c.x-player.x,c.y-player.y)<115&&doorwayClear(player,c,c.kind==='water')).sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)-Math.hypot(b.x-player.x,b.y-player.y));
     const car=candidates[0]; if(!car)return notify('Подойдите к припаркованному транспорту');
     const doorSide=Math.sign(-(player.x-car.x)*Math.sin(car.angle)+(player.y-car.y)*Math.cos(car.angle||0))||1;
+    resetActions();
     personHp=player.hp??100;player.personHp=personHp;
     mode=car.type in VEHICLES?car.type:'sedan'; const profile=VEHICLES[mode];
     Object.assign(player,{entityType:'vehicle',x:car.x,y:car.y,angle:car.angle,width:profile.width,height:profile.height,mass:profile.mass||1500,bodyColor:car.color||profile.color,hp:car.hp??100,damage:car.damage?{...car.damage}:undefined,doorSide,doorActionAt:performance.now()/1000,speed:0,vx:0,vy:0,steeringAngle:0,reverseDelay:0});
@@ -146,11 +150,13 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
     notify(fly?(mode==='plane'?'Взлёт · удерживайте скорость, A/D — курс':'Взлёт · Q — перейти к снижению'):(mode==='plane'?'Снижение · самолёт садится на полосу':'Снижение · выберите свободную площадку'));
   }
   function resetToSedan(x=player.x,y=player.y,angle=0){
+    resetActions();
     mode='sedan';altitude=0;fly=false;landingWarned=false;
     const profile=VEHICLES.sedan;
     Object.assign(player,{entityType:'vehicle',x,y,angle,width:profile.width,height:profile.height,mass:profile.mass||1500,bodyColor:profile.color,damage:undefined,doorActionAt:undefined,speed:0,vx:0,vy:0,contactVx:0,contactVy:0,stance:null,knockdownTimer:0,rpm:0,gear:'D1',steeringAngle:0,reverseDelay:0});
   }
   function resetToFoot(x=player.x,y=player.y,angle=0){
+    resetActions();
     mode='foot';altitude=0;fly=false;landingWarned=false;
     lastFootGround=null;
     Object.assign(player,{entityType:'pedestrian',x,y,angle,width:9,height:9,mass:70,
@@ -162,11 +168,19 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
     const frame=Math.min(dt,.05)*60;
     if(mode==='foot') {
       recoverFootSupport();
+      const jumping=!!keys.handbrake||player.jumpRequested;player.jumpRequested=false;
+      if(jumping&&!player.jumpHeld&&!player.jumpHeight&&!player.knockdownTimer){player.jumpVelocity=105;player.jumpHeight=.0001;}
+      player.jumpHeld=!!keys.handbrake;
+      if(player.jumpHeight>0){
+        const duration=Math.max(0,Math.min(dt,.1)),v=player.jumpVelocity||0;
+        player.jumpHeight+=v*duration-125*duration*duration;player.jumpVelocity=v-250*duration;
+        if(player.jumpHeight<=0){player.jumpHeight=0;player.jumpVelocity=0;player.landed=true;}
+      }
       const sx=Number(!!keys.right)-Number(!!keys.left),sy=Number(!!keys.down)-Number(!!keys.up),len=Math.hypot(sx,sy)||1;
       // Invert the camera basis: up on keyboard/touch moves up on the screen.
       const dx=sx/Math.sqrt(3)+sy,dy=-sx/Math.sqrt(3)+sy;
       const oldX=player.x,oldY=player.y;
-      const moveX=dx/len*2.4*frame,moveY=dy/len*2.4*frame,steps=Math.max(1,Math.ceil(Math.hypot(moveX,moveY)/2));
+      const moveX=dx/len*2.4*frame+(player.contactVx||0)*frame,moveY=dy/len*2.4*frame+(player.contactVy||0)*frame,steps=Math.max(1,Math.ceil(Math.hypot(moveX,moveY)/2));
       // Small swept steps stop at shores and slide along solid walls.
       for(let i=0;i<steps;i++){
         if(footClear(player.x+moveX/steps,player.y))player.x+=moveX/steps;

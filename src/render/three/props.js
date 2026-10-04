@@ -20,6 +20,22 @@ export function streetPropGeometry(type){
     for(const side of [-1,1])add(new THREE.CylinderGeometry(.16,.16,.09,8).rotateZ(Math.PI/2),'#bfa380',side*.37,.55,0);
     add(new THREE.CylinderGeometry(.17,.17,.16,8).rotateX(Math.PI/2),'#8f7660',0,.45,.28);
     box(.08,.10,.08,'#7c6b52',0,1.02,0);
+  }else if(type==='crate'){
+    box(.9,.85,.9,'#806141',0,.48,0);
+    for(const side of [-1,1])for(const z of [-.32,0,.32])box(.035,.85,.025,'#443b2c',side*.46,.48,z);
+    for(const side of [-1,1])for(const y of [.17,.78]){box(.96,.08,.04,'#b09870',0,y,side*.47);box(.04,.08,.96,'#b09870',side*.47,y,0);}
+    for(const x of [-.28,.28])box(.1,.045,.94,'#a7895d',x,.93,0);
+  }else if(type==='barrel'||type==='trashcan'){
+    const steel=type==='barrel';
+    add(new THREE.CylinderGeometry(.4,.38,.85,12),steel?'#8a5842':'#5a6762',0,.47,0);
+    for(const y of [.17,.72])add(new THREE.CylinderGeometry(.42,.42,.06,12),'#38413f',0,y,0);
+    add(new THREE.CylinderGeometry(.43,.43,.05,12),steel?'#89614a':'#738079',0,.92,0);
+    if(steel)add(new THREE.CylinderGeometry(.055,.055,.015,8),'#343d3b',.21,.95,.16);
+    else box(.22,.055,.08,'#303c39',0,.98,0);
+  }else if(type==='cone'){
+    box(.95,.06,.95,'#282f32',0,.03,0);
+    add(new THREE.CylinderGeometry(.05,.32,.82,10),'#d88636',0,.48,0);
+    add(new THREE.CylinderGeometry(.13,.18,.17,10),'#d8d2b7',0,.62,0);
   }else{
     box(.94,.70,.84,'#496657',0,.5,0);
     const lid=new THREE.BoxGeometry(.50,.07,.92);lid.rotateZ(-.06);add(lid,'#303c36',-.25,.91,0);
@@ -34,22 +50,22 @@ export function streetPropGeometry(type){
   }
   const geometry=mergeGeometries(parts);parts.forEach(g=>g.dispose());geometry.computeBoundingSphere();geometryCache.set(type,geometry);return geometry;
 }
-export function createStreetProps(scene,material,capacity=128){
+export function createStreetProps(scene,material,capacity=256){
   const batches={};
-  for(const type of ['hydrant','dumpster']){
+  for(const type of ['hydrant','dumpster','crate','barrel','trashcan','cone']){
     const mesh=new THREE.InstancedMesh(streetPropGeometry(type),material,capacity);mesh.count=0;mesh.frustumCulled=false;scene.add(mesh);batches[type]=mesh;
   }
   const matrix=new THREE.Matrix4(),position=new THREE.Vector3(),scale=new THREE.Vector3(),rotation=new THREE.Quaternion(),axis=new THREE.Vector3(0,1,0);
   return {batches,update(props,surface){
-    const counts={hydrant:0,dumpster:0};
+    const counts=Object.fromEntries(Object.keys(batches).map(type=>[type,0]));
     for(const prop of props.slice(0,capacity)){
       if(prop.intact===false)continue;
-      const type=prop.type==='hydrant'?'hydrant':'dumpster',index=counts[type]++;
+      const type=batches[prop.type]?prop.type:'dumpster',index=counts[type]++;
       rotation.setFromAxisAngle(axis,-(prop.angle||0));
-      matrix.compose(position.set(prop.x,surface(prop.x,prop.y),prop.y),rotation,scale.set(prop.w||14,type==='hydrant'?14:20,prop.h||14));
+      matrix.compose(position.set(prop.x,surface(prop.x,prop.y),prop.y),rotation,scale.set(prop.w||14,prop.collisionHeight||(type==='hydrant'?14:20),prop.h||14));
       batches[type].setMatrixAt(index,matrix);
     }
     for(const type of Object.keys(batches)){batches[type].count=counts[type];batches[type].instanceMatrix.needsUpdate=true;}
-    return counts.hydrant+counts.dumpster;
+    return Object.values(counts).reduce((a,b)=>a+b,0);
   }};
 }

@@ -169,7 +169,7 @@ export function createTransportVisual(vehicle){
 }
 export function updateTransportVisual(group,vehicle,time,altitude=0,weather={},detailed=true){
   const water=vehicle.kind==='water'||['tug','speedboat'].includes(group.userData.type);
-  group.position.set(vehicle.x,(water?-6:3.6)+altitude,vehicle.y);group.rotation.y=-(vehicle.angle||0);
+  group.position.set(vehicle.x,(water?-6:3.6)+altitude,vehicle.y);group.rotation.set(water?0:(vehicle.roll||0),-(vehicle.angle||0),water?0:(vehicle.pitch||0),'YXZ');
   if(group.userData.wake){group.userData.wake.visible=Math.abs(vehicle.speed||0)>.25;group.userData.wake.material.opacity=.12+Math.sin(time*5)**2*.12;group.userData.wake.scale.x=.9+Math.min(1,Math.abs(vehicle.speed||0)/5)*.4;}
   if(group.userData.rotor)group.userData.rotor.rotation.y=time*32;
   if(group.userData.propeller)group.userData.propeller.rotation.x=time*40;

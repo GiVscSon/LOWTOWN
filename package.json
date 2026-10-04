@@ -58,7 +58,9 @@
     "test:refined-transport": "node tests/refined-transport-regression.mjs",
     "test:refined-transport-browser": "node tests/refined-transport-browser.mjs",
     "test:quality-matrix": "node tests/matrix/game-quality.mjs",
-    "test:quality-browser": "node tests/matrix/quality-browser.mjs"
+    "test:quality-browser": "node tests/matrix/quality-browser.mjs",
+    "test:interaction-matrix": "node tests/matrix/interaction-world.mjs",
+    "test:interaction-browser": "node tests/matrix/interaction-browser.mjs"
   },
   "dependencies": {
     "@sentry/browser": "^10.25.0",

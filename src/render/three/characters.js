@@ -61,13 +61,16 @@ export function createCharacterBatch(scene,capacity=512,material=new THREE.MeshL
       const p=people[i],down=p.knockdownTimer>0||p.stance==='down',phase=p.walkPhase||0,gait=p.gait??(phase?1:0),stride=Math.sin(phase)*.42*gait;
       q.setFromAxisAngle(up,-(p.heading??p.angle??0));
       if(down)q.multiply(localQ.setFromAxisAngle(sideAxis,-Math.PI/2));
-      root.compose(pos.set(p.x,surface(p.x,p.y)+(down?3:1.2+Math.abs(Math.sin(phase))*.3*gait),p.y),q,size);
+      root.compose(pos.set(p.x,surface(p.x,p.y)+(down?3:1.2+(p.jumpHeight||0)+Math.abs(Math.sin(phase))*.3*gait),p.y),q,size);
       put('torso',i,0,0,0,0,p.shirt||'#99906d');put('head',i,0,0,0);
       for(const side of [-1,1]){
-        const index=i*2+(side>0?1:0),swing=down?0:stride*side,knee=Math.max(0,-swing)*.9;
+        const index=i*2+(side>0?1:0),swing=down?0:p.jumpHeight>0?-.38:stride*side,knee=p.jumpHeight>0?.65:Math.max(0,-swing)*.9;
         put('thigh',index,0,11.2,side*1.65,swing);
         put('shin',index,Math.sin(swing)*5.5,11.2-Math.cos(swing)*5.5,side*1.65,swing-knee);
-        const arm=-swing*.85+.08;
+        const contactTime=p.combatTimer>0?.35:.14,duration=p.combatTimer>0?.7:.42,t=p.attackTime||0;
+        const envelope=t<contactTime?Math.sin(t/contactTime*Math.PI/2):Math.max(0,Math.cos(Math.min(1,(t-contactTime)/(duration-contactTime))*Math.PI/2));
+        const punch=t>0&&side===(p.attackSide||1)?envelope:0;
+        const arm=punch>0?1.65*punch-.15:p.jumpHeight>0?-.35:-swing*.85+.08;
         put('upperArm',index,0,17.6,side*4.1,arm,p.shirt||'#99906d');
         put('forearm',index,Math.sin(arm)*3.9,17.6-Math.cos(arm)*3.9,side*4.1,arm-.15,p.shirt||'#99906d');
       }

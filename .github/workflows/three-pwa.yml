@@ -57,6 +57,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Full graphics, weather, settings and mobile matrix
         run: npm run test:quality-browser
+      - name: Jump, melee, movable props, particles and touch controls
+        run: npm run test:interaction-browser
       - name: Refined transport and building gallery
         run: npm run test:refined-transport-browser
       - name: Three.js live rendering and PWA offline restart
@@ -71,6 +73,14 @@ jobs:
           npm run test:pages-smoke
       - name: Three.js aerial city visual sweep
         run: npm run test:aerial-visual
+      - name: Upload interaction matrix and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lowtown-interaction-world
+          path: artifacts/interaction-world/
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Upload Three.js aerial screenshots
         if: always()
         uses: actions/upload-artifact@v4

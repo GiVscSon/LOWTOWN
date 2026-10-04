@@ -133,6 +133,7 @@ ctx.state = {
   pausedDuration: 0,
   lastFrameTime: ctx.env.performance.now(),
   keys: {
+    attack: false,
     up: false,
     down: false,
     left: false,

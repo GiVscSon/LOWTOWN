@@ -1,3 +1,4 @@
+import {populateWorldDetails} from './details.js';
 // One shared runtime context owns state; this system has no hidden globals.
 export function installWorldCity(ctx){
 const {AUTHORED_TERRAIN,assignWalkingRoutes,corridorRoad,createCityIncidentDirector,createRoadCircuits,createRoadGraph,createWalkingRoutes,fitBuildingsToStreets,isletWalkways,nearestStreet,normalizeStreetGeometry,onRoadSurface,onStreetCollection,organicStreetNetwork,planStopRoute,pointInCoast,rectangleClearOfStreets,remapBridges,remapLegacyScene,roadTerminals,streetPoints,streetSurfaceGeometry,streetWidth,worldPoint}=ctx.dependencies;
@@ -2237,6 +2238,9 @@ ctx.initTopology = function initTopology() {
       });
     }
   });
+  // Final shelter/scenery relocation can keep array lengths unchanged.
+  // Rebuild collision bounds before assigning residents to walking routes.
+  ctx.invalidateScenery();
   ctx.walkingRoutes = createWalkingRoutes(ctx.roads, ctx.parkZones, (x, y) => !ctx.isPedestrianSceneryBlocked(x, y) && !onRoadSurface(x, y, ctx.roads, ctx.bridges, [], ctx.roadEnds) && !ctx.parkedCars.some(c => ctx.pedestrianCarBlocked(x, y, c)));
   for (const route of ctx.walkingRoutes) {
     const point = route.points[ctx.env.Math.floor(route.points.length / 2)];
@@ -2263,6 +2267,7 @@ ctx.initTopology = function initTopology() {
   }
   assignWalkingRoutes(ctx.pedestrians, ctx.walkingRoutes);
   ctx.preparePedestrianRoutines();
+  populateWorldDetails(ctx);
 };
 ctx.alignStreetLocations = function alignStreetLocations() {
   if (!ctx.roads.some(r => r.points)) return;

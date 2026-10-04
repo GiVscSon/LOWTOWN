@@ -1,4 +1,5 @@
 // Oriented bodies and inelastic momentum exchange used by the live city.
+import {bodyHeight} from './body_physics.js';
 import { createSpatialIndex } from './spatial_index.js';
 export { createSpatialIndex } from './spatial_index.js';
 export function chassis(body) {
@@ -18,7 +19,7 @@ export function contact(a, b) {
   }
   return { ...normal, depth };
 }
-const mass = body => Math.max(50, Number(body.mass) || 1500);
+const mass = body => Math.max(1, Number(body.mass) || 1500);
 const velocity = body => ({x:Number.isFinite(body.vx)?body.vx:Math.cos(body.angle||0)*(body.speed||0),
   y:Number.isFinite(body.vy)?body.vy:Math.sin(body.angle||0)*(body.speed||0)});
 function setVelocity(body,x,y) {
@@ -46,8 +47,8 @@ export function resolveContact(a, b, fixed = false) {
   return true;
 }
 function sceneryBodies(buildings,trees,props){
-  return [...buildings.map(b=>({x:b.x+b.w/2,y:b.y+b.h/2,width:b.w,height:b.h})),
-    ...trees.map(t=>({x:t.x,y:t.y,width:12,height:12})),...props];
+  return [...buildings.map(b=>({x:b.x+b.w/2,y:b.y+b.h/2,width:b.w,height:b.h,collisionHeight:(b.floors||5)*24+12})),
+    ...trees.map(t=>({x:t.x,y:t.y,width:12,height:12,collisionHeight:80})),...props];
 }
 // Static geometry is indexed once by the city, while movable bodies remain
 // in the swept dynamic broad phase. Keep prop sources live (broken hydrants).
@@ -88,7 +89,7 @@ export function solveVehicleMotion(bodies,starts,dt,{buildings=[],trees=[],props
   for(const body of bodies){
     const end={x:body.x,y:body.y,angle:body.angle||0};let start=starts.get(body)||end;
     if(Math.hypot(end.x-start.x,end.y-start.y)>512)start=end; // custody/respawn is a relocation, never a swept crash
-    const person=people.has(body),parked=passive.has(body),angle=person?0:Math.atan2(Math.sin(end.angle-start.angle),Math.cos(end.angle-start.angle));
+    const person=people.has(body),parked=passive.has(body),angle=person?0:Math.atan2(Math.sin(end.angle-start.angle),Math.cos(end.angle-start.angle))+(parked?(body.angularVelocity||0)*dt:0);
     let vx=(end.x-start.x)/frame,vy=(end.y-start.y)/frame;
     if(parked){const v=velocity(body);vx=v.x;vy=v.y;}
     else if(body!==player){vx+=body.contactVx||0;vy+=body.contactVy||0;}
@@ -101,12 +102,13 @@ export function solveVehicleMotion(bodies,starts,dt,{buildings=[],trees=[],props
   for(const s of states){
     Object.assign(s.body,s.start);
     const travel=Math.hypot(s.vx,s.vy)*frame+s.radius+4;
-    s.scenery=sceneryIndex.query(s.start.x-travel,s.start.y-travel,s.start.x+travel,s.start.y+travel);
+    s.scenery=sceneryIndex.query(s.start.x-travel,s.start.y-travel,s.start.x+travel,s.start.y+travel).map(p=>({body:p,person:false,vx:0,vy:0,radius:p.radius}));
   }
   const reported=new Map();
   function collide(a,b,fixed=false){
     if(!isEnabled(a.body)||!isEnabled(b.body.source||b.body))return false;
     if(Math.abs(a.body.x-b.body.x)>a.radius+b.radius||Math.abs(a.body.y-b.body.y)>a.radius+b.radius)return false;
+    if((a.body.jumpHeight||0)>=(b.person?23:bodyHeight(b.body))||(!fixed&&(b.body.jumpHeight||0)>=(a.person?23:bodyHeight(a.body))))return false;
     const hit=contact(shape(a),shape(b));if(!hit)return false;
     const closing=Math.max(0,-((a.vx-b.vx)*hit.x+(a.vy-b.vy)*hit.y));
     const target=b.body.source||b.body;
@@ -143,8 +145,9 @@ export function solveVehicleMotion(bodies,starts,dt,{buildings=[],trees=[],props
   for(let step=0;step<steps;step++){
     for(const s of states){
       const pose={x:s.body.x,y:s.body.y,angle:s.body.angle};
-      s.body.x+=s.vx*slice;s.body.y+=s.vy*slice;s.body.angle=s.start.angle+s.angle*(step+1)/steps;
-      if((s.parked&&Math.hypot(s.vx,s.vy)>.001||Math.abs(s.vx-s.engineX)+Math.abs(s.vy-s.engineY)>.01)&&!canOccupy(s.body,s.body,s.person)){Object.assign(s.body,pose);s.vx=s.vy=0;}
+      const coast=s.parked&&dt>0?(1-Math.exp(-3*dt))/(3*dt):1;
+      s.body.x+=s.vx*slice*coast;s.body.y+=s.vy*slice*coast;s.body.angle=s.start.angle+s.angle*(step+1)/steps;
+      if((s.person||s.parked&&Math.hypot(s.vx,s.vy)>.001||Math.abs(s.vx-s.engineX)+Math.abs(s.vy-s.engineY)>.01)&&!canOccupy(s.body,s.body,s.person)){Object.assign(s.body,pose);s.vx=s.vy=0;}
     }
     for(let pass=0;pass<32;pass++){
       let touched=false;
@@ -157,7 +160,7 @@ export function solveVehicleMotion(bodies,starts,dt,{buildings=[],trees=[],props
         const reach=Math.max(1,Math.ceil((a.radius+maxRadius)/cellSize));
         for(let x=cx-reach;x<=cx+reach;x++)for(let y=cy-reach;y<=cy+reach;y++)
           for(const j of cells.get(`${x},${y}`)||[])if(j>i)touched=collide(a,states[j])||touched;
-        for(const p of a.scenery){const b={body:p,person:false,vx:0,vy:0,radius:p.radius};touched=collide(a,b,true)||touched;}
+        for(const b of a.scenery)touched=collide(a,b,true)||touched;
       }
       if(!touched)break;
     }
@@ -172,4 +175,5 @@ export function solveVehicleMotion(bodies,starts,dt,{buildings=[],trees=[],props
     if(s.parked)setVelocity(s.body,s.vx*decay,s.vy*decay);
     else if(s.body!==player){s.body.contactVx*=decay;s.body.contactVy*=decay;if(Math.hypot(s.body.contactVx,s.body.contactVy)<.01)s.body.contactVx=s.body.contactVy=0;}
   }
+  return {bodies:bodies.length,activeBodies:states.length,sleepingBodies:bodies.length-states.length,steps};
 }

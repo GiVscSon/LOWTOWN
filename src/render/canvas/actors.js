@@ -19,7 +19,7 @@ ctx.drawScreenPedestrian = function drawScreenPedestrian(ped, sx, sy, index, zoo
     skin = ped.skin || '#c99f77';
   const accessory = ped.accessory || '';
   ctx.ctx.save();
-  ctx.ctx.translate(sx, sy);
+  ctx.ctx.translate(sx, sy-(ped.jumpHeight||0)*zoom);
   ctx.ctx.scale(size, size);
   ctx.ctx.fillStyle = 'rgba(0,0,0,.45)';
   ctx.ctx.beginPath();

@@ -91,10 +91,10 @@ ctx.pedestrianSceneryBounds = function pedestrianSceneryBounds(infrastructure=[]
     source: t
   }))];
 };
-ctx.isPedestrianSceneryBlocked = function isPedestrianSceneryBlocked(x, y) {
+ctx.isPedestrianSceneryBlocked = function isPedestrianSceneryBlocked(x, y, jumpHeight=0) {
   if (!ctx.getWalkSurface()(x, y)) return true;
   ctx.pedestrianSceneryIndex = ctx.getCityScenery().pedestrians;
-  if (ctx.pedestrianSceneryIndex) return ctx.pedestrianSceneryIndex.query(x, y, x, y).some(p => p.source?.intact!==false && (p.tree ? ctx.env.Math.hypot(x - p.source.x, y - p.source.y) < 11 : x > p.left && x < p.right && y > p.top && y < p.bottom));
+  if (ctx.pedestrianSceneryIndex) return ctx.pedestrianSceneryIndex.query(x, y, x, y).some(p => p.source?.intact!==false && !(p.source?.collisionHeight && jumpHeight>=p.source.collisionHeight) && (p.tree ? ctx.env.Math.hypot(x - p.source.x, y - p.source.y) < 11 : x > p.left && x < p.right && y > p.top && y < p.bottom));
   if (ctx.buildings.some(b => x > b.x - 7 && x < b.x + b.w + 7 && y > b.y - 7 && y < b.y + b.h + 7)) return true;
   if (ctx.solidProps.some(o => ctx.env.Math.abs(x - o.x) < o.width * .5 + 5 && ctx.env.Math.abs(y - o.y) < o.height * .5 + 5)) return true;
   if (ctx.trees.some(t => ctx.env.Math.hypot(x - t.x, y - t.y) < 11)) return true;

@@ -3,6 +3,16 @@ export function installUiInterface(ctx){
 const {VEHICLES,VEHICLE_ASSETS,coastPath}=ctx.dependencies;
 ctx.renderHud = function renderHud() {
   ctx.renderRadar();
+  const foot = ctx.roam?.mode === 'foot';
+  if (ctx.hudFootMode !== foot) {
+    ctx.hudFootMode = foot;
+    for (const [id,label] of [['btnHandbrake',foot?'Прыжок':'HB'],['btnNitro',foot?'Удар':'N2O']]) {
+      const button=ctx.env.document.getElementById(id),span=button?.querySelector?.('span');
+      if(span)span.textContent=label;
+      button?.setAttribute?.('aria-label',foot?(id==='btnHandbrake'?'Прыжок · Пробел':'Удар · F'):(id==='btnHandbrake'?'Ручной тормоз':'Нитро'));
+    }
+    const gauge=ctx.env.document.querySelector?.('.nitro-gauge');if(gauge)gauge.hidden=foot;
+  }
   const speedEl = ctx.env.document.getElementById('hudSpeed');
   if (speedEl) speedEl.innerText = ctx.roam?.mode === 'foot' ? 'ПЕШКОМ' : ctx.env.Math.round(ctx.env.Math.abs(ctx.player.speed) * 12);
   const enterEl = ctx.env.document.getElementById('btnRoamEnter');
