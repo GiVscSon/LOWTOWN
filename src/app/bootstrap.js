@@ -530,7 +530,7 @@ export function installAppBootstrap(ctx) {
           })),
           people: ctx.pedestrians.length,
           traffic: ctx.trafficCars.length,
-          badPeople: ctx.pedestrians.filter(p => ctx.isPedestrianSceneryBlocked(p.x, p.y)).length,
+          badPeople: ctx.pedestrians.filter(p => ctx.isPedestrianSceneryBlocked(p.x, p.y, 0, p.inWater === true)).length,
           trafficOffRoad: ctx.trafficCars.filter(c => !onRoadSurface(c.x, c.y, ctx.roads, ctx.bridges, ctx.scenicRoads, ctx.roadEnds)).length
         })
       };
