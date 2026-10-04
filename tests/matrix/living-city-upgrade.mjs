@@ -26,6 +26,7 @@ for(const hz of [30,60,120]){
  const before=car.speed;for(let i=0;i<hz*3;i++)stepLandVehicle(car,{down:true},1/hz,{}, {tyreGrip:1});assert(car.speed<before);
  report.rates.push({hz,travelled,angle:car.angle,tyres:car.tyres});
 }
+for(const mu of [.2,.65,1]){const car={x:0,y:0,angle:0,speed:0,width:48,height:24};for(let i=0;i<120;i++)stepLandVehicle(car,{up:true},1/60,{}, {tyreGrip:mu});assert(car.x>5,'low grip must still allow a vehicle to start moving');assert(car.tyres.mu===mu);}
 assert(Math.max(...report.rates.map(r=>r.travelled))-Math.min(...report.rates.map(r=>r.travelled))<1);
 const j={cx:0,cy:0,w:100,h:100},paint={junctions:[j],signals:[]};
 const controller=createJunctionPriority(paint),west={x:-105,y:0,angle:0,width:48,speed:1},south={x:0,y:105,angle:-Math.PI/2,width:48,speed:1};

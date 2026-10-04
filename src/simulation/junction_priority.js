@@ -33,12 +33,26 @@ export function createJunctionPriority(paint){
   }
   return {update,get reservations(){return reservations.size;},nodes:nodes.length};
 }
+const signalIndexes=new WeakMap();
+function nearbySignalBands(car,paint){
+  let cells=signalIndexes.get(paint);
+  if(!cells){
+    cells=new Map();
+    for(const band of paint.crossings||[]){
+      const origin=band.approach?.[0];if(!origin||!(paint.signals||[]).some(j=>Math.hypot(j.cx-origin.x,j.cy-origin.y)<1))continue;
+      const key=`${Math.floor(band.cx/256)},${Math.floor(band.cy/256)}`;
+      if(!cells.has(key))cells.set(key,[]);cells.get(key).push(band);
+    }
+    signalIndexes.set(paint,cells);
+  }
+  const bands=[];for(let x=-1;x<=1;x++)for(let y=-1;y<=1;y++)bands.push(...(cells.get(`${Math.floor(car.x/256)+x},${Math.floor(car.y/256)+y}`)||[]));
+  return bands;
+}
 export function approachSignal(car,paint,signalFor){
-  const bands=paint.crossings||[];let gap=Infinity;
+  const bands=nearbySignalBands(car,paint);let gap=Infinity;
   for(const band of bands){
     const axis=Math.abs(band.ux)>Math.abs(band.uy)?'x':'y',state=signalFor(axis);
     if(state==='green'||Math.cos(car.angle)*band.ux+Math.sin(car.angle)*band.uy>-.65)continue;
-    const origin=band.approach?.[0];if(!origin||!(paint.signals||[]).some(j=>Math.hypot(j.cx-origin.x,j.cy-origin.y)<1))continue;
     const dx=car.x-band.cx,dy=car.y-band.cy,along=dx*band.ux+dy*band.uy,across=Math.abs(-dx*band.uy+dy*band.ux);
     const distance=along-(car.width||48)/2-band.length/2-8;
     if(across>band.width/2||distance< -4||distance>160)continue;

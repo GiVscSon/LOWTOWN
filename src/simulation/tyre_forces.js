@@ -27,7 +27,8 @@ export function stepTyreForces(car,requestedSpeed,steering,dt,profile={},surface
     const available=braking?Math.min(frontLong/.68,rearLong/.32):frontDrive?frontLong:rearLong;
     ax=clamp(requestedAx,-available/mass,available/mass);
   }
-  const speed=(car.speed||0)+ax*dt/6,loads=axleLoads(config,ax,car.lateralAcceleration||0);
+  let speed=(car.speed||0)+ax*dt/6;
+  const loads=axleLoads(config,ax,car.lateralAcceleration||0);
   const fx=mass*ax,frontFx=fx*(braking?.68:frontDrive?1:0),rearFx=fx-frontFx;
   // Each outside tyre carries more weight but gains less grip than it loses inside.
   const axleCapacity=(left,right,force,lock=1)=>frictionCapacity(left,force/2,mu)*lock+frictionCapacity(right,force/2,mu)*lock;
@@ -44,7 +45,7 @@ export function stepTyreForces(car,requestedSpeed,steering,dt,profile={},surface
   if(Math.abs(u)<3){yaw=u/wheelbase*Math.tan(steering);lateral*=Math.exp(-dt*12);}
   else{yaw+=(frontForce*frontLength-rearForce*rearLength)/(mass*(wheelbase*wheelbase+track*track)/12)*dt;lateral+=(lateralForce/mass-u*yaw)*dt;}
   yaw=clamp(yaw,-2.5,2.5);lateral=clamp(lateral,-Math.abs(u)*.65-1,Math.abs(u)*.65+1);
-  if(Math.abs(speed)<.003){lateral=0;yaw=0;}
+  if(Math.abs(speed)<.003&&Math.abs(requestedSpeed)<.003){speed=0;lateral=0;yaw=0;}
   car.speed=speed;car.yawRate=yaw;car.lateralAcceleration=lateralForce/mass;car.angle+=yaw*dt;
   car.vx=Math.cos(car.angle)*speed-Math.sin(car.angle)*lateral/6;
   car.vy=Math.sin(car.angle)*speed+Math.cos(car.angle)*lateral/6;
