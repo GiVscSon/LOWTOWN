@@ -60,6 +60,12 @@ material.onBeforeCompile=shader=>{
   shader.fragmentShader=shader.fragmentShader.replace('#include <lights_physical_fragment>','#include <lights_physical_fragment>\nmaterial.clearcoat*=step(.25,vehicleSurface.x)*(1.0-step(.8,vehicleSurface.x))*(1.0-step(.1,vehicleSurface.z));');
 };
 material.customProgramCacheKey=()=> 'lowtown-vehicle-finish-v2';
+// The shared night map is useful on paint, chrome and glass. Keeping it on
+// the transport material avoids sampling it on every matte city surface.
+export function setTransportEnvironment(texture,intensity=.65){
+  if(material.envMap!==texture){material.envMap=texture;material.needsUpdate=true;}
+  material.envMapIntensity=intensity;
+}
 const simpleMaterial=new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide});
 simpleMaterial.onBeforeCompile=shader=>{
   shader.vertexShader='attribute vec3 surface;varying vec3 vehicleSurface;varying vec3 vehiclePosition;\n'+shader.vertexShader;

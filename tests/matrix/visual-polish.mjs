@@ -6,6 +6,7 @@ import {createBuildingArchitecture} from '../../src/render/three/buildings.js';
 import {foliageGeometry,addUrbanTrees,foliageMaterial} from '../../src/render/three/foliage.js';
 import {nightEnvironmentTexture,contactShadowTexture} from '../../src/render/three/environment.js';
 import {createStreetProps} from '../../src/render/three/props.js';
+import {createTransportVisual,setTransportEnvironment,disposeTransportVisual} from '../../src/render/three/vehicles.js';
 
 const face={points:[[0,0,0],[2,0,0],[2,1,0],[0,1,0]],normals:[[0,0,1],[.6,0,.8],[.6,0,.8],[0,0,1]],uvs:[[0,0],[1,0],[1,1],[0,1]]};
 const clipped=clipSurfaceX(face,1,true);
@@ -26,6 +27,12 @@ for(const type of ['sedan','coupe','sports','wagon','taxi','police','van','bus',
   }
 }
 const source=nightEnvironmentTexture();assert(source.image.data.every(Number.isFinite));assert(Math.max(...source.image.data)>2);assert.equal(source.mapping,THREE.EquirectangularReflectionMapping);
+const transport=createTransportVisual({type:'sedan',width:48,height:24,color:'#e8b84a'}),finishes=new Set();
+transport.traverse(object=>{if(object.material?.isMeshPhysicalMaterial)finishes.add(object.material);});assert(finishes.size>0);
+setTransportEnvironment(source);const version=[...finishes][0].version;
+for(const finish of finishes){assert.equal(finish.envMap,source);assert.equal(finish.envMapIntensity,.65);}
+setTransportEnvironment(source,0);assert.equal([...finishes][0].version,version,'reflection toggle must not recompile shaders');assert.equal([...finishes][0].envMapIntensity,0);
+setTransportEnvironment(null,0);assert.equal([...finishes][0].envMap,null);disposeTransportVisual(transport);source.dispose();
 const shadow=contactShadowTexture(),d=shadow.image.data,s=shadow.image.width;
 assert.equal(d[3],0);assert(d[(s/2*s+s/2)*4+3]>240,'contact shadow must soften at the edges, not remove its centre');
 const canopy=foliageGeometry(),triangles=canopy.index.count/3;assert(triangles>100&&triangles<350);assert(canopy.attributes.normal.array.every(Number.isFinite));

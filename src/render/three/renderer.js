@@ -2,7 +2,7 @@ import {createBuildingArchitecture} from './buildings.js';
 import {addStreetDetail,addForecourts} from './street_detail.js';
 import {mountedSign,apartmentGlassMaterial,createStorefronts} from './storefronts.js';
 import * as THREE from 'three';
-import {createTransportVisual,updateTransportVisual,setTransportLighting,disposeTransportVisual} from './vehicles.js';
+import {createTransportVisual,updateTransportVisual,setTransportLighting,setTransportEnvironment,disposeTransportVisual} from './vehicles.js';
 import {createBoxBatch,ribbonGeometry,addTiledGeometry} from './geometry.js';
 import {createCharacterBatch} from './characters.js';
 import {loadGraphics,changeGraphics,createViewportSizer} from './graphics_settings.js';
@@ -40,7 +40,7 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
   let cameraPreset='normal';
   try{const saved=localStorage.getItem(CAMERA_STORAGE_KEY);if(CAMERA_PRESETS.includes(saved))cameraPreset=saved;}catch{}
   const scene=new THREE.Scene();scene.background=new THREE.Color('#07151d');scene.fog=new THREE.FogExp2('#10202a',.000095);
-  const environment=createNightEnvironment(renderer);scene.environment=environment.texture;scene.environmentIntensity=.65;
+  const environment=createNightEnvironment(renderer);setTransportEnvironment(environment.texture);
   const camera=new THREE.PerspectiveCamera(46,1,2,18000);
   const viewport=createViewportSizer(renderer,camera);
   scene.add(new THREE.HemisphereLight('#9aaec4','#211912',1.25));
@@ -296,7 +296,7 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
     const collectibles=(frame.parts||[]).filter(part=>!part.found&&visible(part,24));parts.count=Math.min(32,collectibles.length);rotation.setFromAxisAngle(axis,time);
     for(let i=0;i<parts.count;i++){const part=collectibles[i];matrix.compose(new THREE.Vector3(part.x,16+Math.sin(time*2+i)*3,part.y),rotation,scale);parts.setMatrixAt(i,matrix);}parts.instanceMatrix.needsUpdate=true;
     headlight.visible=!foot&&altitude<12;headlight.position.set(p.x+Math.cos(heading)*23,12+playerRise,p.y+Math.sin(heading)*23);headlight.target.position.set(p.x+Math.cos(heading)*130,surfaceY(p.x+Math.cos(heading)*130,p.y+Math.sin(heading)*130),p.y+Math.sin(heading)*130);
-    const weather=frame.weather||{},amount=weather.rain||0;scene.environmentIntensity=graphics.reflections?.65:0;scene.fog.density=.000095+(weather.fog||0)*.0004;motorMaterial.roughness=.72-.32*(weather.wetness||0);waterMaterial.roughness=.44+amount*.12;
+    const weather=frame.weather||{},amount=weather.rain||0;setTransportEnvironment(environment.texture,graphics.reflections?.65:0);scene.fog.density=.000095+(weather.fog||0)*.0004;motorMaterial.roughness=.72-.32*(weather.wetness||0);waterMaterial.roughness=.44+amount*.12;
     for(const pair of materialPairs)for(const material of [pair.simple,pair.detailed])if(material.map===surfaceTexture('asphalt'))material.roughness=.9-.44*(weather.wetness||0);moon.intensity=1.8+(weather.flash||0)*5;
     reflectionMaterial.opacity=.08+.8*(weather.wetness||0);
     for(const pair of materialPairs)for(const material of [pair.simple,pair.detailed])if(material.userData.shader?.uniforms.rippleTime)material.userData.shader.uniforms.rippleTime.value=time;
@@ -320,7 +320,7 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
       camera:{preset:cameraPreset,x:camera.position.x,y:camera.position.y,z:camera.position.z,distance:Math.hypot(camera.position.x-p.x,camera.position.z-p.y),fov:camera.fov},player:{x:p.x,y:p.y,altitude,groundElevation:playerRise,visualY:foot?playerRise+3.6:actors.get(p)?.group.position.y}};
   }
   function dispose(){const geometries=new Set(),materials=new Set();scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
-    for(const geometry of geometries)geometry.dispose();for(const material of materials){for(const key of ['map','normalMap','roughnessMap'])material[key]?.dispose();material.userData.cabinTexture?.dispose();material.dispose();}environment.dispose();renderer.dispose();}
+    for(const geometry of geometries)geometry.dispose();for(const material of materials){for(const key of ['map','normalMap','roughnessMap'])material[key]?.dispose();material.userData.cabinTexture?.dispose();material.dispose();}setTransportEnvironment(null,0);environment.dispose();renderer.dispose();}
   return {render,dispose,scene,camera,renderer,bridgeProfiles,bridgeSurface,get cameraPreset(){return cameraPreset;},get graphics(){return {...graphics};},
     setGraphics(patch){
       graphics=changeGraphics(graphics,patch);lowCostMaterials=graphics.lighting==='simple'&&!forceFullMaterials;
