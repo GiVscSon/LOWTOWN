@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import {createTransportVisual,updateTransportVisual,setTransportLighting,setTransportEnvironment,disposeTransportVisual} from './vehicles.js';
 import {createBoxBatch,ribbonGeometry,addTiledGeometry} from './geometry.js';
 import {createCharacterBatch,characterBaseHeight} from './characters.js';
+import {characterPose,presentedCharacters} from '../shared/character_pose.js';
 import {loadGraphics,changeGraphics,createViewportSizer} from './graphics_settings.js';
 import {BEACH_WIDTH} from '../../world/coastline.js';
 import {addStreetFurniture} from './street_furniture.js';
@@ -233,7 +234,7 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
   let frames=0,cameraReady=false,lastPlayerPosition=null,lastMode=null,lastTime=performance.now(),contextLost=false;
   canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();contextLost=true;});canvas.addEventListener('webglcontextrestored',()=>{contextLost=false;cameraReady=false;});
   function render(frame){
-    const now=performance.now(),elapsed=Math.max(0,now-lastTime),dt=Math.min(.1,elapsed/1000),time=now/1000;lastTime=now;
+    const now=performance.now(),elapsed=Math.max(0,now-lastTime),dt=Math.min(.1,elapsed/1000),time=frame.animationTime??now/1000;lastTime=now;
     const width=Math.max(1,canvas.clientWidth||innerWidth),height=Math.max(1,canvas.clientHeight||innerHeight),ratio=graphics.resolution;
     viewport.update(width,height,ratio);
     const p=frame.player,altitude=Math.max(0,frame.altitude||0),foot=frame.mode==='foot',live=new Set();
@@ -270,7 +271,7 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
     if(!foot)drawVehicle(p,{...p,type:frame.mode,model:frame.mode,color:p.bodyColor||p.color},altitude);
     for(const vehicle of frame.vehicles||[])if(vehicle!==p&&Number.isFinite(vehicle.x)&&Number.isFinite(vehicle.y))drawVehicle(vehicle,vehicle,vehicle.altitude||0);
     for(const [key,entry] of actors)if(!live.has(key)){disposeTransportVisual(entry.group);scene.remove(entry.group);actors.delete(key);}
-    const allPeople=foot?[...(frame.pedestrians||[]),{...p,heading:p.angle,shirt:'#b99964'}]:frame.pedestrians||[];
+    const allPeople=presentedCharacters(p,frame.pedestrians||[],foot);
     const people=allPeople.filter(person=>visible(person,24));characters.update(people,(x,y)=>groundRise(x,y)+3.6);
     const grounded=[...new Set([...(foot?[]:[p]),...(frame.vehicles||[])])].filter(v=>v!==p||!foot).filter(v=>v.kind!=='water'&&!['speedboat','tug'].includes(v.type)&&!(v.altitude>12)&&!(v===p&&altitude>12)&&visible(v,Math.max(48,v.width||48)));
     let shadowCount=0,reflectionCount=0;
@@ -321,7 +322,8 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
       visualDetail:{environment:true,trees:trees.count,canopyTriangles:trees.canopyTriangles,architecture:{...architecture.stats},props:propCount,effects:visibleEffects},
       streetFurniture:{lights:(world.lights||[]).length,props:(world.props||[]).length,signals:furniture.signals,visibleSignals},
       bridges:{spans:bridgeProfiles.length,arches:bridgeArches,piers:bridgePiers},
-      camera:{preset:cameraPreset,x:camera.position.x,y:camera.position.y,z:camera.position.z,distance:Math.hypot(camera.position.x-p.x,camera.position.z-p.y),fov:camera.fov},player:{x:p.x,y:p.y,altitude,groundElevation:playerRise,jumpHeight:p.jumpHeight||0,attackTime:p.attackTime||0,inWater:!!p.inWater,waterTime:p.waterTime||0,visualY:foot?characterBaseHeight(p,playerRise+3.6):actors.get(p)?.group.position.y}};
+      characterActions:{...characters.actions},
+      camera:{preset:cameraPreset,x:camera.position.x,y:camera.position.y,z:camera.position.z,distance:Math.hypot(camera.position.x-p.x,camera.position.z-p.y),fov:camera.fov},player:{x:p.x,y:p.y,altitude,groundElevation:playerRise,jumpHeight:p.jumpHeight||0,attackTime:p.attackTime||0,inWater:!!p.inWater,waterTime:p.waterTime||0,animation:foot?characterPose(p).action:p.visualTransition?'enter-vehicle':'driving',visualY:foot?characterBaseHeight(p,playerRise+3.6):actors.get(p)?.group.position.y}};
   }
   function dispose(){const geometries=new Set(),materials=new Set();scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
     for(const geometry of geometries)geometry.dispose();for(const material of materials){for(const key of ['map','normalMap','roughnessMap'])material[key]?.dispose();material.userData.cabinTexture?.dispose();material.dispose();}setTransportEnvironment(null,0);environment.dispose();renderer.dispose();}

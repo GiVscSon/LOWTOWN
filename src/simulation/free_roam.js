@@ -107,7 +107,7 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
   const vehicleClear=(x,y)=>solid(x,y)&&!buildings.some(b=>x>b.x-12&&x<b.x+b.w+12&&y>b.y-12&&y<b.y+b.h+12)&&
     !obstacles.some(o=>Math.abs(x-o.x)<(o.width||12)*.5+12&&Math.abs(y-o.y)<(o.height||12)*.5+12)&&
     ![...fleet,...parked,...dynamicActors()].some(c=>contact({x,y,angle:0,length:16,breadth:16},chassis(c)));
-  const resetActions=()=>Object.assign(player,{jumpHeight:0,jumpVelocity:0,jumpHeld:false,jumpRequested:false,attackRequested:false,attackTime:0,attackHeld:false,attackCooldown:0,landed:false,inWater:false,waterTime:0,swimPhase:0});
+  const resetActions=()=>Object.assign(player,{jumpHeight:0,jumpVelocity:0,jumpHeld:false,jumpRequested:false,attackRequested:false,attackTime:0,attackHeld:false,attackCooldown:0,landed:false,inWater:false,waterTime:0,swimPhase:0,gaitBlend:0,landingRemaining:0,getUpRemaining:0,shotRemaining:0,meleeRecoveryRemaining:0,reloadRemaining:0,weaponDrawRemaining:0,animationWasDown:false,visualTransition:null,doorElapsed:undefined});
   function interact() {
     if(mode==='foot'&&player.jumpHeight>0)return notify('Приземлитесь перед посадкой');
     if(mode!=='foot') {
@@ -119,16 +119,19 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
       }
       if(!exit)return notify('Нет безопасного выхода: подъедьте к берегу или свободному месту');
       const doorSide=Math.sign(-(exit.x-player.x)*Math.sin(player.angle)+(exit.y-player.y)*Math.cos(player.angle))||1;
-      fleet.push({...VEHICLES[mode],type:mode,x:player.x,y:player.y,angle:player.angle,color:player.bodyColor||VEHICLES[mode].color,hp:player.hp,damage:player.damage?{...player.damage}:undefined,speed:0,doorSide,doorActionAt:performance.now()/1000});
-      Object.assign(player,exit,{entityType:'pedestrian',hp:personHp,damage:undefined,width:9,height:9,mass:70,speed:0,vx:0,vy:0,contactVx:0,contactVy:0,walkPhase:0,gait:0});lastFootGround=exit;mode='foot';resetActions(); notify('Пешком · E — сесть в ближайший транспорт'); return;
+      const transition={kind:'exit',fromX:player.x-Math.sin(player.angle)*player.height*.55*doorSide,fromY:player.y+Math.cos(player.angle)*player.height*.55*doorSide,duration:.65,elapsed:0};
+      fleet.push({...VEHICLES[mode],type:mode,x:player.x,y:player.y,angle:player.angle,color:player.bodyColor||VEHICLES[mode].color,hp:player.hp,damage:player.damage?{...player.damage}:undefined,speed:0,doorSide,doorElapsed:0,doorActionAt:performance.now()/1000});
+      Object.assign(player,exit,{entityType:'pedestrian',hp:personHp,damage:undefined,width:9,height:9,mass:70,speed:0,vx:0,vy:0,contactVx:0,contactVy:0,walkPhase:0,gait:0});lastFootGround=exit;mode='foot';resetActions();player.visualTransition=transition; notify('Пешком · E — сесть в ближайший транспорт'); return;
     }
     const candidates=[...fleet,...parked].filter(c=>(!player.inWater||c.kind==='water')&&Math.hypot(c.x-player.x,c.y-player.y)<115&&doorwayClear(player,c,c.kind==='water')).sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)-Math.hypot(b.x-player.x,b.y-player.y));
     const car=candidates[0]; if(!car)return notify('Подойдите к припаркованному транспорту');
     const doorSide=Math.sign(-(player.x-car.x)*Math.sin(car.angle)+(player.y-car.y)*Math.cos(car.angle||0))||1;
+    const transition={kind:'enter',fromX:player.x,fromY:player.y,toX:car.x-Math.sin(car.angle||0)*(car.height||24)*.55*doorSide,toY:car.y+Math.cos(car.angle||0)*(car.height||24)*.55*doorSide,heading:Math.atan2(car.y-player.y,car.x-player.x),duration:.65,elapsed:0,person:{x:player.x,y:player.y,skin:player.skin,shirt:'#b99964',hair:player.hair,inWater:player.inWater,swimPhase:player.swimPhase}};
     resetActions();
     personHp=player.hp??100;player.personHp=personHp;
     mode=car.type in VEHICLES?car.type:'sedan'; const profile=VEHICLES[mode];
-    Object.assign(player,{entityType:'vehicle',x:car.x,y:car.y,angle:car.angle,width:profile.width,height:profile.height,mass:profile.mass||1500,bodyColor:car.color||profile.color,hp:car.hp??100,damage:car.damage?{...car.damage}:undefined,doorSide,doorActionAt:performance.now()/1000,speed:0,vx:0,vy:0,steeringAngle:0,reverseDelay:0});
+    Object.assign(player,{entityType:'vehicle',x:car.x,y:car.y,angle:car.angle,width:profile.width,height:profile.height,mass:profile.mass||1500,bodyColor:car.color||profile.color,hp:car.hp??100,damage:car.damage?{...car.damage}:undefined,doorSide,doorElapsed:0,doorActionAt:performance.now()/1000,speed:0,vx:0,vy:0,steeringAngle:0,reverseDelay:0});
+    player.visualTransition=transition;
     const list=fleet.includes(car)?fleet:parked; list.splice(list.indexOf(car),1);
     notify(profile.name+(profile.kind==='air'?' · кнопка «Высота» / Q — взлёт и посадка':''));
   }
@@ -180,7 +183,7 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
       // Invert the camera basis: up on keyboard/touch moves up on the screen.
       const dx=sx/Math.sqrt(3)+sy,dy=-sx/Math.sqrt(3)+sy;
       const oldX=player.x,oldY=player.y;
-      const pace=swimming?(keys.handbrake?.62:.45):2.4;
+      const pace=swimming?(keys.handbrake?.62:.45):(keys.nitro&&!keys.attack?3.3:2.4);
       const moveX=dx/len*pace*frame+(player.contactVx||0)*frame,moveY=dy/len*pace*frame+(player.contactVy||0)*frame,steps=Math.max(1,Math.ceil(Math.hypot(moveX,moveY)/2));
       // The shore is traversable; only real scenery and bodies stop the sweep.
       for(let i=0;i<steps;i++){

@@ -58,7 +58,7 @@ export function updateLandAnimation(state,vehicle,time,weather={},detailed=true)
   const moved=state.lastPosition?Math.hypot(vehicle.x-state.lastPosition.x,vehicle.y-state.lastPosition.y):0;
   if(moved<128){const cs=Math.cos(vehicle.angle||0),sn=Math.sin(vehicle.angle||0),forward=state.lastPosition?(vehicle.x-state.lastPosition.x)*cs+(vehicle.y-state.lastPosition.y)*sn:0;state.wheelPhase-=forward/(model.breadth/6);}
   state.lastPosition={x:vehicle.x,y:vehicle.y};
-  const age=Number.isFinite(vehicle.doorActionAt)?time-vehicle.doorActionAt:Infinity;
+  const age=Number.isFinite(vehicle.doorElapsed)?vehicle.doorElapsed:Number.isFinite(vehicle.doorActionAt)?time-vehicle.doorActionAt:Infinity;
   const opening=age>=0&&age<1.6?Math.sin(Math.PI*Math.min(1,age/1.6))*.95:0;
   for(const {part,pivotGroup} of state.components){
     if(part.type==='wheel'){pivotGroup.rotation.set(0,part.front?-(vehicle.steeringAngle||0):0,state.wheelPhase);}

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
+import {characterPose} from '../shared/character_pose.js';
 
 function combine(parts){
   const geometries=parts.map(([geometry,color,x=0,y=0,z=0,scale=null])=>{
@@ -54,7 +55,11 @@ export function characterGeometries(){
   };
   return geometries;
 }
-export function characterBaseHeight(person,surface=0){return person.inWater?-26+Math.sin(person.swimPhase||0)*.55:surface+(person.knockdownTimer>0||person.stance==='down'?3:1.2+(person.jumpHeight||0)+Math.abs(Math.sin(person.walkPhase||0))*.3*(person.gait||0));}
+export function characterBaseHeight(person,surface=0,pose=characterPose(person)){
+  if(person.inWater)return pose.waterBase+pose.bob;
+  // The sole reaches -.525 in the neutral pose; keep it on the actual deck.
+  return surface+(pose.down||pose.gettingUp ? .55+2.45*Math.sin(Math.abs(pose.rootPitch)) : .55+(person.jumpHeight||0)+pose.bob);
+}
 export function createCharacterBatch(scene,capacity=512,material=new THREE.MeshLambertMaterial({vertexColors:true})){
   const batches={};
   for(const [name,geometry] of Object.entries(characterGeometries())){
@@ -72,45 +77,58 @@ export function createCharacterBatch(scene,capacity=512,material=new THREE.MeshL
     ]:[[new THREE.CylinderGeometry(.35,.65,12,12).rotateZ(Math.PI/2),'#ae8960',5.3,.1,0],[new THREE.CylinderGeometry(.4,.4,2.5,10).rotateZ(Math.PI/2),'#444a48',.5,.1,0]]);
     const mesh=new THREE.InstancedMesh(geometry,material,capacity);mesh.count=0;mesh.frustumCulled=false;scene.add(mesh);held[type]=mesh;
   }
-  const root=new THREE.Matrix4(),matrix=new THREE.Matrix4(),local=new THREE.Matrix4(),wrist=new THREE.Matrix4().makeTranslation(0,-4,0),weaponRotation=new THREE.Matrix4(),q=new THREE.Quaternion(),localQ=new THREE.Quaternion(),pos=new THREE.Vector3(),size=new THREE.Vector3(1,1,1),up=new THREE.Vector3(0,1,0),sideAxis=new THREE.Vector3(0,0,1),color=new THREE.Color();
-  const put=(name,index,x,y,z,angle=0,paint=null)=>{
-    localQ.setFromAxisAngle(sideAxis,angle);local.compose(pos.set(x,y,z),localQ,size);matrix.multiplyMatrices(root,local);
+  const personal={};
+  for(const [type,geometry] of Object.entries({
+    cup:combine([[new THREE.CylinderGeometry(.75,.6,1.6,10),'#d9d3bb',0,.7,0],[new THREE.CylinderGeometry(.58,.58,.1,10),'#594430',0,1.55,0]]),
+    phone:combine([[box(.35,2.2,1.3),'#242c30',0,1,0],[box(.12,1.6,1),'#809a9c',.22,1.1,0]]),
+    book:combine([[box(2.5,.5,3.4),'#769287',0,0,0],[box(2.1,.2,3.1),'#d4cfb6',0,.3,0]]),
+    bag:combine([[box(2.5,4,2),'#ba9870',0,-2,0],[new THREE.TorusGeometry(.65,.12,4,8),'#756045',0,.3,0]])
+  })){
+    const mesh=new THREE.InstancedMesh(geometry,material,capacity);mesh.count=0;mesh.frustumCulled=false;scene.add(mesh);personal[type]=mesh;
+  }
+  let actions={};
+  const root=new THREE.Matrix4(),matrix=new THREE.Matrix4(),local=new THREE.Matrix4(),wrist=new THREE.Matrix4().makeTranslation(0,-4,0),weaponRotation=new THREE.Matrix4(),q=new THREE.Quaternion(),localQ=new THREE.Quaternion(),yawQ=new THREE.Quaternion(),pos=new THREE.Vector3(),size=new THREE.Vector3(1,1,1),up=new THREE.Vector3(0,1,0),sideAxis=new THREE.Vector3(0,0,1),forwardAxis=new THREE.Vector3(1,0,0),color=new THREE.Color();
+  const put=(name,index,x,y,z,angle=0,paint=null,yaw=0)=>{
+    localQ.setFromAxisAngle(sideAxis,angle).multiply(yawQ.setFromAxisAngle(up,yaw));local.compose(pos.set(x,y,z),localQ,size);matrix.multiplyMatrices(root,local);
     batches[name].setMatrixAt(index,matrix);batches[name].setColorAt(index,color.set(paint||'#ffffff'));
   };
   function update(people,surface){
     const weapons={bat:0,pistol:0,shotgun:0,flare:0};
+    const items={cup:0,phone:0,book:0,bag:0};actions={};
     const count=Math.min(capacity,people.length);
     for(let i=0;i<count;i++){
-      const p=people[i],swimming=!!p.inWater,down=!swimming&&(p.knockdownTimer>0||p.stance==='down'),phase=p.walkPhase||0,gait=p.gait??(phase?1:0),stride=Math.sin(phase)*.42*gait;
+      const p=people[i],swimming=!!p.inWater,pose=characterPose(p),down=pose.down||pose.gettingUp;
+      actions[pose.action]=(actions[pose.action]||0)+1;
       q.setFromAxisAngle(up,-(p.heading??p.angle??0));
-      if(down)q.multiply(localQ.setFromAxisAngle(sideAxis,-Math.PI/2));
-      root.compose(pos.set(p.x,characterBaseHeight(p,surface(p.x,p.y)),p.y),q,size);
-      put('torso',i,0,0,0,0,p.shirt||'#99906d');put('head',i,0,0,0,0,p.skin||'#c8a582');put('hair',i,0,0,0,0,p.hair||'#302b28');put('face',i,0,0,0);
+      q.multiply(localQ.setFromAxisAngle(sideAxis,pose.rootPitch)).multiply(localQ.setFromAxisAngle(forwardAxis,pose.rootRoll));
+      root.compose(pos.set(p.x,characterBaseHeight(p,surface(p.x,p.y),pose),p.y),q,size);
+      put('torso',i,Math.sin(pose.torsoPitch)*10,10*(1-Math.cos(pose.torsoPitch)),0,pose.torsoPitch,p.shirt||'#99906d',pose.torsoYaw);
+      for(const [name,paint] of [['head',p.skin||'#c8a582'],['hair',p.hair||'#302b28'],['face',null]])put(name,i,Math.sin(pose.headPitch)*18.4,18.4*(1-Math.cos(pose.headPitch)),0,pose.headPitch,paint,pose.headYaw);
       for(const side of [-1,1]){
-        const index=i*2+(side>0?1:0),swing=swimming?Math.sin((p.swimPhase||0)*1.5+side)*.55:down?0:p.jumpHeight>0?-.38:stride*side,knee=p.jumpHeight>0?.65:Math.max(0,-swing)*.9;
+        const limb=side>0?1:0,index=i*2+limb,swing=pose.legs[limb].upper;
         put('thigh',index,0,11.2,side*1.65,swing,p.pants||'#364454');
         const legX=Math.sin(swing)*5.5,legY=11.2-Math.cos(swing)*5.5;
-        put('shin',index,legX,legY,side*1.65,swing-knee,p.pants||'#303d4d');put('shoe',index,legX,legY,side*1.65,swing-knee);
-        const contactTime=p.combatTimer>0?.35:.14,duration=p.combatTimer>0?.7:.42,t=p.attackTime||0;
-        const envelope=t<contactTime?Math.sin(t/contactTime*Math.PI/2):Math.max(0,Math.cos(Math.min(1,(t-contactTime)/(duration-contactTime))*Math.PI/2));
-        const punch=t>0&&side===(p.attackSide||1)?envelope:0;
-        const aiming=held[p.weapon]&&p.weapon!=='bat'&&side===1;
-        const arm=swimming?1.7+.55*Math.sin((p.swimPhase||0)+side*Math.PI/2):aiming?1.2+punch*.2:punch>0?1.65*punch-.15:p.jumpHeight>0?-.35:-swing*.85+.08;
+        put('shin',index,legX,legY,side*1.65,pose.legs[limb].lower,p.pants||'#303d4d');put('shoe',index,legX,legY,side*1.65,pose.legs[limb].lower);
+        const arm=pose.arms[limb].upper,lower=pose.arms[limb].lower;
         put('upperArm',index,0,17.6,side*4.1,arm,p.shirt||'#99906d');
-        put('forearm',index,Math.sin(arm)*3.9,17.6-Math.cos(arm)*3.9,side*4.1,arm-.15,p.shirt||'#99906d');
-        put('hand',index,Math.sin(arm)*3.9,17.6-Math.cos(arm)*3.9,side*4.1,arm-.15,p.skin||'#c8a582');
+        put('forearm',index,Math.sin(arm)*3.9,17.6-Math.cos(arm)*3.9,side*4.1,lower,p.shirt||'#99906d');
+        put('hand',index,Math.sin(arm)*3.9,17.6-Math.cos(arm)*3.9,side*4.1,lower,p.skin||'#c8a582');
         if(side===1&&!swimming&&!down&&held[p.weapon]){
-          matrix.multiply(wrist).multiply(weaponRotation.makeRotationZ(-arm+.15));
+          matrix.multiply(wrist).multiply(weaponRotation.makeRotationZ(-lower+pose.weaponPitch));
           held[p.weapon].setMatrixAt(weapons[p.weapon]++,matrix);
+        }else if(side===1&&!swimming&&!down&&pose.item){
+          matrix.multiply(wrist).multiply(weaponRotation.makeRotationZ(-lower));
+          personal[pose.item].setMatrixAt(items[pose.item]++,matrix);
         }
       }
     }
     for(const [type,mesh] of Object.entries(held)){mesh.count=weapons[type];mesh.instanceMatrix.needsUpdate=true;}
+    for(const [type,mesh] of Object.entries(personal)){mesh.count=items[type];mesh.instanceMatrix.needsUpdate=true;}
     for(const [name,mesh] of Object.entries(batches)){
       mesh.count=count*(['head','torso','hair','face'].includes(name)?1:2);mesh.instanceMatrix.needsUpdate=true;
       if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;
     }
     return count;
   }
-  return {update,batches,held};
+  return {update,batches,held,personal,get actions(){return actions;}};
 }

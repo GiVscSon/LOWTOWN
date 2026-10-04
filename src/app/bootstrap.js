@@ -1,3 +1,4 @@
+import {characterPose} from '../render/shared/character_pose.js';
 // One shared runtime context owns state; this system has no hidden globals.
 export function installAppBootstrap(ctx) {
   const {
@@ -385,7 +386,7 @@ export function installAppBootstrap(ctx) {
           ctx.player.waterSafe={x:beach.x+beach.w/2,y:beach.y+160};ctx.stepWaterInteraction(1/60);
           ctx.threeRenderer.setCameraPreset('near');ctx.renderWorld();return {beach,x,y};
         },
-        coastalState:()=>({player:{x:ctx.player.x,y:ctx.player.y,inWater:!!ctx.player.inWater,waterTime:ctx.player.waterTime||0,swimPhase:ctx.player.swimPhase||0,weapon:ctx.player.weapon||'fists',ammo:ctx.player.ammo,reloadRemaining:ctx.player.reloadRemaining||0},beaches:ctx.beachZones,swimmers:ctx.pedestrians.filter(p=>p.inWater).length,beachPeople:ctx.pedestrians.filter(p=>p.beachRoute).length,incident:ctx.cityIncidentDirector.current()?.kind,effects:ctx.effects.active}),
+        coastalState:()=>({player:{x:ctx.player.x,y:ctx.player.y,inWater:!!ctx.player.inWater,waterTime:ctx.player.waterTime||0,swimPhase:ctx.player.swimPhase||0,weapon:ctx.player.weapon||'fists',ammo:ctx.player.ammo,reloadRemaining:ctx.player.reloadRemaining||0,animation:characterPose(ctx.player).action,animationTime:ctx.player.animationTime||0},beaches:ctx.beachZones,swimmers:ctx.pedestrians.filter(p=>p.inWater).length,beachPeople:ctx.pedestrians.filter(p=>p.beachRoute).length,incident:ctx.cityIncidentDirector.current()?.kind,effects:ctx.effects.active}),
         interactionState: () => ({player:{x:ctx.player.x,y:ctx.player.y,hp:ctx.player.hp,jumpHeight:ctx.player.jumpHeight||0,attackTime:ctx.player.attackTime||0},effects:ctx.effects.active,details:ctx.worldDetailCount,
           props:ctx.breakableProps.map(p=>({type:p.type,x:p.x,y:p.y,hp:p.hp,intact:p.intact})),people:ctx.pedestrians.map(p=>({hp:p.hp,reaction:p.reaction,combatTimer:p.combatTimer})),cars:ctx.parkedCars.map(p=>({hp:p.hp,damage:p.damage}))}),
         setWeather(kind, instant = false) {

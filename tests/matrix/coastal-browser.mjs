@@ -13,11 +13,12 @@ try{
   await page.goto(origin+'?cityQA=1',{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__lowtownThreeStats?.frames>=5,null,{timeout:90000});
   await page.evaluate(()=>window.__lowtownCityQA.coastalScene());
   const swimming=await page.evaluate(()=>window.__lowtownCityQA.coastalState());assert(swimming.player.inWater);assert.equal(swimming.beaches.length,3);assert.equal(swimming.beachPeople,30);assert(swimming.effects>0);
+  assert.equal(swimming.player.animation,'tread-water');
   await page.screenshot({path:`${directory}/${device.name}-swimming.png`});
   await page.locator('#btnMenu').click({noWaitAfter:true});const paused=await page.evaluate(()=>window.__lowtownCityQA.coastalState());
   await page.evaluate(()=>window.__lowtownCityQA.advanceScene(1));assert.deepEqual(await page.evaluate(()=>window.__lowtownCityQA.coastalState()),paused);await page.locator('#menuClose').click({noWaitAfter:true});
   // Real keyboard event held while advancing the real runtime at 60 Hz.
-  await page.keyboard.down('ArrowDown');for(let i=0;i<12;i++)await page.evaluate(()=>window.__lowtownCityQA.advanceScene(.25));await page.keyboard.up('ArrowDown');
+  await page.keyboard.down('ArrowDown');await page.evaluate(()=>window.__lowtownCityQA.advanceScene(.25));assert.equal((await page.evaluate(()=>window.__lowtownCityQA.coastalState())).player.animation,'swim');await page.screenshot({path:`${directory}/${device.name}-crawl.png`});for(let i=0;i<11;i++)await page.evaluate(()=>window.__lowtownCityQA.advanceScene(.25));await page.keyboard.up('ArrowDown');
   const ashore=await page.evaluate(()=>window.__lowtownCityQA.coastalState());assert(!ashore.player.inWater,'could not swim back onto the beach');
   await page.evaluate(()=>window.__lowtownCityQA.interactionScene('sedan'));
   if(device.hasTouch){await page.locator('#btnWeapon').tap();await page.locator('#btnWeapon').tap();}else await page.keyboard.press('Digit3');
@@ -29,6 +30,7 @@ try{
   const shot=await page.evaluate(()=>({coast:window.__lowtownCityQA.coastalState(),world:window.__lowtownCityQA.interactionState()}));assert.equal(shot.coast.player.ammo.pistol,11);assert(shot.world.cars.some(c=>c.hp<100&&c.damage));assert(shot.world.effects>0);
   await page.screenshot({path:`${directory}/${device.name}-pistol.png`});
   if(device.hasTouch)await page.locator('#btnReload').tap();else await page.keyboard.press('KeyT');
+  await page.evaluate(()=>window.__lowtownCityQA.advanceScene(.35));assert.equal((await page.evaluate(()=>window.__lowtownCityQA.coastalState())).player.animation,'reload');assert.equal(await page.evaluate(()=>window.__lowtownThreeStats.player.animation),'reload');await page.screenshot({path:`${directory}/${device.name}-reload.png`});
   for(let i=0;i<6;i++)await page.evaluate(()=>window.__lowtownCityQA.advanceScene(.25));assert.equal((await page.evaluate(()=>window.__lowtownCityQA.coastalState())).player.ammo.pistol,12);
   if(!device.hasTouch){await page.evaluate(()=>window.__lowtownCityQA.interactionScene('sedan'));await page.keyboard.press('Digit5');await page.keyboard.press('KeyF');await page.evaluate(()=>window.__lowtownCityQA.advanceScene(.18));assert.equal((await page.evaluate(()=>window.__lowtownCityQA.coastalState())).incident,'fire');await page.screenshot({path:`${directory}/flare-fire.png`});}
   else for(const id of ['btnWeapon','btnReload','btnNitro','btnHandbrake']){const box=await page.locator('#'+id).boundingBox();assert(box&&box.x>=0&&box.x+box.width<=390&&box.y+box.height<=844,id+' overflows mobile viewport');}

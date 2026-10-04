@@ -35,9 +35,9 @@ export function weaponRay(ctx,shooter,angle,range){
 }
 export function installWeapons(ctx){
   ctx.burningBodies=new Set();
-  ctx.selectWeapon=id=>{if(!WEAPONS[id])return;ctx.player.weapon=id;ctx.player.reloadRemaining=0;ctx.player.attackTime=0;ctx.player.attackRequested=false;ctx.showToast(WEAPONS[id].name+' · F — применить · T — перезарядить');};
+  ctx.selectWeapon=id=>{if(!WEAPONS[id])return;ctx.player.weapon=id;ctx.player.weaponDrawRemaining=.28;ctx.player.shotRemaining=0;ctx.player.meleeRecoveryRemaining=0;ctx.player.reloadRemaining=0;ctx.player.attackTime=0;ctx.player.attackRequested=false;ctx.showToast(WEAPONS[id].name+' · F — применить · T — перезарядить');};
   ctx.cycleWeapon=()=>ctx.selectWeapon(WEAPON_IDS[(WEAPON_IDS.indexOf(ctx.player.weapon||'fists')+1)%WEAPON_IDS.length]);
-  ctx.reloadWeapon=()=>{const p=ctx.player,w=WEAPONS[p.weapon];if(w?.capacity&&!p.reloadRemaining){p.reloadRemaining=w.reload;p.attackRequested=false;}};
+  ctx.reloadWeapon=()=>{const p=ctx.player,w=WEAPONS[p.weapon];if(w?.capacity&&!p.reloadRemaining){p.reloadDuration=w.reload;p.reloadRemaining=w.reload;p.attackRequested=false;}};
   const incident=(kind,hit)=>{
     const active=ctx.cityIncidentDirector.current();
     if(active?.kind===kind&&Math.hypot(active.x-hit.x,active.y-hit.y)<300){active.timer=Math.max(active.timer,18);return;}
@@ -51,7 +51,7 @@ export function installWeapons(ctx){
     if(person||prop||!hit.fixed){
       b.hp=Math.max(0,(b.hp??(prop?36:100))-weapon.damage);
       applyBodyImpulse(b,Math.cos(angle)*2400,Math.sin(angle)*2400,hit,person);
-      if(person){b.fleeTimer=6;b.reaction='fleeing';b.provokedTimer=6;if(b.hp<=30){b.stance='down';b.knockdownTimer=2;}}
+      if(person){b.hitFlash=.18;b.fleeTimer=6;b.reaction='fleeing';b.provokedTimer=6;if(b.hp<=30){b.stance='down';b.knockdownTimer=2;}}
       else if(prop&&b.hp===0)ctx.breakWorldProp(b);
       else if(!prop)damagePanel(b,-Math.cos(angle),-Math.sin(angle),.12);
     }
@@ -64,7 +64,9 @@ export function installWeapons(ctx){
   }
   function fire(shooter,id){
     const w=WEAPONS[id],angle=shooter.angle??shooter.heading??0;
+    if(w.capacity)shooter.shotRemaining=.16;
     if(id==='bat'){
+      shooter.meleeRecoveryRemaining=.28;
       const people=new Set([...ctx.pedestrians,...(ctx.roam?.mode==='foot'?[ctx.player]:[])]);
       const hit=meleeTarget(shooter,[...ctx.getCityScenery().contacts.query(shooter.x-60,shooter.y-60,shooter.x+60,shooter.y+60),...ctx.cityCollisionBodies()],people,w.range);
       if(hit){hit.person=people.has(hit.body);damage(shooter,hit,w,angle);ctx.sound.playImpact();}return;

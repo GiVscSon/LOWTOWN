@@ -1,6 +1,7 @@
 import {chassis} from './solid_contacts.js';
 import {applyBodyImpulse,bodyHeight,damagePanel,isMovableProp,stepBodyResponse} from './body_physics.js';
 import {createEffectPool} from './effects.js';
+import {advanceCharacterAnimation} from './character_animation.js';
 
 function contains(body,x,y,person=false){
   const c=person?{x:body.x,y:body.y,angle:0,length:9,breadth:9}:chassis(body),dx=x-c.x,dy=y-c.y,cs=Math.cos(c.angle),sn=Math.sin(c.angle);
@@ -45,7 +46,7 @@ export function installCharacterActions(ctx){
       if(!person.combatTimer){person.attackTime=0;person.fleeTimer=4;person.reaction='fleeing';}
     }
     if(ctx.stepWeapons(dt,keys))return;
-    p.attackCooldown=Math.max(0,(p.attackCooldown||0)-dt);p.hitFlash=Math.max(0,(p.hitFlash||0)-dt);
+    p.attackCooldown=Math.max(0,(p.attackCooldown||0)-dt);
     const requested=p.attackRequested;p.attackRequested=false;
     const foot=ctx.roam?.mode==='foot',pressed=!!keys.attack;
     if(foot&&!p.inWater&&(requested||pressed&&!p.attackHeld)&&!p.attackCooldown&&!p.knockdownTimer){p.attackTime=.001;p.attackHit=false;p.attackSide=-(p.attackSide||-1);p.attackCooldown=.48;}
@@ -72,6 +73,9 @@ export function installCharacterActions(ctx){
     if(p.attackTime>=.42)p.attackTime=0;
   };
   ctx.stepWorldEffects=dt=>{
+    advanceCharacterAnimation(ctx.player,dt,ctx.state.keys);
+    for(const person of new Set([...ctx.pedestrians,...(ctx.cityIncidentDirector?.current()?.actors||[])]))advanceCharacterAnimation(person,dt);
+    for(const vehicle of new Set([ctx.player,...ctx.cityCollisionBodies(),...(ctx.roam?.fleet||[])]))if(Number.isFinite(vehicle.doorElapsed)&&vehicle.doorElapsed<1.6)vehicle.doorElapsed=Math.min(1.6,vehicle.doorElapsed+dt);
     ctx.effects.step(dt);ctx.effectClock=(ctx.effectClock||0)+dt;
     const quality=ctx.threeRenderer?.graphics.effects||'high';
     const pulse=Math.floor(ctx.effectClock*8)!==Math.floor((ctx.effectClock-dt)*8);
