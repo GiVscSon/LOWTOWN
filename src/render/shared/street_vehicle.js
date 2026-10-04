@@ -1,4 +1,4 @@
-import {addLoft,addBox,faceNormal} from '../../assets/vehicle_shapes.js';
+import {addLoft,addBox,faceNormal,clipSurfaceX} from '../../assets/vehicle_shapes.js';
 const GLASS='#263b46',TRIM='#232b30',CHROME='#abb6b4';
 const cache=new Map();
 function projectedNormal(normal,angle=0){const cs=Math.cos(angle),sn=Math.sin(angle),[nx,ny,nz]=normal;return [nx*cs-ny*sn,nx*sn+ny*cs,nz];}
@@ -32,7 +32,7 @@ export function createVehicleMesh(type='sedan',length=48,breadth=24,color='#e09a
       const end=Math.max(0,(Math.abs(x)/w-.43)/.07),width=h*(.49-.095*end),top=bodyZ-(x>0?1.2:.65)*scale*end;
       let low=3*scale;for(const axle of axles){const dx=x-axle;if(Math.abs(dx)<archRadius)low=Math.max(low,radius+Math.sqrt(archRadius**2-dx**2));}
       const shoulder=Math.max(low+.22*scale,top-.9*scale);
-      return [[x,-width*.67,2.8*scale],[x,-width,low],[x,-width,shoulder],[x,-width*.83,top],[x,width*.83,top],[x,width,shoulder],[x,width,low],[x,width*.67,2.8*scale]];
+      return [[x,-width*.67,2.8*scale],[x,-width,low],[x,-width,shoulder],[x,-width*.83,top],[x,0,top+.18*scale],[x,width*.83,top],[x,width,shoulder],[x,width,low],[x,width*.67,2.8*scale]];
     };
     addLoft(faces,[...stations].sort((a,b)=>a-b).map(ringAt),paint);
     let back=-w*.29,front=w*.2,roofBack=-w*.18,roofFront=w*.055,roofZ=15*scale;
@@ -112,22 +112,21 @@ export function createVehicleMesh(type='sedan',length=48,breadth=24,color='#e09a
     disc(.18,CHROME);
     for(let i=start;i<faces.length;i++)faces[i].part={type:'wheel',x,y,z:radius,radius,front:x>0,side};
   }
+  for(const f of faces)if(f.surface==='glass'){
+    const side=Math.abs(f.normal[1])>Math.max(Math.abs(f.normal[0]),Math.abs(f.normal[2]));
+    const points=f.points.map(p=>[p[side?0:1],p[2]]),min=[0,1].map(axis=>Math.min(...points.map(p=>p[axis]))),max=[0,1].map(axis=>Math.max(...points.map(p=>p[axis])));
+    f.uvs=points.map(p=>p.map((value,axis)=>(value-min[axis])/Math.max(.001,max[axis]-min[axis])));
+  }
   if(doorSpan){
-    const clip=(points,bound,keepGreater)=>{
-      const out=[];for(let i=0;i<points.length;i++){
-        const a=points[i],b=points[(i+1)%points.length],inA=keepGreater?a[0]>=bound:a[0]<=bound,inB=keepGreater?b[0]>=bound:b[0]<=bound;
-        if(inA)out.push(a);if(inA!==inB){const t=(bound-a[0])/(b[0]-a[0]);out.push(a.map((v,k)=>v+(b[k]-v)*t));}
-      }return out;
-    };
     const split=[];
     for(const f of faces){
       const side=f.points.every(p=>p[1]>h*.25)?1:f.points.every(p=>p[1]<-h*.25)?-1:0;
       if(f.part||!side||f.points.some(p=>p[2]<doorSpan.bottom)){split.push(f);continue;}
-      const pieces=[{points:clip(f.points,doorSpan.back,false)},
-        {points:clip(clip(f.points,doorSpan.back,true),doorSpan.front,false),part:{type:'door',side}},
-        {points:clip(f.points,doorSpan.front,true)}];
+      const pieces=[clipSurfaceX(f,doorSpan.back,false),
+        {...clipSurfaceX(clipSurfaceX(f,doorSpan.back,true),doorSpan.front,false),part:{type:'door',side}},
+        clipSurfaceX(f,doorSpan.front,true)];
       for(const piece of pieces)if(piece.points.length>=3&&Math.hypot(...faceNormal(piece.points))>1e-7)
-        split.push({...f,...piece,normals:undefined});
+        split.push(piece);
     }
     faces.splice(0,faces.length,...split);
   }

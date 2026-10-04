@@ -5,6 +5,23 @@ export function faceNormal(points){
   return [u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];
 }
 const unit=n=>{const length=Math.hypot(...n);return length>1e-9?n.map(v=>v/length):[0,0,1];};
+// Keep shading and cabin texture coordinates continuous when a curved panel
+// is divided at a door hinge. Discarding normals made the moving doors flat.
+export function clipSurfaceX(face,bound,keepGreater){
+  const result=[];
+  const vertices=face.points.map((point,i)=>({point,normal:face.normals?.[i],uv:face.uvs?.[i]}));
+  for(let i=0;i<vertices.length;i++){
+    const a=vertices[i],b=vertices[(i+1)%vertices.length];
+    const inA=keepGreater?a.point[0]>=bound:a.point[0]<=bound,inB=keepGreater?b.point[0]>=bound:b.point[0]<=bound;
+    if(inA)result.push(a);
+    if(inA!==inB){
+      const t=(bound-a.point[0])/(b.point[0]-a.point[0]);
+      const interpolate=(left,right)=>left.map((value,axis)=>value+(right[axis]-value)*t);
+      result.push({point:interpolate(a.point,b.point),normal:a.normal?unit(interpolate(a.normal,b.normal)):undefined,uv:a.uv?interpolate(a.uv,b.uv):undefined});
+    }
+  }
+  return {...face,points:result.map(v=>v.point),normals:face.normals?result.map(v=>v.normal):undefined,uvs:face.uvs?result.map(v=>v.uv):undefined};
+}
 export function addLoft(faces,rings,paint,{surface='paint',fill=null,caps=true}={}){
   const normals=rings.map(r=>r.map(()=>[0,0,0])),panels=[];
   for(let s=0;s<rings.length-1;s++)for(let j=0;j<rings[s].length;j++){
