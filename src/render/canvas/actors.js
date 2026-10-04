@@ -21,6 +21,12 @@ ctx.drawScreenPedestrian = function drawScreenPedestrian(ped, sx, sy, index, zoo
   ctx.ctx.save();
   ctx.ctx.translate(sx, sy-(ped.jumpHeight||0)*zoom);
   ctx.ctx.scale(size, size);
+  if(ped.inWater){
+    const phase=ped.swimPhase||0;
+    ctx.ctx.strokeStyle='#9fc8d0';ctx.ctx.lineWidth=1;ctx.ctx.beginPath();ctx.ctx.ellipse(0,0,12+Math.sin(phase)*2,4,0,0,ctx.env.Math.PI*2);ctx.ctx.stroke();
+    ctx.ctx.strokeStyle=skin;ctx.ctx.lineWidth=2.6;ctx.ctx.beginPath();ctx.ctx.moveTo(-3,-2);ctx.ctx.lineTo(-9,-4+Math.sin(phase)*3);ctx.ctx.moveTo(3,-2);ctx.ctx.lineTo(9,-4+Math.cos(phase)*3);ctx.ctx.stroke();
+    ctx.ctx.fillStyle=skin;ctx.ctx.beginPath();ctx.ctx.ellipse(0,-5,2.8,3.4,0,0,ctx.env.Math.PI*2);ctx.ctx.fill();ctx.ctx.fillStyle=ped.hair||'#302b28';ctx.ctx.fillRect(-2.5,-8,5,1.8);ctx.ctx.restore();return;
+  }
   ctx.ctx.fillStyle = 'rgba(0,0,0,.45)';
   ctx.ctx.beginPath();
   ctx.ctx.ellipse(2, 1, 6, 2.7, -.15, 0, ctx.env.Math.PI * 2);

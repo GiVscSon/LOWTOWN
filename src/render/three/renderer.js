@@ -4,7 +4,7 @@ import {mountedSign,apartmentGlassMaterial,createStorefronts} from './storefront
 import * as THREE from 'three';
 import {createTransportVisual,updateTransportVisual,setTransportLighting,setTransportEnvironment,disposeTransportVisual} from './vehicles.js';
 import {createBoxBatch,ribbonGeometry,addTiledGeometry} from './geometry.js';
-import {createCharacterBatch} from './characters.js';
+import {createCharacterBatch,characterBaseHeight} from './characters.js';
 import {loadGraphics,changeGraphics,createViewportSizer} from './graphics_settings.js';
 import {BEACH_WIDTH} from '../../world/coastline.js';
 import {addStreetFurniture} from './street_furniture.js';
@@ -55,7 +55,7 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
   const land=litMaterial({color:'#303a2c',roughness:1,side:THREE.DoubleSide});
   const beach=litMaterial({color:'#857853',roughness:1,side:THREE.DoubleSide});
   for(const island of world.islands||[]){
-    const mesh=ground(island.points,land,0),shore=[],width=island.natural?42:BEACH_WIDTH;
+    const mesh=ground(island.points,island.beach?beach:land,island.beach?-.4:0),shore=[],width=island.natural?42:BEACH_WIDTH;
     // Match the collision beach's constant distance from each coast segment.
     // The old scaled polygon exposed walkable ground as visible open water.
     for(let i=0;i<island.points.length;i++){
@@ -262,7 +262,7 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
       entry.group.visible=true;visibleVehicles++;setTransportLighting(entry.group,lowCostMaterials);
       const water=vehicle.kind==='water'||['tug','speedboat'].includes(type),airborne=lift>12;
       const rise=water||airborne?0:groundRise(vehicle.x,vehicle.y),heading=vehicle.angle||0,length=vehicle.width||48;
-      updateTransportVisual(entry.group,vehicle,time,lift+rise,frame.weather||{},key===p||(vehicle.hp??100)<85||Math.hypot(vehicle.x-p.x,vehicle.y-p.y)<650);
+      updateTransportVisual(entry.group,vehicle,time,lift+rise-(vehicle.inWater?Math.min(25,(vehicle.waterTime||0)*9):0),frame.weather||{},key===p||(vehicle.hp??100)<85||Math.hypot(vehicle.x-p.x,vehicle.y-p.y)<650);
       const slope=water||airborne?0:Math.atan2(groundRise(vehicle.x+Math.cos(heading)*length/2,vehicle.y+Math.sin(heading)*length/2)
         -groundRise(vehicle.x-Math.cos(heading)*length/2,vehicle.y-Math.sin(heading)*length/2),length);
       entry.group.quaternion.setFromAxisAngle(axis,-heading).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),slope));
@@ -275,6 +275,7 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
     const grounded=[...new Set([...(foot?[]:[p]),...(frame.vehicles||[])])].filter(v=>v!==p||!foot).filter(v=>v.kind!=='water'&&!['speedboat','tug'].includes(v.type)&&!(v.altitude>12)&&!(v===p&&altitude>12)&&visible(v,Math.max(48,v.width||48)));
     let shadowCount=0,reflectionCount=0;
     for(const actor of graphics.shadows?[...people,...grounded]:[]){
+      if(actor.inWater)continue;
       if(shadowCount>=1024)break;const person=shadowCount<people.length,jumpScale=1-Math.min(.35,(actor.jumpHeight||0)*.012),w=person?12*jumpScale:(actor.width||48)*1.12,h=person?9*jumpScale:(actor.height||24)*1.08;
       rotation.setFromAxisAngle(axis,-(actor.angle||0));matrix.compose(new THREE.Vector3(actor.x+2,surfaceY(actor.x+2,actor.y+1)+.08,actor.y+1),rotation,new THREE.Vector3(w,1,h));actorShadows.setMatrixAt(shadowCount++,matrix);
     }
@@ -292,7 +293,7 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
     }
     actorShadows.count=shadowCount;actorShadows.instanceMatrix.needsUpdate=true;lampReflections.count=reflectionCount;lampReflections.instanceMatrix.needsUpdate=true;
     if(lampReflections.instanceColor)lampReflections.instanceColor.needsUpdate=true;
-    playerMarker.position.set(p.x,playerRise+altitude+(foot?35+(p.jumpHeight||0):28),p.y);playerMarker.visible=altitude<12;
+    playerMarker.position.set(p.x,p.inWater?12:playerRise+altitude+(foot?35+(p.jumpHeight||0):28),p.y);playerMarker.visible=altitude<12;
     const intact=(frame.props||[]).filter(prop=>prop.intact!==false&&visible(prop,32));
     const propCount=props.update(intact,(x,y)=>groundRise(x,y)+3.6);
     const collectibles=(frame.parts||[]).filter(part=>!part.found&&visible(part,24));parts.count=Math.min(32,collectibles.length);rotation.setFromAxisAngle(axis,time);
@@ -320,7 +321,7 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
       visualDetail:{environment:true,trees:trees.count,canopyTriangles:trees.canopyTriangles,architecture:{...architecture.stats},props:propCount,effects:visibleEffects},
       streetFurniture:{lights:(world.lights||[]).length,props:(world.props||[]).length,signals:furniture.signals,visibleSignals},
       bridges:{spans:bridgeProfiles.length,arches:bridgeArches,piers:bridgePiers},
-      camera:{preset:cameraPreset,x:camera.position.x,y:camera.position.y,z:camera.position.z,distance:Math.hypot(camera.position.x-p.x,camera.position.z-p.y),fov:camera.fov},player:{x:p.x,y:p.y,altitude,groundElevation:playerRise,jumpHeight:p.jumpHeight||0,attackTime:p.attackTime||0,visualY:foot?playerRise+3.6+(p.jumpHeight||0):actors.get(p)?.group.position.y}};
+      camera:{preset:cameraPreset,x:camera.position.x,y:camera.position.y,z:camera.position.z,distance:Math.hypot(camera.position.x-p.x,camera.position.z-p.y),fov:camera.fov},player:{x:p.x,y:p.y,altitude,groundElevation:playerRise,jumpHeight:p.jumpHeight||0,attackTime:p.attackTime||0,inWater:!!p.inWater,waterTime:p.waterTime||0,visualY:foot?characterBaseHeight(p,playerRise+3.6):actors.get(p)?.group.position.y}};
   }
   function dispose(){const geometries=new Set(),materials=new Set();scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
     for(const geometry of geometries)geometry.dispose();for(const material of materials){for(const key of ['map','normalMap','roughnessMap'])material[key]?.dispose();material.userData.cabinTexture?.dispose();material.dispose();}setTransportEnvironment(null,0);environment.dispose();renderer.dispose();}

@@ -1,6 +1,8 @@
 import {createLifetime} from './lifetime.js';
 import {RUNTIME_DEPENDENCIES} from './dependencies.js';
 import {installCharacterActions} from '../simulation/character_actions.js';
+import {installWaterInteraction} from '../simulation/water_interaction.js';
+import {installWeapons} from '../simulation/weapons.js';
 import {installRuntimeState} from './state.js';
 import {installRuntimeDiagnostics} from './diagnostics.js';
 import {installAppAudio} from '../app/audio.js';
@@ -41,6 +43,8 @@ export function createGameRuntime({environment={},dependencies={}}={}){
  installSimulationPlayer(ctx);
  installSimulationContacts(ctx);
  installCharacterActions(ctx);
+ installWaterInteraction(ctx);
+ installWeapons(ctx);
  installSimulationPolice(ctx);
  installRenderFrame(ctx);
  installUiInterface(ctx);

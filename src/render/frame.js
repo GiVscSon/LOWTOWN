@@ -8,8 +8,9 @@ ctx.initThreeRuntime = function initThreeRuntime() {
     const world = {
       width: ctx.WORLD_W,
       height: ctx.WORLD_H,
-      islands: ctx.allIslands.map(island => ({
+      islands: [...ctx.allIslands,...(ctx.beachZones||[])].map(island => ({
         id: island.id,
+        beach: !!island.coast && String(island.id).startsWith('beach-'),
         natural: !!island.natural,
         points: coastPoints(island)
       })),
@@ -498,7 +499,7 @@ ctx.drawStreetActors = function drawStreetActors(w, h, center, zoom) {
       }
     });
   });
-  ctx.streetProps.forEach(p => actors.push({
+  ctx.streetProps.filter(p=>!p.movable).forEach(p => actors.push({
     depth: p.x + p.y + p.height / 2,
     draw: () => drawStreetFurniture(ctx.ctx, p)
   }));
@@ -555,6 +556,8 @@ ctx.drawStreetActors = function drawStreetActors(w, h, center, zoom) {
     hair: '#1a1512',
     jumpHeight: ctx.player.jumpHeight,
     attackTime: ctx.player.attackTime,
+    inWater: ctx.player.inWater,
+    swimPhase: ctx.player.swimPhase,
     stance: ctx.player.stance,
     player: true
   });

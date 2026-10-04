@@ -118,6 +118,14 @@ ctx.updatePedestrians = function updatePedestrians(dt) {
   ctx.pedestrianSceneryIndex = ctx.getCityScenery().pedestrians;
   const cars = [...ctx.trafficCars, ...ctx.policeCars, ...ctx.incidentPoliceCars, ...ctx.incidentResponseVehicles, ...(ctx.roam?.mode !== 'foot' && !(ctx.roam?.altitude > 12) ? [ctx.player] : [])];
   ctx.pedestrians.forEach((p, index) => {
+    if(p.beachRoute||p.inWater){
+      const goal=p.beachRoute?.[p.beachRouteIndex||0]||p.waterSafe||ctx.nearestSafeSpawn(p.x,p.y),dx=goal.x-p.x,dy=goal.y-p.y,d=ctx.env.Math.hypot(dx,dy)||1;
+      const move=ctx.env.Math.min(d,dt*(p.inWater?28:34));
+      const x=p.x+dx/d*move,y=p.y+dy/d*move;
+      if(!ctx.isPedestrianSceneryBlocked(x,y,0,true)){p.x=x;p.y=y;p.heading=ctx.env.Math.atan2(dy,dx);p.gait=1;p.walkPhase=(p.walkPhase||0)+move*.23;}
+      if(d<8&&p.beachRoute)p.beachRouteIndex=((p.beachRouteIndex||0)+1)%p.beachRoute.length;
+      return;
+    }
     if (p.homeY === undefined) {
       p.homeY = p.y;
       p.homeX = p.x;

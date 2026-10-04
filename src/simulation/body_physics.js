@@ -6,7 +6,7 @@ export function applyBodyImpulse(body, x, y, point = body, person = false) {
   const mass = Math.max(1, body.mass || (person ? 70 : 1500));
   const vx = x / mass / 60, vy = y / mass / 60;
   if (person) { body.contactVx = (body.contactVx||0)+vx; body.contactVy = (body.contactVy||0)+vy; }
-  else { body.vx = (body.vx||0)+vx; body.vy = (body.vy||0)+vy;
+  else { body.vx = (body.vx??Math.cos(body.angle||0)*(body.speed||0))+vx; body.vy = (body.vy??Math.sin(body.angle||0)*(body.speed||0))+vy;
     body.speed = body.vx*Math.cos(body.angle||0)+body.vy*Math.sin(body.angle||0); }
   if (!person) {
     const inertia = mass*((body.width||body.w||48)**2+(body.height||body.h||24)**2)/12;

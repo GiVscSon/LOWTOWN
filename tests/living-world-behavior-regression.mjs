@@ -49,10 +49,10 @@ const report=JSON.parse(world.run(`{
   const before=pedestrians.map(p=>({x:p.x,y:p.y}));
   const activities={};let unsafe=0,roadWalking=0;
   for(let tick=0;tick<1800;tick++){
-    updateCrowdReactions(pedestrians,null,1/60);updatePedestrians(1/60);
+    updateCrowdReactions(pedestrians,null,1/60);updatePedestrians(1/60);stepWaterInteraction(1/60);
     for(const p of pedestrians){
       if(p.activity)activities[p.activity]=(activities[p.activity]||0)+1;
-      if(isPedestrianSceneryBlocked(p.x,p.y))unsafe++;
+      if(isPedestrianSceneryBlocked(p.x,p.y,0,!!p.inWater))unsafe++;
       if(onRoadSurface(p.x,p.y,roads,bridges,[],roadEnds))roadWalking++;
     }
   }

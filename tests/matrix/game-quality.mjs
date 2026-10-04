@@ -3,6 +3,7 @@ import './night-detail.mjs';
 import './frame-watchdog.mjs';
 import './visual-polish.mjs';
 import './interaction-world.mjs';
+import './coastal-weapons.mjs';
 import assert from 'node:assert/strict';
 import {mkdirSync,writeFileSync} from 'node:fs';
 import {runtimeCity} from '../helpers/runtime-city.mjs';
@@ -46,7 +47,8 @@ for(const hz of [30,60,120])for(const terrain of ['pier','bridge']){
   const deck={x:0,y:0,w:90,h:90},surface=createWalkSurface(terrain==='pier'?{piers:[deck]}:{bridges:[deck]});
   assert(surface(45,45));assert(!surface(88,45));assert(!surface(94,45));
   const person={x:45,y:45,hp:100},roam=createFreeRoam(person,[],[],[],(x,y)=>surface(x,y,0),()=>{},[],()=>false,()=>[],{footSupport:surface});roam.fleet.length=0;roam.resetToFoot();
-  for(let i=0;i<hz;i++){roam.step({down:true},1/hz);assert(surface(person.x,person.y),`${terrain}/${hz}: walked off support`);}
+  for(let i=0;i<hz;i++)roam.step({down:true},1/hz);
+  assert(!surface(person.x,person.y),`${terrain}/${hz}: open deck edge became an invisible wall`);
   roam.resetToFoot(99999,99999);assert(surface(person.x,person.y),'invalid saved position must recover to known ground');
   report.terrain.push({hz,terrain,position:[person.x,person.y]});
 }

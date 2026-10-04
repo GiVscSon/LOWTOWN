@@ -1,4 +1,5 @@
-import {populateWorldDetails} from './details.js';
+import {populateWorldDetails,mobilizeSmallProps} from './details.js';
+import {populateBeaches} from './beaches.js';
 // One shared runtime context owns state; this system has no hidden globals.
 export function installWorldCity(ctx){
 const {AUTHORED_TERRAIN,assignWalkingRoutes,corridorRoad,createCityIncidentDirector,createRoadCircuits,createRoadGraph,createWalkingRoutes,fitBuildingsToStreets,isletWalkways,nearestStreet,normalizeStreetGeometry,onRoadSurface,onStreetCollection,organicStreetNetwork,planStopRoute,pointInCoast,rectangleClearOfStreets,remapBridges,remapLegacyScene,roadTerminals,streetPoints,streetSurfaceGeometry,streetWidth,worldPoint}=ctx.dependencies;
@@ -2268,6 +2269,9 @@ ctx.initTopology = function initTopology() {
   assignWalkingRoutes(ctx.pedestrians, ctx.walkingRoutes);
   ctx.preparePedestrianRoutines();
   populateWorldDetails(ctx);
+  populateBeaches(ctx);
+  mobilizeSmallProps(ctx);
+  ctx.pedestrians.forEach((person,index)=>{if(!person.beachRoute&&index%23===0)person.weapon=index%2?'pistol':'bat';});
 };
 ctx.alignStreetLocations = function alignStreetLocations() {
   if (!ctx.roads.some(r => r.points)) return;
