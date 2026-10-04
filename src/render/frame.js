@@ -69,6 +69,7 @@ ctx.renderWorld = function renderWorld() {
       vehicles: [...ctx.trafficCars, ...ctx.parkedCars, ...ctx.policeCars, ...ctx.incidentPoliceCars, ...ctx.incidentResponseVehicles, ...(ctx.roam?.fleet || []), ...ctx.airMedicalVehicles, ...(ctx.cityIncidentDirector?.current()?.wrecks || [])],
       pedestrians: [...ctx.pedestrians, ...(ctx.cityIncidentDirector?.current()?.actors || [])],
       props: ctx.breakableProps,
+      effects: ctx.effects.particles,
       parts: ctx.CARPARTS,
       incident: ctx.cityIncidentDirector?.current(),
       signals: {
@@ -399,6 +400,11 @@ ctx.renderWorld = function renderWorld() {
   ctx.drawStreetActors(w, h, center, cameraZoom);
 
   // Water Splashes
+  for(const particle of ctx.effects.particles)if(particle.life>0){
+    ctx.ctx.save();ctx.ctx.globalAlpha=Math.min(.7,particle.life/.3);
+    ctx.ctx.fillStyle={water:'#a7d3de',chip:'#ac9063',spark:'#ffd787',steam:'#9ca6a7',dust:'#a99c83'}[particle.kind];
+    ctx.ctx.beginPath();ctx.ctx.arc(particle.x-particle.z,particle.y-particle.z,particle.size,0,ctx.env.Math.PI*2);ctx.ctx.fill();ctx.ctx.restore();
+  }
   ctx.waterSplashes.forEach((sp, idx) => {
     ctx.ctx.fillStyle = `rgba(180, 210, 240, ${sp.alpha})`;
     ctx.ctx.beginPath();
@@ -547,6 +553,8 @@ ctx.drawStreetActors = function drawStreetActors(w, h, center, zoom) {
     pants: '#22272b',
     skin: '#d5b594',
     hair: '#1a1512',
+    jumpHeight: ctx.player.jumpHeight,
+    attackTime: ctx.player.attackTime,
     stance: ctx.player.stance,
     player: true
   });

@@ -13,6 +13,7 @@ export function installAppInput(ctx) {
     }
     Object.keys(ctx.state.keys).forEach(key => ctx.state.keys[key] = false);
     ctx.env.document.querySelectorAll('.btn-drive').forEach(button => button.classList.remove('active'));
+    ctx.player.attackHeld = ctx.player.jumpHeld = ctx.player.attackRequested = ctx.player.jumpRequested = false;
     ctx.accumulator = 0;
     ctx.lastSimulationTime = ctx.env.performance.now();
     ctx.state.lastFrameTime = ctx.env.performance.now();
@@ -49,12 +50,13 @@ export function installAppInput(ctx) {
       if (ctx.driveLab?.running) return;
       ctx.sound.init();
       if (e.code === 'KeyE' && !e.repeat) ctx.roam?.interact();
+      if (e.code === 'KeyF' && !e.repeat) {ctx.state.keys.attack = true;ctx.player.attackRequested=true;}
       if (e.code === 'KeyQ' && !e.repeat) ctx.roam?.toggleFlight();
       if (e.code === 'KeyW' || e.code === 'ArrowUp') ctx.state.keys.up = true;
       if (e.code === 'KeyS' || e.code === 'ArrowDown') ctx.state.keys.down = true;
       if (e.code === 'KeyA' || e.code === 'ArrowLeft') ctx.state.keys.left = true;
       if (e.code === 'KeyD' || e.code === 'ArrowRight') ctx.state.keys.right = true;
-      if (e.code === 'Space') ctx.state.keys.handbrake = true;
+      if (e.code === 'Space') {ctx.state.keys.handbrake=true;if(!e.repeat&&ctx.roam?.mode==='foot')ctx.player.jumpRequested=true;}
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') ctx.state.keys.nitro = true;
       if (e.code === 'KeyM' && !e.repeat) ctx.toggleMap();
       if (e.code === 'KeyG' && !e.repeat) ctx.toggleGarage();
@@ -68,6 +70,7 @@ export function installAppInput(ctx) {
       if (e.code === 'KeyS' || e.code === 'ArrowDown') ctx.state.keys.down = false;
       if (e.code === 'KeyA' || e.code === 'ArrowLeft') ctx.state.keys.left = false;
       if (e.code === 'KeyD' || e.code === 'ArrowRight') ctx.state.keys.right = false;
+      if (e.code === 'KeyF') ctx.state.keys.attack = false;
       if (e.code === 'Space') ctx.state.keys.handbrake = false;
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') ctx.state.keys.nitro = false;
     });
@@ -80,12 +83,14 @@ export function installAppInput(ctx) {
         if (ctx.state.custodyTimer > 0) return;
         ctx.sound.init();
         ctx.state.keys[keyName] = true;
+        if(ctx.roam?.mode==='foot'){if(keyName==='nitro'){ctx.state.keys.attack=true;ctx.player.attackRequested=true;}if(keyName==='handbrake')ctx.player.jumpRequested=true;}
         btn.classList.add('active');
         if (ctx.env.navigator.vibrate) ctx.env.navigator.vibrate(10);
       };
       const onRelease = e => {
         if (e.cancelable) e.preventDefault();
         ctx.state.keys[keyName] = false;
+        if (keyName === 'nitro') ctx.state.keys.attack = false;
         btn.classList.remove('active');
       };
       if (ctx.env.window.PointerEvent) {
@@ -146,6 +151,7 @@ export function installAppInput(ctx) {
       ctx.state.keys.right = false;
       ctx.state.keys.handbrake = false;
       ctx.state.keys.nitro = false;
+      ctx.state.keys.attack = false;
       ctx.env.document.querySelectorAll('.btn-drive').forEach(b => b.classList.remove('active'));
     });
     ctx.listen(ctx.env.document.getElementById('btnOpenMap'), 'click', ctx.toggleMap);

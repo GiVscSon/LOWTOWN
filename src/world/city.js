@@ -1,3 +1,4 @@
+import {populateWorldDetails} from './details.js';
 // One shared runtime context owns state; this system has no hidden globals.
 export function installWorldCity(ctx){
 const {AUTHORED_TERRAIN,assignWalkingRoutes,corridorRoad,createCityIncidentDirector,createRoadCircuits,createRoadGraph,createWalkingRoutes,fitBuildingsToStreets,isletWalkways,nearestStreet,normalizeStreetGeometry,onRoadSurface,onStreetCollection,organicStreetNetwork,planStopRoute,pointInCoast,rectangleClearOfStreets,remapBridges,remapLegacyScene,roadTerminals,streetPoints,streetSurfaceGeometry,streetWidth,worldPoint}=ctx.dependencies;
@@ -2263,6 +2264,7 @@ ctx.initTopology = function initTopology() {
   }
   assignWalkingRoutes(ctx.pedestrians, ctx.walkingRoutes);
   ctx.preparePedestrianRoutines();
+  populateWorldDetails(ctx);
 };
 ctx.alignStreetLocations = function alignStreetLocations() {
   if (!ctx.roads.some(r => r.points)) return;

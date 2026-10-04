@@ -138,6 +138,7 @@ ctx.updatePedestrians = function updatePedestrians(dt) {
       }
       return;
     }
+    if(p.combatTimer>0){p.gait=0;return;}
     p.pause = ctx.env.Math.max(0, p.pause - dt);
     p.routeRecoveryCooldown = ctx.env.Math.max(0, (p.routeRecoveryCooldown || 0) - dt);
     const panicking = p.reaction === 'fleeing' || p.fleeTimer > 0 || p.eventFleeTimer > 0 || !!p.avoidZone;

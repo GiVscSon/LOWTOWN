@@ -1,3 +1,4 @@
+import {createNeighbourhood} from './neighbourhood.js';
 // One shared runtime context owns state; this system has no hidden globals.
 export function installSimulationStep(ctx){
 const {advanceRouteActor,advanceTrafficCar,captureMotion,pointInCoast,stepLandVehicle,surfaceMovement,updateCrowdReactions,weatherMovement}=ctx.dependencies;
@@ -35,6 +36,7 @@ ctx.updatePhysics = function updatePhysics(dt) {
   ctx.player.hitCooldown = ctx.env.Math.max(0, (ctx.player.hitCooldown || 0) - dt);
   if (!ctx.player.knockdownTimer && ctx.player.stance === 'down') ctx.player.stance = null;
   const movementKeys = inCustody || ctx.player.knockdownTimer > 0 ? {} : ctx.state.keys;
+  ctx.stepCharacterActions(dt, movementKeys);
   const specialMovement = ctx.roam?.step(movementKeys, dt);
   if (!specialMovement) {
     const onGround = ctx.isPositionOnSolidGround(ctx.player.x, ctx.player.y);
@@ -71,7 +73,8 @@ ctx.updatePhysics = function updatePhysics(dt) {
         ctx.state.invulnTimer = 120;
         ctx.showToast('⚠️ МАШИНА УТОНУЛА! ЭВАКУАЦИЯ (-$50)');
         ctx.state.cash = ctx.env.Math.max(0, ctx.state.cash - 50);
-        if (ctx.player.hp <= 0) ctx.respawnPlayer('утопление');
+        ctx.stepWorldEffects(dt);
+  if (ctx.player.hp <= 0) ctx.respawnPlayer('утопление');
         return;
       }
     }
@@ -117,6 +120,12 @@ ctx.updatePhysics = function updatePhysics(dt) {
       }
     });
   }
+  // One swept neighbourhood index per physics step. Keep the exact following
+  // test; expand the neighbourhood for sequential actor movement.
+  const trafficOccupants=[...(ctx.roam?.mode !== 'foot' && (ctx.roam?.altitude||0)<12?[ctx.player]:[]),...ctx.trafficCars,...ctx.parkedCars,...ctx.policeCars,...ctx.incidentPoliceCars,...ctx.incidentResponseVehicles,...(ctx.roam?.fleet||[]).filter(v=>v.kind!=='water'),...ctx.breakableProps.filter(p=>p.movable&&p.intact!==false)];
+  const footOccupants=[...ctx.pedestrians,...(ctx.roam?.mode==='foot'?[ctx.player]:[])];
+  const motionPad=Math.max(32,...trafficOccupants.map(body=>Math.max(body.width||body.w||48,body.height||body.h||24)/2+Math.hypot(body.vx||0,body.vy||0,body.speed||0)*dt*60));
+  const trafficNeighbourhood=createNeighbourhood(trafficOccupants),footNeighbourhood=createNeighbourhood(footOccupants);
   // Traffic update
   ctx.trafficCars.forEach(c => {
     if (c.cruiseSpeed === undefined) c.cruiseSpeed = c.speed;
@@ -136,7 +145,7 @@ ctx.updatePhysics = function updatePhysics(dt) {
       const opposing = Number.isFinite(other.angle) && ctx.env.Math.cos(other.angle - c.angle) < -.8;
       return along > 0 && along < gap && ctx.env.Math.abs(-dx * sn + dy * cs) < (opposing ? ctx.env.Math.max(0, margin - 10) : margin);
     };
-    const occupied = [...(ctx.roam?.mode !== 'foot' && (ctx.roam?.altitude || 0) < 12 ? [ctx.player] : []), ...ctx.trafficCars, ...ctx.parkedCars, ...ctx.policeCars, ...ctx.incidentPoliceCars, ...ctx.incidentResponseVehicles, ...(ctx.roam?.fleet || []).filter(v => v.kind !== 'water')].some(other => other !== c && ahead(other, forwardGap, ((c.height || 24) + (other.height || 24)) / 2 + 12)) || [...ctx.pedestrians, ...(ctx.roam?.mode === 'foot' ? [ctx.player] : [])].some(person => ahead(person, 70, (c.height || 24) / 2 + 7));
+    const occupied = trafficNeighbourhood.some(c.x,c.y,forwardGap+motionPad+64,other => other !== c && ahead(other, forwardGap, ((c.height || 24) + (other.height || 24)) / 2 + 12)) || footNeighbourhood.some(c.x,c.y,100+motionPad,person => ahead(person, 70, (c.height || 24) / 2 + 7));
     const approachingRed = ctx.trafficMustStopAtSignal(c);
     c.collisionHold = ctx.env.Math.max(0, (c.collisionHold || 0) - dt);
     const obstacle = occupied || approachingRed || emergencyYield || c.collisionHold > 0;
@@ -216,7 +225,7 @@ ctx.updatePhysics = function updatePhysics(dt) {
   const stuntVehicles = [...ctx.trafficCars, ...ctx.policeCars, ...ctx.incidentPoliceCars, ...ctx.incidentResponseVehicles];
   stuntVehicles.forEach(vehicle => ctx.updateStuntVehicle(vehicle, dt));
   ctx.resolveCityMotion(motionStarts, dt);
-  if (ctx.player.hp <= 0) ctx.respawnPlayer('тяжёлая авария');
+  if (ctx.player.hp <= 0) ctx.respawnPlayer(ctx.roam?.mode==='foot'?'потеря сознания':'тяжёлая авария');
   const speedKmh = ctx.env.Math.abs(ctx.player.speed) * 12;
   if (!ctx.roam?.special) ctx.player.gear = ctx.player.speed < -0.1 ? 'R' : speedKmh < 30 ? 'D1' : speedKmh < 60 ? 'D2' : speedKmh < 95 ? 'D3' : speedKmh < 130 ? 'D4' : 'D5';
   ctx.player.rpm = ctx.env.Math.min(1.0, speedKmh % 35 / 35 + 0.2);

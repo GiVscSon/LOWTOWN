@@ -2,6 +2,7 @@ import './simulation-clock.mjs';
 import './night-detail.mjs';
 import './frame-watchdog.mjs';
 import './visual-polish.mjs';
+import './interaction-world.mjs';
 import assert from 'node:assert/strict';
 import {mkdirSync,writeFileSync} from 'node:fs';
 import {runtimeCity} from '../helpers/runtime-city.mjs';

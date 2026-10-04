@@ -266,6 +266,9 @@
               <option value="simple">Лёгкое</option><option value="detailed">Подробное</option>
             </select></label>
           </div>
+          <label>Эффекты мира<select data-graphics="effects" id="menuEffects">
+            <option value="high">Все эффекты</option><option value="medium">Умеренно</option><option value="off">Выключены</option>
+          </select></label>
           <div class="menu-graphics-checks">
             <label><input type="checkbox" data-graphics="shadows">Тени</label>
             <label><input type="checkbox" data-graphics="reflections">Отражения</label>
@@ -290,13 +293,15 @@
         <dl class="menu-controls">
           <div><dt>Движение и руль</dt><dd><kbd>WASD</kbd><kbd>↑↓←→</kbd></dd></div>
           <div><dt>Выйти / сесть</dt><dd><kbd>E</kbd></dd></div>
-          <div><dt>Ручной тормоз</dt><dd><kbd>Пробел</kbd></dd></div>
+          <div><dt>Прыжок пешком</dt><dd><kbd>Пробел</kbd></dd></div>
+          <div><dt>Удар пешком</dt><dd><kbd>F</kbd></dd></div>
+          <div><dt>Ручной тормоз в машине</dt><dd><kbd>Пробел</kbd></dd></div>
           <div><dt>Нитро</dt><dd><kbd>Shift</kbd></dd></div>
           <div><dt>Взлёт / снижение</dt><dd><kbd>Q</kbd></dd></div>
           <div><dt>Карта / гараж / радио</dt><dd><kbd>M</kbd><kbd>G</kbd><kbd>R</kbd></dd></div>
           <div><dt>Меню и пауза</dt><dd><kbd>Esc</kbd></dd></div>
         </dl>
-        <p class="menu-controls-note">На телефоне — руль и педали внизу экрана. Самолёт взлетает после разгона по полосе; для вертолёта нажми Q.</p>
+        <p class="menu-controls-note">На телефоне — руль и педали внизу экрана; пешком кнопки «Прыжок» и «Удар». Самолёт взлетает после разгона по полосе; для вертолёта нажми Q.</p>
       </div>
       <footer class="menu-footer">
         <span id="menuKeyHint">Esc · Продолжить</span>

@@ -26,7 +26,14 @@ export function addStreetFurniture(world,{details,reflectors,pools,roadReflectio
     }else if(prop.type==='stall'||prop.type==='kiosk'){
       add(0,10,0,w,20,h,'#7b7869');add(0,22,0,w+5,3,h+5,'#725347');add(0,13,h*.51,w*.7,10,1,'#273b43');
       add(0,7,h*.56,w*.9,2,5,'#b2a27b');
-    }else if(prop.type==='gardenbed'||prop.type==='pond'||prop.type==='fountain'){
+    }else if(prop.type==='planter'){
+      add(0,4,0,w,8,h,'#827c6b');add(0,8,0,w*.86,.6,h*.86,'#443d2e');
+      add(0,12,0,w*.72,8,h*.72,'#516944');add(w*.15,15,-h*.1,w*.45,6,h*.5,'#627950');
+    }else if(prop.type==='bikeRack'){
+      for(const u of [-w*.35,0,w*.35]){add(u,5,-h*.35,1.2,10,1.2,'#7f8c89');add(u,5,h*.35,1.2,10,1.2,'#7f8c89');add(u,10,0,1.2,1.2,h*.7,'#7f8c89');}
+    }else if(prop.type==='mailbox'){
+      add(0,6,0,2,12,2,'#58636a');add(0,15,0,w*.7,12,h*.8,'#385b72');add(0,21,0,w*.76,1,h*.85,'#637988');add(0,17,h*.42,w*.4,1,.4,'#162c39');
+    }else if(prop.type==='gardenbed' ||prop.type==='pond'||prop.type==='fountain'){
       add(0,2,0,w,4,h,'#777d70');add(0,4,0,w*.88,1,h*.85,prop.type==='gardenbed'?'#4c6144':'#396371');
       if(prop.type==='fountain'){add(0,8,0,8,12,8,'#8c978c');add(0,15,0,w*.45,2,h*.45,'#939b8a');}
     }else {

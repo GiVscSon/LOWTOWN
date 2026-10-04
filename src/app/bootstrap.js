@@ -18,7 +18,7 @@ export function installAppBootstrap(ctx) {
     };
     ctx.listen(ctx.env.window, 'lowtown-before-update', () => ctx.autoSaveProgress());
     ctx.initThreeRuntime();
-    ctx.roam = createFreeRoam(ctx.player, ctx.parkedCars, ctx.buildings, ctx.trees, ctx.isPositionOnSolidGround, ctx.showToast, ctx.solidProps, ctx.isPositionOnWaterObstacle, () => [...ctx.trafficCars, ...ctx.policeCars, ...ctx.incidentPoliceCars, ...ctx.incidentResponseVehicles], {
+    ctx.roam = createFreeRoam(ctx.player, ctx.parkedCars, ctx.buildings, ctx.trees, ctx.isPositionOnSolidGround, ctx.showToast, ctx.solidProps, ctx.isPositionOnWaterObstacle, () => [...ctx.trafficCars, ...ctx.policeCars, ...ctx.incidentPoliceCars, ...ctx.incidentResponseVehicles, ...ctx.breakableProps.filter(p => p.intact !== false && p.type !== 'hydrant')], {
       mapPoint: worldPoint,
       runways: ctx.PLANE_RUNWAYS,
       streets: ctx.roads,
@@ -362,6 +362,19 @@ export function installAppBootstrap(ctx) {
             target
           };
         },
+        interactionScene(type='crate') {
+          ctx.env.window.__lowtownCityQA.collisionScene('bin',true);
+          const x=1690,y=1200;
+          for(let i=ctx.breakableProps.length-1;i>=0;i--)if(ctx.env.Math.hypot(ctx.breakableProps[i].x-x,ctx.breakableProps[i].y-y)<250)ctx.breakableProps.splice(i,1);
+          const width=type==='sedan'?48:16,body={type,x,y,angle:0,width,height:type==='sedan'?24:16,w:width,h:16,mass:type==='sedan'?1500:type==='barrel'?45:type==='dumpster'?130:22,hp:36,intact:true,collisionHeight:18,speed:0};
+          if(type==='person'){body.hp=100;body.entityType='pedestrian';body.pause=999;ctx.pedestrians.push(body);}
+          else if(type==='sedan'){body.hp=100;ctx.parkedCars.push(body);}else ctx.breakableProps.push(body);
+          ctx.invalidateScenery();ctx.roam.resetToFoot(x-width/2-15,y,0);
+          ctx.threeRenderer.setCameraPreset('near');ctx.renderWorld();
+          return {type,x,y};
+        },
+        interactionState: () => ({player:{x:ctx.player.x,y:ctx.player.y,hp:ctx.player.hp,jumpHeight:ctx.player.jumpHeight||0,attackTime:ctx.player.attackTime||0},effects:ctx.effects.active,details:ctx.worldDetailCount,
+          props:ctx.breakableProps.map(p=>({type:p.type,x:p.x,y:p.y,hp:p.hp,intact:p.intact})),people:ctx.pedestrians.map(p=>({hp:p.hp,reaction:p.reaction,combatTimer:p.combatTimer})),cars:ctx.parkedCars.map(p=>({hp:p.hp,damage:p.damage}))}),
         setWeather(kind, instant = false) {
           ctx.weather.set(kind);
           if (instant) Object.assign(ctx.weather, {
