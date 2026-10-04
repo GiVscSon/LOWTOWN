@@ -2238,6 +2238,9 @@ ctx.initTopology = function initTopology() {
       });
     }
   });
+  // Final shelter/scenery relocation can keep array lengths unchanged.
+  // Rebuild collision bounds before assigning residents to walking routes.
+  ctx.invalidateScenery();
   ctx.walkingRoutes = createWalkingRoutes(ctx.roads, ctx.parkZones, (x, y) => !ctx.isPedestrianSceneryBlocked(x, y) && !onRoadSurface(x, y, ctx.roads, ctx.bridges, [], ctx.roadEnds) && !ctx.parkedCars.some(c => ctx.pedestrianCarBlocked(x, y, c)));
   for (const route of ctx.walkingRoutes) {
     const point = route.points[ctx.env.Math.floor(route.points.length / 2)];
