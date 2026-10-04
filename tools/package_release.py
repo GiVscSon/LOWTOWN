@@ -40,7 +40,7 @@ game = out / f'LOWTOWN-{version}-game.zip'
 source = out / f'LOWTOWN-{version}-source.zip'
 with zipfile.ZipFile(game, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
     for file in sorted(dist.rglob('*')):
-        if file.is_file() and not file.name.endswith('.map'):
+        if file.is_file() and not file.name.endswith('.map') and file.relative_to(dist).parts[0] not in {'debug', 'screenshots'}:
             archive.write(file, file.relative_to(dist))
     archive.writestr('start.py', launcher)
     archive.writestr('START.bat', '@echo off\r\ncd /d "%~dp0"\r\npy -3 start.py\r\nif errorlevel 1 pause\r\n')
