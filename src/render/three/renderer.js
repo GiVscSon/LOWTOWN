@@ -13,6 +13,9 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {surfaceMaterial,surfaceTexture,glowTexture,waterMaterial as createWaterMaterial} from './materials.js';
 import {CAMERA_PRESETS,CAMERA_STORAGE_KEY,cameraFraming} from './camera.js';
 import {createBridgeProfiles,bridgeSurfaceIndex,raisedBridgeGeometry,addBridgeStructures} from './bridges.js';
+import {createNightEnvironment,contactShadowTexture} from './environment.js';
+import {addUrbanTrees,foliageMaterial} from './foliage.js';
+import {createStreetProps} from './props.js';
 
 function ground(points,material,elevation=0){
   if(!points?.length)return null;
@@ -32,11 +35,12 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
   const pairedMaterial=factory=>{
     const pair={simple:factory(true),detailed:factory(false)};materialPairs.push(pair);return pair[lowCostMaterials?'simple':'detailed'];
   };
-  const litMaterial=options=>pairedMaterial(cheap=>cheap?new THREE.MeshLambertMaterial({color:options.color,side:options.side||THREE.FrontSide}):new THREE.MeshStandardMaterial(options));
+  const litMaterial=options=>pairedMaterial(cheap=>cheap?new THREE.MeshLambertMaterial({color:options.color,side:options.side||THREE.FrontSide,vertexColors:!!options.vertexColors}):new THREE.MeshStandardMaterial(options));
   const citySurface=(kind,color)=>pairedMaterial(cheap=>surfaceMaterial(kind,color,cheap));
   let cameraPreset='normal';
   try{const saved=localStorage.getItem(CAMERA_STORAGE_KEY);if(CAMERA_PRESETS.includes(saved))cameraPreset=saved;}catch{}
   const scene=new THREE.Scene();scene.background=new THREE.Color('#07151d');scene.fog=new THREE.FogExp2('#10202a',.000095);
+  const environment=createNightEnvironment(renderer);scene.environment=environment.texture;scene.environmentIntensity=.65;
   const camera=new THREE.PerspectiveCamera(46,1,2,18000);
   const viewport=createViewportSizer(renderer,camera);
   scene.add(new THREE.HemisphereLight('#9aaec4','#211912',1.25));
@@ -70,7 +74,7 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
   const asphalt=createBoxBatch(staticGroup,'#31383b',.88,undefined,asphaltMaterial);
   const timber=createBoxBatch(staticGroup,'#887050',1,undefined,woodMaterial);
   const reflectors=createBoxBatch(staticGroup,'#dfc991',1,undefined,new THREE.MeshBasicMaterial({color:0xffffff}));
-  const shadowMaterial=new THREE.MeshBasicMaterial({color:'#050d13',transparent:true,opacity:.22,depthWrite:false,side:THREE.DoubleSide});
+  const shadowMaterial=new THREE.MeshBasicMaterial({color:'#050d13',map:contactShadowTexture(),transparent:true,opacity:.29,depthWrite:false,side:THREE.DoubleSide});
   shadowMaterial.forceSinglePass=true;
   const staticShadows=createBoxBatch(shadowGroup,'#ffffff',1,new THREE.PlaneGeometry(1,1).rotateX(-Math.PI/2),shadowMaterial);
   const glowMaterial=new THREE.MeshBasicMaterial({color:0xffffff,map:glowTexture(),transparent:true,opacity:.36,blending:THREE.AdditiveBlending,depthWrite:false});
@@ -188,26 +192,20 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
     storefronts.add(b,placement,index);
   }
   const storefrontDetail=storefronts.flush();
-  const foliage=createBoxBatch(staticGroup,'#3a5940',1,new THREE.IcosahedronGeometry(.65,0),litMaterial({color:0xffffff,roughness:1}));
-  for(const tree of world.trees||[]){const size=tree.size||20;details.add(tree.x,size*.5,tree.y,4,size,4,'#5e4834');foliage.add(tree.x,size*1.2,tree.y,size*1.25,size,size*1.25,'#3a5940');staticShadows.add(tree.x+size*.25,3.22,tree.y+size*.2,size*1.25,1,size*.85);}
+  const trees=addUrbanTrees(staticGroup,world.trees||[],{material:pairedMaterial(foliageMaterial),lit:litMaterial,shadows:staticShadows});
   const furniture=addStreetFurniture(world,{details,reflectors,pools,roadReflection,mountedSign,scene:staticGroup});
   for(const board of world.billboards||[]){details.add(board.x,32,board.y,4,64,4,'#606a61');const sign=mountedSign(board.text,95);sign.position.set(board.x,62,board.y);staticGroup.add(sign);}
   for(const crane of world.cranes||[]){details.add(crane.x,65,crane.y,5,130,5,'#b88845');details.add(crane.x+crane.reach/2,130,crane.y,Math.abs(crane.reach),5,5,'#b88845');}
-  groundBoxes.flush();paving.flush();asphalt.flush();timber.flush();reflectors.flush();staticShadows.flush();pools.flush();reflections.flush();details.flush();architecture.flush();const crowns=foliage.flush();
-  if(crowns)crowns.material.onBeforeCompile=shader=>{
-    shader.uniforms.windTime={value:0};shader.uniforms.windStrength={value:0};crowns.material.userData.shader=shader;
-    shader.vertexShader='uniform float windTime;uniform float windStrength;\n'+shader.vertexShader;
-    shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\ntransformed.x+=sin(windTime*2.0+instanceMatrix[3].x*.02)*windStrength*(position.y+.7)*.08;');
-  };
+  groundBoxes.flush();paving.flush();asphalt.flush();timber.flush();reflectors.flush();staticShadows.flush();pools.flush();reflections.flush();details.flush();architecture.flush();
 
-  const actors=new Map(),characters=createCharacterBatch(scene);
+  const actors=new Map(),characters=createCharacterBatch(scene,512,litMaterial({color:0xffffff,vertexColors:true,roughness:.92}));
   const actorShadows=new THREE.InstancedMesh(new THREE.CircleGeometry(.5,12).rotateX(-Math.PI/2),shadowMaterial,1024);
   actorShadows.frustumCulled=false;scene.add(actorShadows);
   const lampReflections=new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1).rotateX(-Math.PI/2),reflectionMaterial,512);
   lampReflections.frustumCulled=false;scene.add(lampReflections);
-  const props=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),litMaterial({color:0xffffff,roughness:.75}),128);
+  const props=createStreetProps(scene,litMaterial({color:0xffffff,vertexColors:true,roughness:.8,metalness:.12}));
   const parts=new THREE.InstancedMesh(new THREE.OctahedronGeometry(6),new THREE.MeshBasicMaterial({color:'#e9b94e'}),32);
-  props.frustumCulled=parts.frustumCulled=false;scene.add(props,parts);
+  parts.frustumCulled=false;scene.add(parts);
   const markerCanvas=document.createElement('canvas');markerCanvas.width=markerCanvas.height=64;
   const markerContext=markerCanvas.getContext('2d');markerContext.fillStyle='#ffb828';markerContext.strokeStyle='#191813';markerContext.lineWidth=6;
   markerContext.beginPath();markerContext.moveTo(12,13);markerContext.lineTo(52,13);markerContext.lineTo(32,51);markerContext.closePath();markerContext.fill();markerContext.stroke();
@@ -293,18 +291,16 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
     actorShadows.count=shadowCount;actorShadows.instanceMatrix.needsUpdate=true;lampReflections.count=reflectionCount;lampReflections.instanceMatrix.needsUpdate=true;
     if(lampReflections.instanceColor)lampReflections.instanceColor.needsUpdate=true;
     playerMarker.position.set(p.x,playerRise+altitude+(foot?35:28),p.y);playerMarker.visible=altitude<12;
-    const intact=(frame.props||[]).filter(prop=>prop.intact!==false&&visible(prop,32));props.count=Math.min(128,intact.length);
-    for(let i=0;i<props.count;i++){const prop=intact[i],hydrant=prop.type==='hydrant';rotation.setFromAxisAngle(axis,-(prop.angle||0));
-      matrix.compose(new THREE.Vector3(prop.x,groundRise(prop.x,prop.y)+(hydrant?7:10),prop.y),rotation,new THREE.Vector3(prop.w||14,hydrant?14:20,prop.h||14));props.setMatrixAt(i,matrix);props.setColorAt(i,new THREE.Color(hydrant?'#be4636':'#487050'));}
-    props.instanceMatrix.needsUpdate=true;if(props.instanceColor)props.instanceColor.needsUpdate=true;
+    const intact=(frame.props||[]).filter(prop=>prop.intact!==false&&visible(prop,32));
+    const propCount=props.update(intact,(x,y)=>groundRise(x,y)+3.6);
     const collectibles=(frame.parts||[]).filter(part=>!part.found&&visible(part,24));parts.count=Math.min(32,collectibles.length);rotation.setFromAxisAngle(axis,time);
     for(let i=0;i<parts.count;i++){const part=collectibles[i];matrix.compose(new THREE.Vector3(part.x,16+Math.sin(time*2+i)*3,part.y),rotation,scale);parts.setMatrixAt(i,matrix);}parts.instanceMatrix.needsUpdate=true;
     headlight.visible=!foot&&altitude<12;headlight.position.set(p.x+Math.cos(heading)*23,12+playerRise,p.y+Math.sin(heading)*23);headlight.target.position.set(p.x+Math.cos(heading)*130,surfaceY(p.x+Math.cos(heading)*130,p.y+Math.sin(heading)*130),p.y+Math.sin(heading)*130);
-    const weather=frame.weather||{},amount=weather.rain||0;scene.fog.density=.000095+(weather.fog||0)*.0004;motorMaterial.roughness=.72-.32*(weather.wetness||0);waterMaterial.roughness=.44+amount*.12;
+    const weather=frame.weather||{},amount=weather.rain||0;scene.environmentIntensity=graphics.reflections?.65:0;scene.fog.density=.000095+(weather.fog||0)*.0004;motorMaterial.roughness=.72-.32*(weather.wetness||0);waterMaterial.roughness=.44+amount*.12;
     for(const pair of materialPairs)for(const material of [pair.simple,pair.detailed])if(material.map===surfaceTexture('asphalt'))material.roughness=.9-.44*(weather.wetness||0);moon.intensity=1.8+(weather.flash||0)*5;
     reflectionMaterial.opacity=.08+.8*(weather.wetness||0);
     for(const pair of materialPairs)for(const material of [pair.simple,pair.detailed])if(material.userData.shader?.uniforms.rippleTime)material.userData.shader.uniforms.rippleTime.value=time;
-    if(crowns?.material.userData.shader){crowns.material.userData.shader.uniforms.windTime.value=time;crowns.material.userData.shader.uniforms.windStrength.value=weather.wind||0;}
+    for(const pair of materialPairs)for(const material of [pair.simple,pair.detailed])if(material.userData.wind){material.userData.wind.time.value=time;material.userData.wind.strength.value=weather.wind||0;}
     rain.visible=graphics.rain&&amount>.03;if(rain.visible){
       for(let i=0;i<240;i++){const x=p.x+((i*173.31+time*(weather.wind||1)*32)%1600)-800,z=p.y+((i*117.13)%1600)-800,y=(i*37.19-time*500)%600+600;rainPositions.set([x,y,z,x-6*(weather.wind||1),y-18,z+3],i*6);}
       rainGeometry.attributes.position.needsUpdate=true;rain.material.opacity=.15+amount*.4;
@@ -318,12 +314,13 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
     globalThis.__lowtownThreeStats={frames,vehicles:(frame.vehicles||[]).length+(foot?0:1),visibleVehicles,pedestrians:allPeople.length,visiblePedestrians:people.length,objects:scene.children.length,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,contextLost,renderQuality:ratio/Math.min(globalThis.devicePixelRatio||1,1.5),software:!!software,lowCostMaterials,
       graphics:{...graphics},resolution:{ratio,width:canvas.width,height:canvas.height,resizes:viewport.resizes},renderCpuMs:performance.now()-now,
       streetDetail:{...streetDetail,shopWindows:storefrontDetail.windows},
+      visualDetail:{environment:true,trees:trees.count,canopyTriangles:trees.canopyTriangles,architecture:{...architecture.stats},props:propCount},
       streetFurniture:{lights:(world.lights||[]).length,props:(world.props||[]).length,signals:furniture.signals,visibleSignals},
       bridges:{spans:bridgeProfiles.length,arches:bridgeArches,piers:bridgePiers},
       camera:{preset:cameraPreset,x:camera.position.x,y:camera.position.y,z:camera.position.z,distance:Math.hypot(camera.position.x-p.x,camera.position.z-p.y),fov:camera.fov},player:{x:p.x,y:p.y,altitude,groundElevation:playerRise,visualY:foot?playerRise+3.6:actors.get(p)?.group.position.y}};
   }
   function dispose(){const geometries=new Set(),materials=new Set();scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
-    for(const geometry of geometries)geometry.dispose();for(const material of materials){for(const key of ['map','normalMap','roughnessMap'])material[key]?.dispose();material.dispose();}renderer.dispose();}
+    for(const geometry of geometries)geometry.dispose();for(const material of materials){for(const key of ['map','normalMap','roughnessMap'])material[key]?.dispose();material.userData.cabinTexture?.dispose();material.dispose();}environment.dispose();renderer.dispose();}
   return {render,dispose,scene,camera,renderer,bridgeProfiles,bridgeSurface,get cameraPreset(){return cameraPreset;},get graphics(){return {...graphics};},
     setGraphics(patch){
       graphics=changeGraphics(graphics,patch);lowCostMaterials=graphics.lighting==='simple'&&!forceFullMaterials;

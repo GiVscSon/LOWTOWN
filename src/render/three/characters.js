@@ -44,8 +44,8 @@ export function characterGeometries(){
   };
   return geometries;
 }
-export function createCharacterBatch(scene,capacity=512){
-  const material=new THREE.MeshLambertMaterial({vertexColors:true}),batches={};
+export function createCharacterBatch(scene,capacity=512,material=new THREE.MeshLambertMaterial({vertexColors:true})){
+  const batches={};
   for(const [name,geometry] of Object.entries(characterGeometries())){
     const mesh=new THREE.InstancedMesh(geometry,material,capacity*(name==='head'||name==='torso'?1:2));
     mesh.frustumCulled=false;mesh.count=0;scene.add(mesh);batches[name]=mesh;

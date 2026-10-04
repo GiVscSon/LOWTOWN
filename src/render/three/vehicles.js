@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {addLoft,addBox,faceNormal} from '../../assets/vehicle_shapes.js';
 import {createVehicleMesh} from '../shared/street_vehicle.js';
 import {createLandAnimation,updateLandAnimation,disposeLandAnimation} from './vehicle_animation.js';
+import {cabinTexture} from './cabin_texture.js';
 
 const geometries=new Map();
 const palette={sirenRed:'#e95642',sirenBlue:'#4199e2',sirenAmber:'#e6b352',tail:'#b54c3e'};
@@ -12,7 +13,7 @@ export function landVehicleGeometry(type,width=48,height=24,color='#e8b84a',poli
   geometry.userData.type=type;geometries.set(key,geometry);return geometry;
 }
 export function surfaceGeometry(faces){
-  const positions=[],colors=[],normals=[],surfaces=[],lights=[];
+  const positions=[],colors=[],normals=[],surfaces=[],lights=[],detailUvs=[];
   for(const face of faces){
     const normal=face.normal,drop=normal.map(Math.abs).indexOf(Math.max(...normal.map(Math.abs)));
     const flat=face.points.map(point=>new THREE.Vector2(...point.filter((_,axis)=>axis!==drop)));
@@ -26,7 +27,8 @@ export function surfaceGeometry(faces){
         const smooth=face.normals?.[vertex]||normal,n=new THREE.Vector3(smooth[0],smooth[2],smooth[1]).normalize();normals.push(n.x,n.y,n.z);
         const glass=face.surface==='glass'||face.fill==='#263b46'||face.fill==='#34474c',chrome=face.surface==='chrome'||face.fill==='#abb6b4'||face.fill==='#b9c2bf',rubber=face.surface==='rubber'||face.fill==='#1d2428';
         const lamp=face.surface==='lamp'||face.fill==='tail'||face.fill.startsWith('siren')||face.fill==='#fff0b7';
-        surfaces.push(glass?.18:chrome?.24:rubber?.96:.44,chrome?.82:glass?.25:rubber?0:.28,lamp?1.3:0);
+        surfaces.push(glass?.14:chrome?.22:rubber?.96:.33,chrome?.82:glass?.08:rubber?0:.42,lamp?1.3:0);
+        detailUvs.push(...(face.uvs?.[vertex]||[0,0]));
         if(face.fill.startsWith('siren'))lights.push({index:colors.length-3,color:paint.clone(),blue:face.fill==='sirenBlue'});
       }
     }
@@ -35,25 +37,29 @@ export function surfaceGeometry(faces){
   geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
   geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
   geometry.setAttribute('surface',new THREE.Float32BufferAttribute(surfaces,3));
+  geometry.setAttribute('detailUv',new THREE.Float32BufferAttribute(detailUvs,2));
   geometry.setAttribute('normal',new THREE.Float32BufferAttribute(normals,3));geometry.computeBoundingSphere();
   geometry.userData={lights};return geometry;
 }
 
-const material=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.5,metalness:.22,side:THREE.DoubleSide});
+const material=new THREE.MeshPhysicalMaterial({vertexColors:true,roughness:.33,metalness:.42,clearcoat:.38,clearcoatRoughness:.3,envMapIntensity:.75,side:THREE.DoubleSide});
+material.userData.cabinTexture=cabinTexture();
 material.onBeforeCompile=shader=>{
-  shader.vertexShader='attribute vec3 surface;varying vec3 vehicleSurface;varying vec3 vehiclePosition;\n'+shader.vertexShader;
-  shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvehicleSurface=surface;vehiclePosition=position;');
-  shader.fragmentShader='varying vec3 vehicleSurface;varying vec3 vehiclePosition;\n'+shader.fragmentShader;
+  shader.uniforms.cabinMap={value:cabinTexture()};
+  shader.vertexShader='attribute vec3 surface;attribute vec2 detailUv;varying vec2 cabinUv;varying vec3 vehicleSurface;varying vec3 vehiclePosition;\n'+shader.vertexShader;
+  shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvehicleSurface=surface;vehiclePosition=position;cabinUv=detailUv;');
+  shader.fragmentShader='uniform sampler2D cabinMap;varying vec2 cabinUv;varying vec3 vehicleSurface;varying vec3 vehiclePosition;\n'+shader.fragmentShader;
   shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
     float grain=fract(sin(dot(floor(vehiclePosition*7.0),vec3(12.9898,78.233,37.719)))*43758.5453);
-    if(vehicleSurface.x>.3 && vehicleSurface.z<.1){float wear=sin(vehiclePosition.x*.63+vehiclePosition.z*1.9)*sin(vehiclePosition.y*.83);diffuseColor.rgb*=.90+grain*.12+wear*.035;}
-    if(vehicleSurface.x<.21){float sky=smoothstep(-.3,.9,sin(vehiclePosition.z*.42+vehiclePosition.x*.045));diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.27,.38,.43),sky*.38);}
+    if(vehicleSurface.x>.3 && vehicleSurface.x<.8 && vehicleSurface.z<.1){float wear=sin(vehiclePosition.x*.63+vehiclePosition.z*1.9)*sin(vehiclePosition.y*.83);float detail=1.0-smoothstep(.3,1.2,length(fwidth(vehiclePosition*7.0)));diffuseColor.rgb*=.985+(grain-.5)*.035*detail+wear*.012;}
+    if(vehicleSurface.x<.21){vec3 interior=texture2D(cabinMap,cabinUv).rgb;diffuseColor.rgb=mix(diffuseColor.rgb,interior*.36,.72);}
   `);
   shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=vehicleSurface.x;');
   shader.fragmentShader=shader.fragmentShader.replace('#include <metalnessmap_fragment>','#include <metalnessmap_fragment>\nmetalnessFactor=vehicleSurface.y;');
   shader.fragmentShader=shader.fragmentShader.replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance+=vColor.rgb*vehicleSurface.z;');
+  shader.fragmentShader=shader.fragmentShader.replace('#include <lights_physical_fragment>','#include <lights_physical_fragment>\nmaterial.clearcoat*=step(.25,vehicleSurface.x)*(1.0-step(.8,vehicleSurface.x))*(1.0-step(.1,vehicleSurface.z));');
 };
-material.customProgramCacheKey=()=> 'lowtown-vehicle-surfaces';
+material.customProgramCacheKey=()=> 'lowtown-vehicle-finish-v2';
 const simpleMaterial=new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide});
 simpleMaterial.onBeforeCompile=shader=>{
   shader.vertexShader='attribute vec3 surface;varying vec3 vehicleSurface;varying vec3 vehiclePosition;\n'+shader.vertexShader;
