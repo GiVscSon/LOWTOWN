@@ -10,16 +10,21 @@ export function addStreetFurniture(world,{details,reflectors,pools,roadReflectio
     if(prop.type==='bench'){
       for(const side of [-1,1]){add(side*w*.34,5,0,2,10,8,'#303d42');add(side*w*.34,12,3,2,14,2,'#303d42');}
       for(let i=0;i<3;i++){add(0,8,-3+i*3,w,1.1,2.4,'#947050');add(0,12+i*2.2,4,w,1.5,1.2,'#856044');}
+      for(const side of [-1,1]){add(side*w*.38,11,0,1.3,6,7,'#485655');for(const y of [8,14,17])add(side*w*.34,y,4.7,.7,.7,.3,'#b3af94');}
     }else if(prop.type==='bin'){
       add(0,7,0,w*.65,14,h*.65,'#49615c');add(0,14,0,w*.75,1.5,h*.75,'#2d3e42');add(0,13.6,0,w*.36,.3,h*.35,'#121e23');
       for(const side of [-1,1])add(side*w*.3,8,0,.6,9,h*.65,'#718077');
+      for(let n=-2;n<=2;n++)add(n*w*.12,7,h*.335,.4,10,.5,'#283d39');
     }else if(prop.type==='phone'){
       add(0,13,0,w*.85,26,h*.75,'#34484f');add(0,27,0,w,2,h,'#597a7d');add(0,13,h*.4,w*.6,20,.5,'#152831');
       add(0,18,h*.44,w*.44,3,.7,'#d2b883');add(0,13,h*.44,w*.35,6,.7,'#748b88');
+      add(-w*.12,13,h*.49,1.2,5,1.2,'#202a2c');add(-w*.12,15.8,h*.49,3,1,1.2,'#1a2427');
+      for(let u=-1;u<=1;u++)for(let v=0;v<3;v++)add(u*1.6,10+v*1.5,h*.48,.75,.75,.3,'#b7beb5');
     }else if(prop.type==='shelter'){
       add(0,25,0,w+4,3,h+4,'#687976');
       for(const side of [-1,1]){add(side*w*.45,12,0,2,24,2,'#83908c');add(side*w*.42,14,h*.35,1.5,16,h*.5,'#354f5a');}
       add(0,13,h*.4,w*.8,18,1,'#354f5a');add(0,8,h*.15,w*.7,2.5,6,'#957653');
+      for(const u of [-w*.36,0,w*.36])add(u,14,h*.415,1,18,1,'#939f99');add(0,3,h*.15,w*.65,1,5,'#465352');
       const sign=mountedSign('BUS',Math.min(30,w*.45),'#b7d4cc');sign.position.set(prop.x,23,prop.y-h*.5);sign.rotation.y=angle;scene.add(sign);
     }else if(prop.type==='bollard'){
       add(0,6,0,4,12,4,'#687578');add(0,10,0,4.2,1.5,4.2,'#ddc487');
@@ -33,6 +38,13 @@ export function addStreetFurniture(world,{details,reflectors,pools,roadReflectio
       for(const u of [-w*.35,0,w*.35]){add(u,5,-h*.35,1.2,10,1.2,'#7f8c89');add(u,5,h*.35,1.2,10,1.2,'#7f8c89');add(u,10,0,1.2,1.2,h*.7,'#7f8c89');}
     }else if(prop.type==='mailbox'){
       add(0,6,0,2,12,2,'#58636a');add(0,15,0,w*.7,12,h*.8,'#385b72');add(0,21,0,w*.76,1,h*.85,'#637988');add(0,17,h*.42,w*.4,1,.4,'#162c39');
+      add(0,12,h*.43,w*.46,3,.5,'#7f959e');add(w*.27,16,h*.44,.8,1,.6,'#c2b49b');
+    }else if(prop.type==='parasol'){
+      add(0,15,0,1.2,30,1.2,'#b5a38a');
+      const umbrella=new THREE.Mesh(new THREE.ConeGeometry(24,9,12,1,true),new THREE.MeshLambertMaterial({color:prop.color||'#bc7357',side:THREE.DoubleSide}));
+      umbrella.position.set(prop.x,30,prop.y);scene.add(umbrella);
+      for(let n=0;n<6;n++){const a=n*Math.PI/3;details.beam(new THREE.Vector3(prop.x,33,prop.y),new THREE.Vector3(prop.x+Math.cos(a)*23,26,prop.y+Math.sin(a)*23),.45,.45,'#b9ad92');}
+      add(22,.4,0,30,.8,15,'#c6b69a');
     }else if(prop.type==='gardenbed' ||prop.type==='pond'||prop.type==='fountain'){
       add(0,2,0,w,4,h,'#777d70');add(0,4,0,w*.88,1,h*.85,prop.type==='gardenbed'?'#4c6144':'#396371');
       if(prop.type==='fountain'){add(0,8,0,8,12,8,'#8c978c');add(0,15,0,w*.45,2,h*.45,'#939b8a');}

@@ -183,6 +183,9 @@ ctx.emergencyPassingGroundClear = function emergencyPassingGroundClear(pose) {
     }));
   })) return false;
   if (ctx.bridgeRails.some(rail => overlaps(rail))) return false;
+  // The passing planner must reserve the same solid organic parapets as the
+  // contact solver; otherwise a staged turn is planned through the guardrail.
+  if (ctx.getCityScenery().contacts.query(pose.x-radius,pose.y-radius,pose.x+radius,pose.y+radius).some(rail=>rail.type==='bridgeRail'&&contact(body,chassis(rail)))) return false;
   return true;
 };
 ctx.serviceFootprintSupported = function serviceFootprintSupported(unit) {

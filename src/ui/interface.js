@@ -3,18 +3,22 @@ export function installUiInterface(ctx){
 const {VEHICLES,VEHICLE_ASSETS,coastPath}=ctx.dependencies;
 ctx.renderHud = function renderHud() {
   ctx.renderRadar();
-  const foot = ctx.roam?.mode === 'foot';
-  if (ctx.hudFootMode !== foot) {
-    ctx.hudFootMode = foot;
-    for (const [id,label] of [['btnHandbrake',foot?'Прыжок':'HB'],['btnNitro',foot?'Удар':'N2O']]) {
+  const foot = ctx.roam?.mode === 'foot',swimming=foot&&ctx.player.inWater,weapon=ctx.player.weapon||'fists',hudMode=`${foot}:${swimming}:${weapon}`;
+  if (ctx.hudFootMode !== hudMode) {
+    ctx.hudFootMode = hudMode;
+    for (const [id,label] of [['btnHandbrake',foot?(swimming?'Гребок':'Прыжок'):'HB'],['btnNitro',foot?(weapon==='fists'||weapon==='bat'?'Удар':'Огонь'):'N2O']]) {
       const button=ctx.env.document.getElementById(id),span=button?.querySelector?.('span');
       if(span)span.textContent=label;
-      button?.setAttribute?.('aria-label',foot?(id==='btnHandbrake'?'Прыжок · Пробел':'Удар · F'):(id==='btnHandbrake'?'Ручной тормоз':'Нитро'));
+      button?.setAttribute?.('aria-label',foot?(id==='btnHandbrake'?`${swimming?'Гребок':'Прыжок'} · Пробел`:`${weapon==='fists'||weapon==='bat'?'Удар':'Огонь'} · F`):(id==='btnHandbrake'?'Ручной тормоз':'Нитро'));
     }
     const gauge=ctx.env.document.querySelector?.('.nitro-gauge');if(gauge)gauge.hidden=foot;
   }
   const speedEl = ctx.env.document.getElementById('hudSpeed');
-  if (speedEl) speedEl.innerText = ctx.roam?.mode === 'foot' ? 'ПЕШКОМ' : ctx.env.Math.round(ctx.env.Math.abs(ctx.player.speed) * 12);
+  if (speedEl) speedEl.innerText = foot ? (swimming?'ПЛЫВУ':'ПЕШКОМ') : ctx.env.Math.round(ctx.env.Math.abs(ctx.player.speed) * 12);
+  const weaponEl=ctx.env.document.getElementById('btnWeapon'),reloadEl=ctx.env.document.getElementById('btnReload');
+  const names={fists:'Кулаки',bat:'Бита',pistol:'Пистолет',shotgun:'Дробовик',flare:'Сигнальный'},capacities={pistol:12,shotgun:6,flare:4};
+  if(weaponEl){weaponEl.style.display=foot?'':'none';weaponEl.textContent=`${names[weapon]}${capacities[weapon]?` ${ctx.player.ammo?.[weapon]??capacities[weapon]}/${capacities[weapon]}`:''} · Q`;}
+  if(reloadEl){reloadEl.style.display=foot&&capacities[weapon]?'':'none';reloadEl.textContent=ctx.player.reloadRemaining>0?'Перезарядка…':'Перезарядить · T';}
   const enterEl = ctx.env.document.getElementById('btnRoamEnter');
   if (enterEl) enterEl.textContent = ctx.roam?.mode === 'foot' ? 'Сесть · E' : 'Выйти · E';
   const flyEl = ctx.env.document.getElementById('btnRoamFly');

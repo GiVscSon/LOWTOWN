@@ -48,6 +48,10 @@ jobs:
       - run: npm run build
       - name: Runtime, terrain, contact and graphics matrix
         run: npm run test:quality-matrix
+      - name: Populated city and safe emergency return after bridge contacts
+        run: npm run test:movement-stability
+      - name: Residents, beaches and swimming routes
+        run: npm run test:living-world
       - run: npm run test:three-pwa-contract
       - run: node tests/three-city-geometry.mjs
       - run: npm run test:refined-transport
@@ -59,6 +63,8 @@ jobs:
         run: npm run test:quality-browser
       - name: Jump, melee, movable props, particles and touch controls
         run: npm run test:interaction-browser
+      - name: Coastal swimming, weapon reactions and touch controls
+        run: npm run test:coastal-browser
       - name: Refined transport and building gallery
         run: npm run test:refined-transport-browser
       - name: Three.js live rendering and PWA offline restart
@@ -111,5 +117,14 @@ jobs:
         with:
           name: lowtown-game-menu
           path: artifacts/game-menu/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload coastal release matrix
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lowtown-coastal-weapons
+          path: artifacts/coastal-weapons/
           if-no-files-found: ignore
           retention-days: 14

@@ -17,7 +17,7 @@ const city=runtimeCity(73),report=JSON.parse(city.run(`JSON.stringify((()=>{
 })())`));
 assert(report.bent>=45,'district streets must have genuine curves');assert.equal(report.connected,report.nodes);
 assert.equal(report.buildings.length,232);assert(report.buildings.every(b=>b.clear&&b.land&&b.road&&b.facing),JSON.stringify(report.buildings.filter(b=>!b.clear||!b.land||!b.road||!b.facing)));
-assert.equal(report.bases,10);assert.equal(report.buses,4);assert.equal(report.residents,152);
+assert.equal(report.bases,10);assert.equal(report.buses,4);assert.equal(report.residents,182);
 assert.equal(report.badCaps.length,0,'end caps must not seal a connected road');
 const profiles=createBridgeProfiles(report.paths),surface=bridgeSurfaceIndex(profiles),scene=new THREE.Scene();
 const details=createBoxBatch(scene,'#ffffff'),reflectors=createBoxBatch(scene,'#ffffff');let arches=0,piers=0;

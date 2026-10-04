@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {bridgeRailOpenAt} from '../../world/bridge_rails.js';
 import {roundedBridgePoints,ribbonGeometry,ribbonTangent} from './geometry.js';
 
 const BASE=3.6;
@@ -75,6 +76,8 @@ export function addBridgeStructures(profile,{details,reflectors}){
     const a=bridgePointAt(profile,profile.samples[i-1].distance),b=bridgePointAt(profile,profile.samples[i].distance);
     for(const side of [-1,1]){
       beam(point(a,side,0,-6),point(b,side,0,-6),12,7,'#455d6c');
+      const pa=point(a,side,2),pb=point(b,side,2);
+      if(bridgeRailOpenAt(profile,(pa.x+pb.x)/2,(pa.z+pb.z)/2))continue;
       beam(point(a,side,2,3),point(b,side,2,3),5,5,'#b1afa0');
       beam(point(a,side,2,21),point(b,side,2,21),3,3,'#92a8af');
       beam(point(a,side,8,.25),point(b,side,8,.25),.3,2,'#dbd9be');
@@ -84,6 +87,7 @@ export function addBridgeStructures(profile,{details,reflectors}){
     const sample=bridgePointAt(profile,distance);
     for(const side of [-1,1]){
       const p=point(sample,side,2,10);
+      if(bridgeRailOpenAt(profile,p.x,p.z))continue;
       details.add(p.x,p.y,p.z,4,20,4,'#899ca5');reflectors.add(p.x,p.y+10,p.z,5,3,5,'#e9d9a5');
     }
   }
@@ -150,6 +154,7 @@ export function addBridgeStructures(profile,{details,reflectors}){
     const sample=bridgePointAt(profile,distance);
     for(const side of [-1,1]){
       const p=point(sample,side,3,12);
+      if(bridgeRailOpenAt(profile,p.x,p.z))continue;
       details.add(p.x,p.y,p.z,8,25,8,'#b4b39b');
       for(let stripe=0;stripe<4;stripe++)details.add(p.x,sample.height+4+stripe*6,p.z,8.3,3,8.3,stripe%2?'#d6c68c':'#33404a');
       reflectors.add(p.x,sample.height+26,p.z,9,3,9,'#f2ce85');

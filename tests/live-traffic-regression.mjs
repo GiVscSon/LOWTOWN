@@ -25,7 +25,7 @@ Object.assign(sandbox,{createWalkSurface,createSceneryIndex});
 attachRuntime(sandbox,{legacyStreets:true});
 vm.runInContext(`
 initTopology();
-let maxJump=0,water=0,invalid=0,turns=0,offRoad=0,pedBlocked=0;
+let maxJump=0,water=0,invalid=0,turns=0,offRoad=0,pedBlocked=0,swimming=0,invalidWater=0;
 const travel=trafficCars.map(()=>0),dwell=trafficCars.map(()=>0),carTurns=trafficCars.map(()=>0);
 for(let tick=0;tick<1800;tick++){
   advanceClock();
@@ -40,7 +40,8 @@ for(let tick=0;tick<1800;tick++){
     if(Math.abs(Math.atan2(Math.sin(c.angle-before[i].angle),Math.cos(c.angle-before[i].angle)))>.001){turns++;carTurns[i]++;}
     if(!onRoadSurface(c.x,c.y,roads,bridges,scenicRoads,roadEnds))offRoad++;
   });
-  pedestrians.forEach(p=>{if(isPedestrianSceneryBlocked(p.x,p.y))pedBlocked++;});
+  // Swimming intentionally leaves dry support, but never ignores solid scenery.
+  pedestrians.forEach(p=>{if(isPedestrianSceneryBlocked(p.x,p.y,0,!!p.inWater))pedBlocked++;if(p.inWater){swimming++;if(getWalkSurface()(p.x,p.y))invalidWater++;}});
 }
 const target=trafficCars.find(c=>!c.turn&&isPositionOnSolidGround(c.x,c.y));
 Object.assign(player,{x:target.x-Math.cos(target.angle)*60,y:target.y-Math.sin(target.angle)*60,angle:target.angle,speed:6,vx:Math.cos(target.angle)*6,vy:Math.sin(target.angle)*6,hp:100});
@@ -66,7 +67,7 @@ const motionByType=Object.fromEntries([...new Set(trafficCars.map(c=>c.type))].m
     minTravel:Math.min(...indices.map(i=>travel[i])),maxTravel:Math.max(...indices.map(i=>travel[i])),
     dwellFrames:indices.reduce((sum,i)=>sum+dwell[i],0),turnFrames:indices.reduce((sum,i)=>sum+carTurns[i],0)}];
 }));
-this.result={cars:trafficCars.length,motionByType,maxJump,water,invalid,turns,offRoad,pedBlocked,impactDamage,stationaryDamage,stationaryWanted,followingStopped};
+this.result={cars:trafficCars.length,motionByType,maxJump,water,invalid,turns,offRoad,pedBlocked,swimming,invalidWater,impactDamage,stationaryDamage,stationaryWanted,followingStopped};
 `,sandbox);
 console.log(sandbox.result);
 assert(sandbox.result.cars>=50);
@@ -76,6 +77,8 @@ assert(sandbox.result.maxJump<35,'traffic jumped across the scene');
 assert.equal(sandbox.result.water,0,'traffic left solid ground');
 assert.equal(sandbox.result.offRoad,0,'traffic left the road surface');
 assert.equal(sandbox.result.pedBlocked,0,'pedestrian entered solid scenery');
+assert(sandbox.result.swimming>0,'beach residents never entered the sea');
+assert.equal(sandbox.result.invalidWater,0,'a dry pedestrian was incorrectly marked as swimming');
 assert(sandbox.result.impactDamage>0,'player and traffic contact did not cause damage');
 assert(sandbox.result.followingStopped,'following traffic failed to stop before the idle player');
 assert.equal(sandbox.result.stationaryDamage,0,'idle player took damage from traffic');

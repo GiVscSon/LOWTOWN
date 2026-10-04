@@ -47,5 +47,5 @@ const street=new THREE.Group(),props=createStreetProps(street,new THREE.MeshStan
 assert.equal(props.update([{type:'hydrant',x:10,y:20,w:14,h:14,intact:true},{type:'dumpster',x:30,y:40,intact:false}],()=>3.6),1);
 assert.equal(props.batches.dumpster.count,0,'destroyed containers must disappear from the instanced scene');
 const transform=new THREE.Matrix4();props.batches.hydrant.getMatrixAt(0,transform);assert(Math.abs(transform.elements[13]-3.6)<1e-6);
-for(const mesh of street.children){mesh.geometry.computeBoundingBox();assert(mesh.geometry.boundingBox.max.x<.55);assert(mesh.geometry.boundingBox.min.y>=-1e-6);}
+for(const [type,mesh] of Object.entries(props.batches)){mesh.geometry.computeBoundingBox();assert(mesh.geometry.boundingBox.max.x<(type==='parasol'?2.1:.55),type+': model exceeds its footprint/canopy');assert(mesh.geometry.boundingBox.min.y>=-1e-6);}
 console.log('VISUAL_POLISH_MATRIX_OK',JSON.stringify({glassPanels:panels,canopyTriangles:triangles,architecture:architecture.stats}));

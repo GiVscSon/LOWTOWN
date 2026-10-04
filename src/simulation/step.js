@@ -39,45 +39,6 @@ ctx.updatePhysics = function updatePhysics(dt) {
   ctx.stepCharacterActions(dt, movementKeys);
   const specialMovement = ctx.roam?.step(movementKeys, dt);
   if (!specialMovement) {
-    const onGround = ctx.isPositionOnSolidGround(ctx.player.x, ctx.player.y);
-    if (!onGround && !ctx.state.isDrowning) {
-      ctx.state.isDrowning = true;
-      ctx.state.drownProgress = 0;
-      ctx.sound.playSplash();
-      for (let i = 0; i < 16; i++) {
-        ctx.waterSplashes.push({
-          x: ctx.player.x,
-          y: ctx.player.y,
-          vx: (ctx.env.Math.random() - 0.5) * 4,
-          vy: (ctx.env.Math.random() - 0.5) * 4,
-          size: 6 + ctx.env.Math.random() * 8,
-          alpha: 0.8
-        });
-      }
-    }
-    if (ctx.state.isDrowning) {
-      ctx.state.drownProgress += dt * 1.5;
-      ctx.player.speed *= 0.8;
-      ctx.player.vx *= 0.8;
-      ctx.player.vy *= 0.8;
-      if (ctx.state.drownProgress >= 1.0) {
-        const nearest = ctx.nearestSafeSpawn(ctx.player.x, ctx.player.y);
-        ctx.player.x = nearest.x;
-        ctx.player.y = nearest.y;
-        ctx.player.speed = 0;
-        ctx.player.vx = 0;
-        ctx.player.vy = 0;
-        ctx.player.hp = ctx.env.Math.max(0, ctx.player.hp - 25);
-        ctx.state.isDrowning = false;
-        ctx.state.drownProgress = 0;
-        ctx.state.invulnTimer = 120;
-        ctx.showToast('⚠️ МАШИНА УТОНУЛА! ЭВАКУАЦИЯ (-$50)');
-        ctx.state.cash = ctx.env.Math.max(0, ctx.state.cash - 50);
-        ctx.stepWorldEffects(dt);
-        if (ctx.player.hp <= 0) ctx.respawnPlayer('утопление');
-        return;
-      }
-    }
     const surface = ctx.surfaceAt(ctx.player.x, ctx.player.y),
       surfaceResponse = weatherMovement(surfaceMovement(surface, ctx.roam?.profile), ctx.weather);
     ctx.player.surface = surface;
@@ -98,7 +59,7 @@ ctx.updatePhysics = function updatePhysics(dt) {
     ctx.state.nitroAmount = ctx.env.Math.max(0, ctx.env.Math.min(100, ctx.state.nitroAmount + (isBoosting ? -.7 : .2) * dt * 60));
     const nitroBarEl = ctx.env.document.getElementById('nitroBar');
     if (nitroBarEl) nitroBarEl.style.width = ctx.env.Math.round(ctx.state.nitroAmount) + '%';
-    stepLandVehicle(ctx.player, movementKeys, dt, driveProfile, surfaceResponse);
+    stepLandVehicle(ctx.player, ctx.player.inWater ? {} : movementKeys, dt, driveProfile, surfaceResponse);
     if (ctx.state.keys.handbrake && ctx.env.Math.abs(ctx.player.speed) > 2) {
       ctx.skidmarks.push({
         x: ctx.player.x,
@@ -225,6 +186,7 @@ ctx.updatePhysics = function updatePhysics(dt) {
   const stuntVehicles = [...ctx.trafficCars, ...ctx.policeCars, ...ctx.incidentPoliceCars, ...ctx.incidentResponseVehicles];
   stuntVehicles.forEach(vehicle => ctx.updateStuntVehicle(vehicle, dt));
   ctx.resolveCityMotion(motionStarts, dt);
+  ctx.stepWaterInteraction(dt);
   ctx.stepWorldEffects(dt);
   if (ctx.player.hp <= 0) ctx.respawnPlayer(ctx.roam?.mode==='foot'?'потеря сознания':'тяжёлая авария');
   const speedKmh = ctx.env.Math.abs(ctx.player.speed) * 12;

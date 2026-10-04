@@ -168,7 +168,7 @@ writeFileSync('artifacts/movement/service-contact-report.json',JSON.stringify(se
 assert.equal(services.units,3);assert(services.fire&&services.medical,JSON.stringify(services));
 assert(services.returned.every(u=>u.returned),JSON.stringify(services));assert.equal(services.unsafe,0);
 assert.equal(services.contacts,0,'response vehicles must not collide with traffic while giving way');
-assert(services.maxStep<12.1,JSON.stringify(services));assert.equal(services.people,152);assert.equal(services.traffic,65);
+assert(services.maxStep<12.1,JSON.stringify(services));assert.equal(services.people,182);assert.equal(services.traffic,65);
 const report={people,police,yielding,returnTurn,junctionYield,services:{...services,seconds:ticks/30}};
 writeFileSync('artifacts/movement/regression-report.json',JSON.stringify(report,null,2));
 console.log('MOVEMENT STABILITY PASS',JSON.stringify(report));

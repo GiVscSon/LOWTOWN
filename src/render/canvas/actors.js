@@ -1,3 +1,4 @@
+import {characterPose} from '../shared/character_pose.js';
 // One shared runtime context owns state; this system has no hidden globals.
 export function installRenderCanvasActors(ctx){
 const {drawTransport,projectIso}=ctx.dependencies;
@@ -18,14 +19,23 @@ ctx.drawScreenPedestrian = function drawScreenPedestrian(ped, sx, sy, index, zoo
     pants = ped.pants || '#22262a',
     skin = ped.skin || '#c99f77';
   const accessory = ped.accessory || '';
+  const pose=characterPose(ped);
   ctx.ctx.save();
   ctx.ctx.translate(sx, sy-(ped.jumpHeight||0)*zoom);
   ctx.ctx.scale(size, size);
+  ctx.ctx.translate(0,-pose.bob);
+  if(pose.down||pose.gettingUp)ctx.ctx.rotate(-pose.rootPitch*(fx<0?-1:1));
+  if(ped.inWater){
+    const phase=ped.swimPhase||0;
+    ctx.ctx.strokeStyle='#9fc8d0';ctx.ctx.lineWidth=1;ctx.ctx.beginPath();ctx.ctx.ellipse(0,0,12+Math.sin(phase)*2,4,0,0,ctx.env.Math.PI*2);ctx.ctx.stroke();
+    ctx.ctx.strokeStyle=skin;ctx.ctx.lineWidth=2.6;ctx.ctx.beginPath();ctx.ctx.moveTo(-3,-2);ctx.ctx.lineTo(-9,-4+Math.sin(phase)*3);ctx.ctx.moveTo(3,-2);ctx.ctx.lineTo(9,-4+Math.cos(phase)*3);ctx.ctx.stroke();
+    ctx.ctx.fillStyle=skin;ctx.ctx.beginPath();ctx.ctx.ellipse(0,-5,2.8,3.4,0,0,ctx.env.Math.PI*2);ctx.ctx.fill();ctx.ctx.fillStyle=ped.hair||'#302b28';ctx.ctx.fillRect(-2.5,-8,5,1.8);ctx.ctx.restore();return;
+  }
   ctx.ctx.fillStyle = 'rgba(0,0,0,.45)';
   ctx.ctx.beginPath();
   ctx.ctx.ellipse(2, 1, 6, 2.7, -.15, 0, ctx.env.Math.PI * 2);
   ctx.ctx.fill();
-  if (ped.stance === 'down') {
+  if (pose.down && !ped.animationWasDown) {
     ctx.ctx.save();
     ctx.ctx.rotate(-.16);
     ctx.ctx.fillStyle = pants;
@@ -72,7 +82,7 @@ ctx.drawScreenPedestrian = function drawScreenPedestrian(ped, sx, sy, index, zoo
       return;
     }
     if (ped.activity === 'talking' && side === (fx > 0 ? 1 : -1)) {
-      const gesture = ctx.env.Math.sin(ctx.env.performance.now() / 350 + index) * 1.2;
+      const gesture = ctx.env.Math.sin((ped.animationTime||0)*2.8 + index) * 1.2;
       limb([[side * shoulder, -21], [side * (shoulder + 2), -18], [side * (shoulder + 4), -21 + gesture]], shirt, 2.3);
       ctx.ctx.fillStyle = skin;
       ctx.ctx.fillRect(side * (shoulder + 4) - 1, -22 + gesture, 2, 2);
@@ -97,12 +107,14 @@ ctx.drawScreenPedestrian = function drawScreenPedestrian(ped, sx, sy, index, zoo
       ctx.ctx.fill();
       return;
     }
-    const stride = -swing * side * 2.8;
-    limb([[side * shoulder, -21], [side * (shoulder + 1) + fx * stride * .45, -16], [side * (shoulder + .8) + fx * stride, -11 + fy * stride * .4]], shirt, 2.3);
+    const joint=pose.arms[side>0?1:0],elbowX=side*shoulder+fx*Math.sin(joint.upper)*4.9,elbowY=-21+Math.cos(joint.upper)*4.9;
+    const handX=elbowX+fx*Math.sin(joint.lower)*5.1,handY=elbowY+Math.cos(joint.lower)*5.1;
+    limb([[side * shoulder, -21], [elbowX,elbowY], [handX,handY]], shirt, 2.3);
     ctx.ctx.fillStyle = skin;
     ctx.ctx.beginPath();
-    ctx.ctx.ellipse(side * (shoulder + .8) + fx * stride, -10.5 + fy * stride * .4, 1.1, 1.5, 0, 0, ctx.env.Math.PI * 2);
+    ctx.ctx.ellipse(handX,handY,1.1,1.5,0,0,ctx.env.Math.PI*2);
     ctx.ctx.fill();
+    if(side>0&&ped.weapon&&ped.weapon!=='fists')limb([[handX,handY],[handX+fx*(ped.weapon==='bat'?10:ped.weapon==='shotgun'?9:4)*Math.cos(pose.weaponPitch),handY-(ped.weapon==='bat'?10:4)*Math.sin(pose.weaponPitch)]],ped.weapon==='bat'?'#ae8960':'#69777d',1.3);
   };
   arm(fx > 0 ? -1 : 1);
   const coat = ctx.ctx.createLinearGradient(-shoulder, -22, shoulder, -12);

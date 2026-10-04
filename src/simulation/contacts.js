@@ -84,7 +84,8 @@ ctx.resolveCityMotion = function resolveCityMotion(starts, dt) {
     onImpact: impact,
     isEnabled: body => body.intact !== false,
     canOccupy: (body, pose, person) => {
-      if (person) return !ctx.isPedestrianSceneryBlocked(pose.x, pose.y,body.jumpHeight||0);
+      if (person) return !ctx.isPedestrianSceneryBlocked(pose.x, pose.y,body.jumpHeight||0,true);
+      if (body===ctx.player) return true; // Open shoreline: water entry is handled after the sweep.
       if (services.has(body) && ctx.serviceFootprintSupported(body)) return ctx.serviceFootprintSupported(pose);
       return ctx.isPositionOnSolidGround(pose.x, pose.y);
     }

@@ -81,9 +81,9 @@ const people=JSON.parse(city.run(`
   const before=pedestrians.map(p=>({x:p.x,y:p.y}));
   let activities=0,blocked=0,roadWalking=0;
   for(let tick=0;tick<720;tick++){
-    updateCrowdReactions(pedestrians,null,1/60);updatePedestrians(1/60);
+    updateCrowdReactions(pedestrians,null,1/60);updatePedestrians(1/60);stepWaterInteraction(1/60);
     activities+=pedestrians.filter(p=>p.activity==='checkingPhone').length;
-    blocked+=pedestrians.filter(p=>isPedestrianSceneryBlocked(p.x,p.y)).length;
+    blocked+=pedestrians.filter(p=>isPedestrianSceneryBlocked(p.x,p.y,0,!!p.inWater)).length;
     roadWalking+=pedestrians.filter(p=>onRoadSurface(p.x,p.y,roads,bridges,[],roadEnds)).length;
   }
   JSON.stringify({aerialWanted,ambulanceBlocked,ambulanceSideClear,activities,blocked,roadWalking,

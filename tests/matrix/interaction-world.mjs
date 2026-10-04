@@ -39,10 +39,10 @@ for(const hz of [30,60,120]){
   for(let i=0;i<hz*1.2;i++){c.roam.step({handbrake:true},1/hz);apex=Math.max(apex,c.player.jumpHeight);}
   assert(Math.abs(apex-22.05)<.05);assert.equal(c.player.jumpHeight,0,'held jump repeated after landing');
   c.roam.step({},1/hz);c.roam.step({handbrake:true},1/hz);assert(c.player.jumpHeight>0);
-  c.roam.resetToFoot(495,100);for(let i=0;i<hz;i++)c.roam.step({down:true,handbrake:true},1/hz);
-  assert(c.getWalkSurface()(c.player.x,c.player.y),'jump allowed water walking');
+  c.roam.resetToFoot(495,100);Object.assign(c.state.keys,{down:true,handbrake:true});for(let i=0;i<hz;i++)runtime.step(1/hz);
+  assert(c.player.inWater,'shore must allow water entry');assert.equal(c.player.jumpHeight,0,'water entry retained walking/jumping pose');Object.assign(c.state.keys,{down:false,handbrake:false});
   c.roam.resetToSedan();assert.equal(c.player.jumpHeight,0);assert.equal(c.player.attackTime,0);
-  report.jumps.push({hz,apex,shoreSupported:true});
+  report.jumps.push({hz,apex,shoreWaterEntry:true});
   for(const type of ['crate','barrel','dumpster','sedan','person','wall']){
     scene();const person=type==='person',fixed=type==='wall';
     const target={type,x:22,y:0,width:16,height:16,w:16,h:16,mass:person?70:type==='crate'?22:type==='barrel'?45:type==='dumpster'?130:1500,intact:true,hp:100,collisionHeight:23,angle:0};

@@ -1,3 +1,4 @@
+import {presentedCharacters} from './shared/character_pose.js';
 // One shared runtime context owns state; this system has no hidden globals.
 export function installRenderFrame(ctx){
 const {AUTHORED_TERRAIN,BEACH_WIDTH,coastPath,coastPoints,createLowtownThreeRenderer,drawRoadTerminals,drawStreetFurniture,drawStreetTree,drawTransport,pointInBeach,projectIso,visibleOceanChunks}=ctx.dependencies;
@@ -8,8 +9,9 @@ ctx.initThreeRuntime = function initThreeRuntime() {
     const world = {
       width: ctx.WORLD_W,
       height: ctx.WORLD_H,
-      islands: ctx.allIslands.map(island => ({
+      islands: [...ctx.allIslands,...(ctx.beachZones||[])].map(island => ({
         id: island.id,
+        beach: !!island.coast && String(island.id).startsWith('beach-'),
         natural: !!island.natural,
         points: coastPoints(island)
       })),
@@ -64,6 +66,7 @@ ctx.renderWorld = function renderWorld() {
   if (ctx.threeRenderer) {
     ctx.threeRenderer.render({
       player: ctx.player,
+      animationTime: ctx.effectClock || 0,
       mode: ctx.roam?.mode || 'sedan',
       altitude: ctx.roam?.altitude || 0,
       vehicles: [...ctx.trafficCars, ...ctx.parkedCars, ...ctx.policeCars, ...ctx.incidentPoliceCars, ...ctx.incidentResponseVehicles, ...(ctx.roam?.fleet || []), ...ctx.airMedicalVehicles, ...(ctx.cityIncidentDirector?.current()?.wrecks || [])],
@@ -498,7 +501,7 @@ ctx.drawStreetActors = function drawStreetActors(w, h, center, zoom) {
       }
     });
   });
-  ctx.streetProps.forEach(p => actors.push({
+  ctx.streetProps.filter(p=>!p.movable).forEach(p => actors.push({
     depth: p.x + p.y + p.height / 2,
     draw: () => drawStreetFurniture(ctx.ctx, p)
   }));
@@ -542,22 +545,8 @@ ctx.drawStreetActors = function drawStreetActors(w, h, center, zoom) {
   }));
   for (const wreck of activeIncident?.wrecks || []) addVehicle(wreck, () => ctx.drawDetailedCar(ctx.ctx, wreck.x, wreck.y, wreck.angle, wreck.color, wreck.width, wreck.height, false, wreck.type));
   for (const vehicle of ctx.roam?.fleet || []) if (vehicle.kind !== 'water') addVehicle(vehicle, () => vehicle.kind === 'land' ? ctx.drawDetailedCar(ctx.ctx, vehicle.x, vehicle.y, vehicle.angle, vehicle.color, vehicle.width, vehicle.height, false, vehicle.type, ctx.stuntHeightFor(vehicle), vehicle) : drawTransport(ctx.ctx, vehicle, ctx.env.performance.now() / 1000, ctx.stuntHeightFor(vehicle)));
-  const people = [...ctx.pedestrians, ...(activeIncident?.actors || [])];
-  if (ctx.roam?.mode === 'foot') people.push({
-    x: ctx.player.x,
-    y: ctx.player.y,
-    heading: ctx.player.angle,
-    gait: ctx.player.gait || 0,
-    walkPhase: ctx.player.walkPhase || 0,
-    shirt: '#735235',
-    pants: '#22272b',
-    skin: '#d5b594',
-    hair: '#1a1512',
-    jumpHeight: ctx.player.jumpHeight,
-    attackTime: ctx.player.attackTime,
-    stance: ctx.player.stance,
-    player: true
-  });
+  const people = presentedCharacters(ctx.player,[...ctx.pedestrians, ...(activeIncident?.actors || [])],ctx.roam?.mode === 'foot');
+  if(ctx.roam?.mode==='foot')Object.assign(people[people.length-1],{shirt:'#735235',pants:'#22272b',skin:'#d5b594',hair:'#1a1512',player:true});
   people.forEach((ped, index) => {
     const ground = projectIso(ped.x, ped.y);
     const sx = w / 2 + (ground.x - center.x) * zoom,

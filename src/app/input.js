@@ -51,7 +51,9 @@ export function installAppInput(ctx) {
       ctx.sound.init();
       if (e.code === 'KeyE' && !e.repeat) ctx.roam?.interact();
       if (e.code === 'KeyF' && !e.repeat) {ctx.state.keys.attack = true;ctx.player.attackRequested=true;}
-      if (e.code === 'KeyQ' && !e.repeat) ctx.roam?.toggleFlight();
+      if (e.code === 'KeyQ' && !e.repeat) {if(ctx.roam?.mode==='foot')ctx.cycleWeapon();else ctx.roam?.toggleFlight();}
+      if (e.code === 'KeyT' && !e.repeat && ctx.roam?.mode==='foot') ctx.reloadWeapon();
+      if (/^Digit[1-5]$/.test(e.code) && !e.repeat && ctx.roam?.mode==='foot') ctx.selectWeapon(['fists','bat','pistol','shotgun','flare'][Number(e.code.at(-1))-1]);
       if (e.code === 'KeyW' || e.code === 'ArrowUp') ctx.state.keys.up = true;
       if (e.code === 'KeyS' || e.code === 'ArrowDown') ctx.state.keys.down = true;
       if (e.code === 'KeyA' || e.code === 'ArrowLeft') ctx.state.keys.left = true;

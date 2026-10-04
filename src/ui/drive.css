@@ -26,7 +26,7 @@
 @media(max-height:520px) { #driveLab {top:12px;left:120px;width:260px;} #driveLab details {display:none;} #labMetrics {font-size:12px;} }
 .roam-controls { position:fixed; left:50%; top:76px; transform:translateX(-50%); display:flex; gap:8px; z-index:60; }
 .roam-controls button { background:#151a1eef; color:#ebd6a5; border:1px solid #76613d; border-radius:8px; padding:12px; font:600 14px sans-serif; touch-action:manipulation; min-height:44px; }
-@media(max-width:600px) { .roam-controls { top:110px; width:max-content; } .roam-controls button { padding:10px; } }
+@media(max-width:600px) { .roam-controls { top:110px; width:calc(100% - 24px); max-width:480px; flex-wrap:wrap; justify-content:center; } .roam-controls button { padding:10px; font-size:12px; } }
 
 #custodyOverlay{position:fixed;inset:0;z-index:1000;align-items:center;justify-content:center;flex-direction:column;white-space:pre-line;text-align:center;line-height:2;padding:24px;color:#ecd7a8;background:#10161bf5;font:600 18px/2 monospace;touch-action:none;}
 .btn-drive{touch-action:none;}

@@ -25,3 +25,16 @@ export function populateWorldDetails(ctx){
   }
   ctx.worldDetailCount=serial;ctx.invalidateScenery();
 }
+
+export function mobilizeSmallProps(ctx){
+  const types=new Set(['bench','bin','phone','bollard','planter','bikeRack','mailbox','parasol','stall','kiosk','workzone']);
+  const heights={bench:17,bin:15,phone:28,bollard:12,planter:18,bikeRack:12,mailbox:23,parasol:34,stall:24,kiosk:24,workzone:18};
+  for(let i=ctx.solidProps.length-1;i>=0;i--){
+    const p=ctx.solidProps[i],w=p.width||p.w||16,h=p.height||p.h||16;
+    if(!types.has(p.type)||Math.max(w,h)>80)continue;
+    Object.assign(p,{w,h,width:w,height:h,movable:true,intact:true,hp:90,collisionHeight:heights[p.type],mass:p.type==='bollard'?45:p.type==='bench'?65:p.type==='phone'?140:p.type==='planter'?100:p.type==='parasol'?18:50});
+    ctx.breakableProps.push(p);ctx.solidProps.splice(i,1);
+  }
+  for(const p of ctx.breakableProps)if(p.type==='hydrant'){p.movable=true;p.mass=85;p.collisionHeight=14;}
+  ctx.invalidateScenery();
+}

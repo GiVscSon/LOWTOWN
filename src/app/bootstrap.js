@@ -1,3 +1,4 @@
+import {characterPose} from '../render/shared/character_pose.js';
 // One shared runtime context owns state; this system has no hidden globals.
 export function installAppBootstrap(ctx) {
   const {
@@ -39,7 +40,11 @@ export function installAppBootstrap(ctx) {
     ctx.listen(flyButton, 'click', () => {
       if (!ctx.isGamePaused()) ctx.roam.toggleFlight();
     });
-    roamControls.append(enterButton, flyButton);
+    const weaponButton=ctx.env.document.createElement('button');weaponButton.id='btnWeapon';weaponButton.textContent='Кулаки · Q';
+    ctx.listen(weaponButton,'click',()=>{if(!ctx.isGamePaused())ctx.cycleWeapon();});
+    const reloadButton=ctx.env.document.createElement('button');reloadButton.id='btnReload';reloadButton.textContent='Перезарядить · T';
+    ctx.listen(reloadButton,'click',()=>{if(!ctx.isGamePaused())ctx.reloadWeapon();});
+    roamControls.append(enterButton, flyButton,weaponButton,reloadButton);
     ctx.env.document.body.appendChild(roamControls);ctx.roamControls=roamControls;
     ctx.loadProgress();
     ctx.setupInputListeners();
@@ -373,6 +378,15 @@ export function installAppBootstrap(ctx) {
           ctx.threeRenderer.setCameraPreset('near');ctx.renderWorld();
           return {type,x,y};
         },
+        coastalScene(){
+          const beach=ctx.beachZones[0];
+          ctx.qaManualSceneClock=ctx.env.performance.now();
+          ctx.clearGameInput();ctx.roam.resetToFoot(beach.x+beach.w/2,beach.y+100,0);ctx.selectWeapon('fists');
+          const x=beach.x+beach.w/2,y=beach.y-80;Object.assign(ctx.player,{x,y,jumpHeight:0});
+          ctx.player.waterSafe={x:beach.x+beach.w/2,y:beach.y+160};ctx.stepWaterInteraction(1/60);
+          ctx.threeRenderer.setCameraPreset('near');ctx.renderWorld();return {beach,x,y};
+        },
+        coastalState:()=>({player:{x:ctx.player.x,y:ctx.player.y,inWater:!!ctx.player.inWater,waterTime:ctx.player.waterTime||0,swimPhase:ctx.player.swimPhase||0,weapon:ctx.player.weapon||'fists',ammo:ctx.player.ammo,reloadRemaining:ctx.player.reloadRemaining||0,animation:characterPose(ctx.player).action,animationTime:ctx.player.animationTime||0},beaches:ctx.beachZones,swimmers:ctx.pedestrians.filter(p=>p.inWater).length,beachPeople:ctx.pedestrians.filter(p=>p.beachRoute).length,incident:ctx.cityIncidentDirector.current()?.kind,effects:ctx.effects.active}),
         interactionState: () => ({player:{x:ctx.player.x,y:ctx.player.y,hp:ctx.player.hp,jumpHeight:ctx.player.jumpHeight||0,attackTime:ctx.player.attackTime||0},effects:ctx.effects.active,details:ctx.worldDetailCount,
           props:ctx.breakableProps.map(p=>({type:p.type,x:p.x,y:p.y,hp:p.hp,intact:p.intact})),people:ctx.pedestrians.map(p=>({hp:p.hp,reaction:p.reaction,combatTimer:p.combatTimer})),cars:ctx.parkedCars.map(p=>({hp:p.hp,damage:p.damage}))}),
         setWeather(kind, instant = false) {
@@ -517,7 +531,7 @@ export function installAppBootstrap(ctx) {
           })),
           people: ctx.pedestrians.length,
           traffic: ctx.trafficCars.length,
-          badPeople: ctx.pedestrians.filter(p => ctx.isPedestrianSceneryBlocked(p.x, p.y)).length,
+          badPeople: ctx.pedestrians.filter(p => ctx.isPedestrianSceneryBlocked(p.x, p.y, 0, p.inWater === true)).length,
           trafficOffRoad: ctx.trafficCars.filter(c => !onRoadSurface(c.x, c.y, ctx.roads, ctx.bridges, ctx.scenicRoads, ctx.roadEnds)).length
         })
       };
