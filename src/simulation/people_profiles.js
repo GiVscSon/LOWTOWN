@@ -17,7 +17,9 @@ export function assignPeopleTypes(people){
     const profile=PEOPLE_TYPES[p.personType]||PEOPLE_TYPES.resident;
     p.hp??=100;p.personId??=index;p.walkSpeed=profile.pace;p.bodyBuild=profile.build;
     p.skin=skin[index%skin.length];p.accessory=profile.accessory;p.gender=index%3===0?'woman':'man';
-    p.hair=index%7===0?'#9c9690':index%4===0?'#71553c':'#302720';
+    if(p.personType==='elderly'&&Math.floor(index/16)%2)p.accessory='scarf';
+    if(p.accessory==='beard'&&p.gender==='woman')p.accessory='cap';
+    p.hair=p.personType==='elderly'?'#a7a19b':index%7===0?'#9c9690':index%4===0?'#71553c':'#302720';
     p.visualScale=p.personType==='elderly'?.93:p.personType==='jogger'?1.03:1;
     if(profile.weapon&&!p.beachRoute)p.weapon ||= p.personType==='troublemaker'&&index%3===0?'pistol':profile.weapon;
     if(p.dailyStops)for(const stop of p.dailyStops)if(!['swimming','beachWalk','sunbathing'].includes(stop.kind))stop.activity=profile.activity;

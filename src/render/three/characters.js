@@ -102,6 +102,7 @@ export function createCharacterBatch(scene,capacity=512,material=new THREE.MeshL
   const accessoryGeometry={
     cap:combine([[new THREE.SphereGeometry(2.4,16,7,0,Math.PI*2,0,Math.PI*.5),'#698984',0,22,0,[1,.65,1]],[box(2,.2,3),'#486c69',2,22,0]]),
     hardhat:combine([[new THREE.SphereGeometry(2.6,16,8,0,Math.PI*2,0,Math.PI*.55),'#dbb452',0,22,0,[1,.7,1]],[new THREE.CylinderGeometry(2.8,2.8,.3,16),'#c79b36',0,22,0],[box(.25,.7,4),'#edcf76',0,23.8,0]]),
+    scarf:combine([[new THREE.CylinderGeometry(1.7,1.7,1,10),'#b17c61',0,18.7,0],[box(.5,4,1.2),'#a36852',2.45,16.4,1.5],[new THREE.SphereGeometry(.55,8,5),'#bc8b71',2.2,18.6,1.5]]),
     glasses:combine([...[-1,1].map(side=>[new THREE.TorusGeometry(.53,.09,6,12).rotateY(Math.PI/2),'#b1aaa0',2.09,21.2,side*.85]),[box(.1,.09,.65),'#b1aaa0',2.13,21.2,0]]),
     beard:combine([[new THREE.SphereGeometry(1.6,14,8),'#42352b',.45,19.35,0,[.9,.56,1]],[box(.18,.2,1.1),'#42352b',2.06,20,0]]),
     backpack:combine([[new THREE.SphereGeometry(2.7,12,8),'#6c816b',-2.45,14.8,0,[.5,1.2,.8]],[box(.3,6,.3),'#313d31',.2,16.5,-2.75],[box(.3,6,.3),'#313d31',.2,16.5,2.75],[box(.5,2,2.7),'#51674f',-3.95,13.5,0]]),
