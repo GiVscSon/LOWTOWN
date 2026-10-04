@@ -7,7 +7,8 @@ import {captureMotion,contact,chassis} from '../../src/simulation/solid_contacts
 import {applyBodyImpulse,stepBodyResponse,isMovableProp} from '../../src/simulation/body_physics.js';
 import {meleeTarget} from '../../src/simulation/character_actions.js';
 import {createEffectPool} from '../../src/simulation/effects.js';
-import {rectangleClearOfStreets} from '../../src/world/street_corridors.js';
+import {rectangleClearOfStreets,onStreetCollection} from '../../src/world/street_corridors.js';
+import {signalPosts} from '../../src/world/furniture_layout.js';
 import {createCharacterBatch} from '../../src/render/three/characters.js';
 import {createStreetProps} from '../../src/render/three/props.js';
 import * as THREE from 'three';
@@ -17,13 +18,16 @@ const neighbours=Array.from({length:1000},()=>({x:random()*8000,y:random()*8000}
 for(let i=0;i<500;i++){const x=random()*8000,y=random()*8000,radius=30+random()*200,predicate=b=>Math.hypot(b.x-x,b.y-y)<radius;assert.equal(grid.some(x,y,radius,predicate),neighbours.some(predicate));}
 const {runtime}=runtimeCity(731),c=runtime.context,report={jumps:[],impacts:[],world:{},particles:{}};
 const details=[...c.solidProps,...c.breakableProps].filter(p=>p.authoredDetail);
+const paint=c.buildRoadPaintGeometry(),posts=signalPosts(paint.signals);
+assert(posts.length>0);
+for(const p of posts)assert(!onStreetCollection(p.x,p.y,paint.surfaces,4),'signal base obstructs an oblique junction');
 assert(details.length>=70&&details.length<=140,'the populated city must contain real, bounded roadside details');
 for(const p of details){
   assert(rectangleClearOfStreets({x:p.x-p.width/2,y:p.y-p.height/2,w:p.width,h:p.height},[...c.roads,...c.bridges],4));
   assert(c.getWalkSurface()(p.x,p.y));
   assert(c.walkingRoutes.every(r=>r.points.every(q=>Math.hypot(p.x-q.x,p.y-q.y)>Math.hypot(p.width,p.height)/2+8)),'detail obstructs walking route');
 }
-report.world={details:details.length,movable:details.filter(isMovableProp).length,vents:c.ambientVents.length};
+report.world={details:details.length,movable:details.filter(isMovableProp).length,vents:c.ambientVents.length,clearSignalPosts:posts.length};
 const notices=[];c.showToast=s=>notices.push(s);c.raiseWantedFromCrime=()=>{};
 function scene(){
   for(const key of ['buildings','trees','solidProps','breakableProps','parkedCars','trafficCars','policeCars','pedestrians','incidentPoliceCars','incidentResponseVehicles','bridges','allIslands'])c[key].length=0;
