@@ -12,8 +12,13 @@ export function velocityForHeading(car, retention = 0.18) {
 export function routeInput(car, target) {
   const distance = Math.hypot(target.x - car.x, target.y - car.y);
   const error = angleDifference(Math.atan2(target.y - car.y, target.x - car.x), car.angle);
-  const desired = Math.abs(error) > 0.35 ? .8 : Math.max(.8,Math.min(4.8,distance/60));
-  return { up: car.speed < desired, down: car.speed > desired + 0.3,
+  // Slow before the waypoint using available tyre braking distance. The old
+  // distance/60 ramp only braked after a turn became unavoidable.
+  const braking=Math.max(1,Math.min(6,(car.tyres?.mu||1)*6));
+  const arrival=.4,remaining=Math.max(0,distance-40);
+  const approach=Math.sqrt((arrival*6)**2+2*braking*remaining/10)/6;
+  const desired = Math.abs(error) > 0.35 ? arrival : Math.max(arrival,Math.min(4.8,approach));
+  return { up: car.speed < desired-.05, down: car.speed > desired + 0.1,
     left: error < -0.025, right: error > 0.025, handbrake: false, nitro: false };
 }
 
