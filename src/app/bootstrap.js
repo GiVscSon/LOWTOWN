@@ -378,6 +378,18 @@ export function installAppBootstrap(ctx) {
           ctx.threeRenderer.setCameraPreset('near');ctx.renderWorld();
           return {type,x,y};
         },
+        livingCityScene(){
+          const types=new Map(ctx.pedestrians.map(p=>[p.personType,p]));
+          ctx.env.window.__lowtownCityQA.collisionScene('bin',true);
+          ctx.roam.resetToFoot(1660,1200,0);
+          let i=0;for(const [type,source] of types){if(!type)continue;
+            ctx.pedestrians.push({...source,x:1640+(i%4)*28,y:1160+Math.floor(i/4)*80,route:null,beachRoute:null,dailyStops:[],pause:999,activityRemaining:0,eventFleeTimer:0,fleeTimer:0,heading:0,angle:0,hp:100,dead:false,inWater:false});i++;
+          }
+          ctx.state.wanted=3;ctx.updatePoliceAI(1/60);
+          if(ctx.pursuitAirUnit)Object.assign(ctx.pursuitAirUnit,{x:1770,y:1250,searchTarget:{x:1660,y:1200}});
+          ctx.threeRenderer.setCameraPreset('near');ctx.renderWorld();
+          return {types:[...types.keys()].filter(Boolean),armed:ctx.pedestrians.filter(p=>p.weapon).length};
+        },
         coastalScene(){
           const beach=ctx.beachZones[0];
           ctx.qaManualSceneClock=ctx.env.performance.now();

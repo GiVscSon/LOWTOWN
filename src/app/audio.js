@@ -8,7 +8,10 @@ ctx.SynthAudio = class SynthAudio {
     this.radioGain = null;
     this.radioInterval = null;
     this.enabled = false;
-    this.stationIdx = 0;
+    this.stationIdx = 1;
+    this.radioStep = 0;
+    this.radioNextTime = 0;
+    this.voices = new Set();
     this.masterGain = null;
     this.volume = 1;
     this.paused = false;
@@ -34,7 +37,7 @@ ctx.SynthAudio = class SynthAudio {
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.setValueAtTime(this.paused ? 0 : this.volume, this.ctx.currentTime);
       this.masterGain.connect(this.ctx.destination);
-      this.radioGain.gain.setValueAtTime(0.04, this.ctx.currentTime);
+      this.radioGain.gain.setValueAtTime(0.65, this.ctx.currentTime);
       this.radioGain.connect(this.masterGain);
       this.motorOsc.type = 'sawtooth';
       this.motorOsc.frequency.setValueAtTime(45, this.ctx.currentTime);
@@ -79,8 +82,10 @@ ctx.SynthAudio = class SynthAudio {
   setStation(index) {
     if (!Number.isInteger(index) || index < 0 || index >= this.stations.length) return this.stations[this.stationIdx];
     this.stationIdx = index;
-    if (this.radioInterval) clearInterval(this.radioInterval);
+    if (this.radioInterval) ctx.env.clearInterval(this.radioInterval);
     this.radioInterval = null;
+    for (const voice of this.voices) try { voice.stop(); } catch {}
+    this.voices.clear();
     this.saveSettings();
     if (this.stationIdx === 0) return this.stations[0];
     this.startSynthRadio();
@@ -88,25 +93,40 @@ ctx.SynthAudio = class SynthAudio {
   }
   startSynthRadio() {
     if (!this.ctx) return;
-    const notes = this.stationIdx === 1 ? [130, 164, 196, 246, 261, 329] : this.stationIdx === 2 ? [110, 138, 165, 220, 277] : [98, 123, 147, 196, 220];
-    let step = 0;
-    this.radioInterval = ctx.env.setInterval(() => {
-      if (!this.ctx || this.stationIdx === 0 || this.paused || !this.volume) return;
-      try {
-        const osc = this.ctx.createOscillator();
-        const g = this.ctx.createGain();
-        osc.type = this.stationIdx === 1 ? 'sawtooth' : this.stationIdx === 2 ? 'sine' : 'square';
-        const freq = notes[step % notes.length];
-        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-        g.gain.setValueAtTime(0.03, this.ctx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.22);
-        osc.connect(g);
-        g.connect(this.radioGain);
-        osc.start();
-        osc.stop(this.ctx.currentTime + 0.24);
-        step++;
-      } catch (e) {}
-    }, 240);
+    if (this.radioInterval) ctx.env.clearInterval(this.radioInterval);
+    this.radioStep = 0; this.radioNextTime = this.ctx.currentTime;
+    const tracks = [null,
+      {bpm:108,root:130.81,notes:[0,7,12,10,7,3,5,7,0,7,12,15,12,10,7,5],chords:[0,-5,-2,-7],wave:'triangle'},
+      {bpm:84,root:110,notes:[0,3,7,10,7,3,2,0,0,7,10,12,10,7,5,3],chords:[0,-2,-5,-7],wave:'sine'},
+      {bpm:126,root:98,notes:[0,0,7,12,10,7,5,3,0,7,12,7,10,7,3,5],chords:[0,-5,-7,-2],wave:'triangle'}];
+    const schedule = () => {
+      if (!this.ctx || !this.stationIdx) return;
+      if (this.paused || !this.volume || this.ctx.state !== 'running') { this.radioNextTime = this.ctx.currentTime; return; }
+      const track=tracks[this.stationIdx],interval=60/track.bpm/2;
+      this.radioNextTime=Math.max(this.ctx.currentTime,this.radioNextTime);
+      let scheduled=0;
+      while(this.radioNextTime<this.ctx.currentTime+.3 && scheduled++<4){
+        const step=this.radioStep++,time=this.radioNextTime,root=track.root*2**(track.chords[Math.floor(step/16)%4]/12);
+        this.radioNote(root*2**(track.notes[step%16]/12),time,interval*.85,.16,track.wave);
+        if(step%2===0)this.radioNote(root/2,time,interval*1.7,.13,'triangle');
+        if(step%8===0)for(const semi of [0,3,7])this.radioNote(root*2**(semi/12),time,interval*6,.035,'sine');
+        if(step%4===0)this.radioNote(70,time,.13,.17,'sine',32);
+        if(step%4===2)this.radioNote(180,time,.08,.045,'triangle',65);
+        this.radioNextTime+=interval;
+      }
+    };
+    schedule();this.radioInterval=ctx.env.setInterval(schedule,100);
+  }
+  radioNote(frequency,time,duration,level,wave,fallTo) {
+    if(this.voices.size>=48)return;
+    const osc=this.ctx.createOscillator(),gain=this.ctx.createGain();
+    osc.type=wave;osc.frequency.setValueAtTime(frequency,time);
+    if(fallTo)osc.frequency.exponentialRampToValueAtTime(fallTo,time+duration);
+    gain.gain.setValueAtTime(.0001,time);gain.gain.linearRampToValueAtTime(level,time+.012);
+    gain.gain.exponentialRampToValueAtTime(.0001,time+duration);
+    osc.connect(gain);gain.connect(this.radioGain);this.voices.add(osc);
+    osc.onended=()=>{this.voices.delete(osc);osc.disconnect();gain.disconnect();};
+    osc.start(time);osc.stop(time+duration+.01);
   }
   playSplash() {
     if (!this.enabled || !this.ctx) return;

@@ -95,6 +95,7 @@ export function surfaceMovement(surface,vehicle={}){
     acceleration:clamp(base.acceleration+adjustment*.25,.3,1.15),
     steering:clamp(base.steering+adjustment*.16,.45,1.12),
     slipRetention:clamp(base.slip+(1-capability)*demand*.16,.12,.72),
+    tyreGrip:resolveSurface(surface).grip,
     coast:base.coast
   };
 }
@@ -135,6 +136,6 @@ export function createWeather(){
 }
 export function weatherMovement(response,weather){
   const wet=clamp(weather.wetness||0,0,1);
-  return {...response,slipRetention:Math.min(.72,response.slipRetention+wet*.13),braking:1-wet*.23,
+  return {...response,tyreGrip:(response.tyreGrip??1)*(1-wet*.32),slipRetention:Math.min(.72,response.slipRetention+wet*.13),braking:1-wet*.23,
     acceleration:response.acceleration*(1-wet*.04)};
 }

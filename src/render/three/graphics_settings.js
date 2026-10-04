@@ -1,8 +1,8 @@
 export const GRAPHICS_STORAGE_KEY='lowtown_graphics_settings_v1';
 export const GRAPHICS_PRESETS={
-  performance:{distance:'near',reflections:false,shadows:true,rain:false,lighting:'simple',effects:'medium'},
-  balanced:{distance:'normal',reflections:true,shadows:true,rain:true,lighting:'simple',effects:'medium'},
-  high:{distance:'far',reflections:true,shadows:true,rain:true,lighting:'detailed',effects:'high'}
+  performance:{reflectionQuality:'low',distance:'near',reflections:false,shadows:true,rain:false,lighting:'simple',effects:'medium'},
+  balanced:{reflectionQuality:'low',distance:'normal',reflections:true,shadows:true,rain:true,lighting:'simple',effects:'medium'},
+  high:{reflectionQuality:'auto',distance:'far',reflections:true,shadows:true,rain:true,lighting:'detailed',effects:'high'}
 };
 export const DEFAULT_GRAPHICS={preset:'high',resolution:1.5,fps:60,...GRAPHICS_PRESETS.high};
 export function normalizeGraphics(value={},base=DEFAULT_GRAPHICS){
@@ -11,6 +11,7 @@ export function normalizeGraphics(value={},base=DEFAULT_GRAPHICS){
   if([.75,1,1.25,1.5,2].includes(Number(value.resolution)))next.resolution=Number(value.resolution);
   if([30,60,0].includes(Number(value.fps)))next.fps=Number(value.fps);
   if(['near','normal','far'].includes(value.distance))next.distance=value.distance;
+  if(['auto','low','high'].includes(value.reflectionQuality))next.reflectionQuality=value.reflectionQuality;
   if(['simple','detailed'].includes(value.lighting))next.lighting=value.lighting;
   if(['off','medium','high'].includes(value.effects))next.effects=value.effects;
   for(const key of ['reflections','shadows','rain'])if(typeof value[key]==='boolean')next[key]=value[key];

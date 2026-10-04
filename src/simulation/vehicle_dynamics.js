@@ -1,3 +1,4 @@
+import {stepTyreForces} from './tyre_forces.js';
 export const projectIso = (x, y) => ({ x: (x - y) * Math.sqrt(3) / 2, y: (x + y) / 2 });
 export const angleDifference = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
@@ -37,11 +38,7 @@ export function stepLandVehicle(car, keys, dt, profile={}, surface={}) {
     }else car.reverseDelay=0;
     const drag=(.002+speed*speed*.000045)*(surface.coast ? (1-surface.coast)/.035:1)+(keys.handbrake?.07:0);
     speed=Math.sign(speed)*Math.max(0,Math.abs(speed)-drag*frame);
-    car.speed=speed;
-    const wheelbase=Math.max(22,(profile.width||car.width||48)*.7);
-    car.angle+=speed/wheelbase*Math.tan(car.steeringAngle)*(surface.steering??1)*frame;
-    const retention=Math.pow(surface.slipRetention??.18,frame);
-    Object.assign(car,velocityForHeading(car,retention));
+    stepTyreForces(car,speed,car.steeringAngle*(surface.steering??1),step,profile,surface,keys.handbrake);
     car.x+=car.vx*frame;car.y+=car.vy*frame;
   }
   return car;

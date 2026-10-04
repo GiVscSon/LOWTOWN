@@ -125,6 +125,8 @@ ctx.updatePedestrians = function updatePedestrians(dt) {
       p.trip = 0;
     }
     p.movedDistance = 0;
+    if(p.dead){p.stance='down';p.gait=0;p.activity='dead';return;}
+    p.runIntent=p.personType==='jogger';
     p.hitCooldown = ctx.env.Math.max(0, (p.hitCooldown || 0) - dt);
     if (p.knockdownTimer > 0) {
       p.knockdownTimer = ctx.env.Math.max(0, p.knockdownTimer - dt);
@@ -141,7 +143,7 @@ ctx.updatePedestrians = function updatePedestrians(dt) {
     if(p.combatTimer>0){p.gait=0;return;}
     if(p.beachRoute||p.inWater){
       const goal=p.beachRoute?.[p.beachRouteIndex||0]||p.waterSafe||ctx.nearestSafeSpawn(p.x,p.y),dx=goal.x-p.x,dy=goal.y-p.y,d=ctx.env.Math.hypot(dx,dy)||1;
-      const move=ctx.env.Math.min(d,dt*(p.inWater?28:34));
+      const move=ctx.env.Math.min(d,dt*(p.inWater?28:(p.walkSpeed||.56)*60));
       const x=p.x+dx/d*move,y=p.y+dy/d*move;
       if(!ctx.isPedestrianBlocked(x,y,true)){p.x=x;p.y=y;p.heading=ctx.env.Math.atan2(dy,dx);p.gait=1;p.walkPhase=(p.walkPhase||0)+move*.23;}
       if(d<8&&p.beachRoute)p.beachRouteIndex=((p.beachRouteIndex||0)+1)%p.beachRoute.length;
@@ -240,7 +242,7 @@ ctx.updatePedestrians = function updatePedestrians(dt) {
       const eventPanic = (p.eventFleeTimer || 0) > 0 && !threat;
       const fleeX = eventPanic ? p.eventFleeX || 0 : p.fleeX || 0;
       const fleeY = eventPanic ? p.eventFleeY || 0 : p.fleeY || 0;
-      const pace = eventPanic ? 1.9 : 1.3;
+      const pace = (eventPanic ? 1.9 : 1.3)*Math.max(.65,Math.min(1.15,(p.walkSpeed||.44)/.44));
       dx = fleeX * pace * frame;
       dy = fleeY * pace * frame;
     } else if (!p.pause) {

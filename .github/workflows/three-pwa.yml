@@ -65,6 +65,8 @@ jobs:
         run: npm run test:interaction-browser
       - name: Coastal swimming, weapon reactions and touch controls
         run: npm run test:coastal-browser
+      - name: People types, audible radio, wet reflections and pursuit beam
+        run: npm run test:living-city-upgrade-browser
       - name: Refined transport and building gallery
         run: npm run test:refined-transport-browser
       - name: Three.js live rendering and PWA offline restart
@@ -126,5 +128,14 @@ jobs:
         with:
           name: lowtown-coastal-weapons
           path: artifacts/coastal-weapons/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload living city upgrade matrix
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lowtown-living-city-upgrade
+          path: artifacts/living-city-1.1/
           if-no-files-found: ignore
           retention-days: 14

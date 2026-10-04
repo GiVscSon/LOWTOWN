@@ -33,6 +33,8 @@ export function installAppInput(ctx) {
     ctx.sound.setPaused(paused);
   };
   ctx.setupInputListeners = function setupInputListeners() {
+    // Browsers require a real gesture; any mouse/touch interaction unlocks radio.
+    ctx.listen(ctx.env.window, 'pointerdown', () => ctx.sound.init(), {passive:true});
     ctx.listen(ctx.env.window, 'keydown', e => {
       if (e.code === 'Escape') {
         e.preventDefault();

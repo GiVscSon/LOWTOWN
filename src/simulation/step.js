@@ -87,6 +87,7 @@ ctx.updatePhysics = function updatePhysics(dt) {
   const footOccupants=[...ctx.pedestrians,...(ctx.roam?.mode==='foot'?[ctx.player]:[])];
   const motionPad=Math.max(32,...trafficOccupants.map(body=>Math.max(body.width||body.w||48,body.height||body.h||24)/2+Math.hypot(body.vx||0,body.vy||0,body.speed||0)*dt*60));
   const trafficNeighbourhood=createNeighbourhood(trafficOccupants),footNeighbourhood=createNeighbourhood(footOccupants);
+  ctx.updateJunctionPriority(ctx.trafficCars,dt);
   // Traffic update
   ctx.trafficCars.forEach(c => {
     if (c.cruiseSpeed === undefined) c.cruiseSpeed = c.speed;
@@ -107,13 +108,14 @@ ctx.updatePhysics = function updatePhysics(dt) {
       return along > 0 && along < gap && ctx.env.Math.abs(-dx * sn + dy * cs) < (opposing ? ctx.env.Math.max(0, margin - 10) : margin);
     };
     const occupied = trafficNeighbourhood.some(c.x,c.y,forwardGap+motionPad+64,other => other !== c && ahead(other, forwardGap, ((c.height || 24) + (other.height || 24)) / 2 + 12)) || footNeighbourhood.some(c.x,c.y,100+motionPad,person => ahead(person, 70, (c.height || 24) / 2 + 7));
+    if(occupied)ctx.planTrafficDetour(c,trafficOccupants,dt);else c.detourCooldown=ctx.env.Math.max(0,(c.detourCooldown||0)-dt);
     const approachingRed = ctx.trafficMustStopAtSignal(c);
     c.collisionHold = ctx.env.Math.max(0, (c.collisionHold || 0) - dt);
-    const obstacle = occupied || approachingRed || emergencyYield || c.collisionHold > 0;
-    const signalSpeed = approachingRed ? ctx.env.Math.max(0, c.signalGap - 3) / 12 : Infinity;
+    const obstacle = occupied || approachingRed || c.priorityStop || emergencyYield || c.collisionHold > 0;
+    const signalSpeed = ctx.env.Math.min(approachingRed ? ctx.env.Math.max(0, c.signalGap - 3) / 12 : Infinity,c.priorityStop?ctx.env.Math.max(0,c.junctionGap-3)/12:Infinity);
     const allowedSpeed = occupied || emergencyYield || c.collisionHold > 0 ? 0 : ctx.env.Math.sign(c.cruiseSpeed) * ctx.env.Math.min(ctx.env.Math.abs(c.cruiseSpeed), signalSpeed);
     if (c.routeManaged) {
-      if (emergencyYield) {
+      if (emergencyYield || (approachingRed&&c.signalGap<=4) || (c.priorityStop&&c.junctionGap<=4)) {
         c.speed = 0;
         return;
       }
@@ -123,13 +125,17 @@ ctx.updatePhysics = function updatePhysics(dt) {
         angle: c.angle,
         routeIndex: c.routeIndex,
         routeWait: c.routeWait,
-        lastStopIndex: c.lastStopIndex
+        lastStopIndex: c.lastStopIndex,
+        detourRoute:c.detourRoute,detourIndex:c.detourIndex
       };
-      advanceRouteActor(c, c.route, dt, {
-        speed: allowedSpeed,
+      const savedIndex=c.routeIndex;
+      if(c.detourRoute)c.routeIndex=c.detourIndex;
+      advanceRouteActor(c, c.detourRoute||c.route, dt, {
+        speed: ctx.env.Math.abs(allowedSpeed),
         dwell: 2.1,
         stopRadius: 12
       });
+      if(c.detourRoute){c.detourIndex=c.routeIndex;c.routeIndex=savedIndex;if(ctx.env.Math.hypot(c.x-c.detourRoute.points.at(-1).x,c.y-c.detourRoute.points.at(-1).y)<18){c.detourRoute=null;c.routeIndex=((savedIndex||0)+2)%c.route.points.length;}}
       if (!ctx.policeFootprintOnRoad(c) || ctx.trafficTouchesResponder(c)) {
         Object.assign(c, pose);
         c.speed = 0;
