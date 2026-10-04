@@ -74,7 +74,7 @@ ctx.updatePhysics = function updatePhysics(dt) {
         ctx.showToast('⚠️ МАШИНА УТОНУЛА! ЭВАКУАЦИЯ (-$50)');
         ctx.state.cash = ctx.env.Math.max(0, ctx.state.cash - 50);
         ctx.stepWorldEffects(dt);
-  if (ctx.player.hp <= 0) ctx.respawnPlayer('утопление');
+        if (ctx.player.hp <= 0) ctx.respawnPlayer('утопление');
         return;
       }
     }
@@ -225,6 +225,7 @@ ctx.updatePhysics = function updatePhysics(dt) {
   const stuntVehicles = [...ctx.trafficCars, ...ctx.policeCars, ...ctx.incidentPoliceCars, ...ctx.incidentResponseVehicles];
   stuntVehicles.forEach(vehicle => ctx.updateStuntVehicle(vehicle, dt));
   ctx.resolveCityMotion(motionStarts, dt);
+  ctx.stepWorldEffects(dt);
   if (ctx.player.hp <= 0) ctx.respawnPlayer(ctx.roam?.mode==='foot'?'потеря сознания':'тяжёлая авария');
   const speedKmh = ctx.env.Math.abs(ctx.player.speed) * 12;
   if (!ctx.roam?.special) ctx.player.gear = ctx.player.speed < -0.1 ? 'R' : speedKmh < 30 ? 'D1' : speedKmh < 60 ? 'D2' : speedKmh < 95 ? 'D3' : speedKmh < 130 ? 'D4' : 'D5';

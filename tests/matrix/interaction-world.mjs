@@ -70,6 +70,26 @@ const paused={jump:c.player.jumpHeight,attack:c.player.attackTime,particles:JSON
 const light={x:0,y:0,width:16,height:16,mass:20},heavy={...light,mass:1500};applyBodyImpulse(light,4200,0,{x:0,y:4});applyBodyImpulse(heavy,4200,0,{x:0,y:4});assert(light.vx>heavy.vx*70);assert(light.angularVelocity<0);
 for(let i=0;i<120;i++)stepBodyResponse(light,1/60,true);assert(Math.abs(light.angularVelocity)<.03);assert(Number.isFinite(light.pitch+light.roll));
 for(const hz of [30,60,120]){const pool=createEffectPool(64,()=>.5);pool.burst(0,0,10,'chip',5000);assert.equal(pool.particles.length,64);assert.equal(pool.active,64);for(let i=0;i<hz*4;i++)pool.step(1/hz);assert.equal(pool.active,0);report.particles[hz]={capacity:64,expired:true};}
+// Exercise the real physics entry point: standalone effect/spring tests cannot
+// detect a missing connection to the ordinary game loop.
+report.runtimeEffects=[];
+for(const hz of [30,60,120]){
+  scene();c.ambientVents=[];c.effects=createEffectPool(256,()=>.5);
+  Object.keys(c.state.keys).forEach(key=>c.state.keys[key]=false);
+  c.effects.burst(50,50,5,'chip',1);const initialLife=c.effects.particles[0].life;
+  const coasting={type:'sedan',x:120,y:120,width:48,height:24,mass:1500,vx:2,vy:0,speed:2,angle:0,angularVelocity:1};c.parkedCars.push(coasting);
+  runtime.step(1/hz);runtime.step(1/hz);
+  assert(c.effects.particles[0].life<initialLife,'normal runtime did not advance particles');
+  assert(Math.abs(coasting.pitch)>0,'normal runtime did not update vehicle response');
+  assert(coasting.angularVelocity<1,'normal runtime did not damp angular motion');
+  for(let i=0;i<hz*2;i++)runtime.step(1/hz);assert.equal(c.effects.active,0,'normal runtime retained expired particles');
+  const hydrant={type:'hydrant',x:200,y:200,intact:false,sprayRemaining:1};c.breakableProps.push(hydrant);
+  for(let i=0;i<hz/2;i++)runtime.step(1/hz);assert(c.effects.active>0,'broken hydrant did not emit water');assert(hydrant.sprayRemaining<.51);
+  for(let i=0;i<hz*2;i++)runtime.step(1/hz);assert.equal(hydrant.sprayRemaining,0);assert.equal(c.effects.active,0);
+  c.roam.resetToSedan(0,0,0);for(let i=0;i<hz/2;i++)runtime.step(1/hz);
+  assert(c.effects.particles.some(p=>p.life>0&&p.kind==='steam'),'idle vehicle did not emit exhaust');
+  report.runtimeEffects.push({hz,particlesExpire:true,vehicleResponse:true,hydrantExpires:true,idleExhaust:true});
+}
 const scene3=new THREE.Group(),batch=createCharacterBatch(scene3,4),p={x:0,y:0,jumpHeight:22,attackTime:.14,attackSide:1};batch.update([p],()=>0);const m=new THREE.Matrix4();batch.batches.torso.getMatrixAt(0,m);assert(m.elements[13]>22);batch.batches.forearm.getMatrixAt(1,m);assert(m.elements[12]>3.7,'fist must extend at the contact moment');
 const props=createStreetProps(scene3,new THREE.MeshLambertMaterial());assert.equal(props.update(['crate','barrel','trashcan','cone'].map((type,i)=>({type,x:i*20,y:0,w:16,h:16,intact:true})),()=>0),4);
 for(const mesh of Object.values(props.batches))assert(mesh.geometry.attributes.position.array.every(Number.isFinite));
