@@ -54,7 +54,7 @@ ctx.getWalkSurface = function getWalkSurface() {
   return ctx.walkSurfaceCache.supported;
 };
 ctx.getCityScenery = function getCityScenery() {
-  const arrays = [ctx.buildings, ctx.trees, ctx.solidProps, ctx.bridgeRails, ctx.breakableProps,ctx.streetLights,ctx.bridges],
+  const arrays = [ctx.buildings, ctx.trees, ctx.solidProps, ctx.bridgeRails, ctx.breakableProps,ctx.streetLights,ctx.bridges,ctx.roads],
     stamp = arrays.map(a => a.length).join(':');
   if (!ctx.citySceneryCache || ctx.citySceneryCache.stamp !== stamp || arrays.some((a, i) => a !== ctx.citySceneryCache.arrays[i])) {
     const rails = [...ctx.bridgeRails.map(r => ({
@@ -62,7 +62,7 @@ ctx.getCityScenery = function getCityScenery() {
       y: r.y + r.h / 2,
       width: r.w,
       height: r.h
-    })),...bridgeRailBodies(ctx.bridges.filter(b=>!b.footway&&b.points).map(b=>({id:b.logicalId||b.id,width:b.width||b.w||100,path:b.points.map(([x,y])=>({x,y})),organic:true})))];
+    })),...bridgeRailBodies(ctx.bridges.filter(b=>!b.footway&&b.points).map(b=>({id:b.logicalId||b.id,railAccess:ctx.roads.filter(r=>!r.bridgeApproach),width:b.width||b.w||100,path:b.points.map(([x,y])=>({x,y})),organic:true})))];
     const infrastructure=infrastructureColliders(ctx.streetLights,ctx.roadPaintGeometry?.signals);
     ctx.citySceneryCache = {
       arrays,

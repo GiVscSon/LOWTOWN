@@ -137,7 +137,7 @@ function curvedStreetSurface(roads,bridges,graph){
       phase+=length;
     }
   }
-  const bridgePaths=bridges.filter(b=>!b.footway).map(b=>({id:b.logicalId||b.id,width:streetWidth(b),path:streetPoints(b).map(([x,y])=>({x,y})),organic:true}));
+  const bridgePaths=bridges.filter(b=>!b.footway).map(b=>({id:b.logicalId||b.id,railAccess:roads.filter(r=>!r.bridgeApproach),width:streetWidth(b),path:streetPoints(b).map(([x,y])=>({x,y})),organic:true}));
   const crosswalkJunctions=junctions.filter(j=>[...j.horizontalRoads,...j.verticalRoads].every(r=>!r.serviceAccess&&!r.bridgeApproach));
   const signals=crosswalkJunctions.filter(j=>j.directions.length>=4);
   const paint={surfaces,curbs,lanes,bridgePaths,junctions,crosswalkJunctions,crosswalks,crossings,signals,organic:true};

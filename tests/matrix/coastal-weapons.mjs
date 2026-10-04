@@ -3,7 +3,7 @@ import {mkdirSync,writeFileSync} from 'node:fs';
 import * as THREE from 'three';
 import {runtimeCity} from '../helpers/runtime-city.mjs';
 import {createFreeRoam} from '../../src/simulation/free_roam.js';
-import {bridgeRailBodies} from '../../src/world/bridge_rails.js';
+import {bridgeRailBodies,bridgeRailOpenAt} from '../../src/world/bridge_rails.js';
 import {createBridgeProfiles} from '../../src/render/three/bridges.js';
 import {characterGeometries,createCharacterBatch,characterBaseHeight} from '../../src/render/three/characters.js';
 import {WEAPONS,weaponRay} from '../../src/simulation/weapons.js';
@@ -19,11 +19,13 @@ for(const type of dynamicTypes){assert(!c.solidProps.some(p=>p.type===type&&Math
 assert(c.breakableProps.filter(p=>p.type==='hydrant').every(p=>p.movable));
 const originalPaths=c.buildRoadPaintGeometry().bridgePaths;
 for(const path of originalPaths){
-  const profile=createBridgeProfiles([path])[0],rails=bridgeRailBodies([path]);assert.equal(rails.length,(profile.samples.length-1)*2);
-  for(let i=0;i<profile.samples.length-1;i++)for(const [side,k] of [[-1,0],[1,1]]){
-    const rail=rails[k*(profile.samples.length-1)+i],a=profile.samples[i],b=profile.samples[i+1],offset=side*(profile.width/2-2);
+  const profile=createBridgeProfiles([path])[0],rails=bridgeRailBodies([path]);assert(rails.length>0&&rails.length<=(profile.samples.length-1)*2);
+  for(const rail of rails){
+    const i=rail.sampleIndex,side=rail.side,a=profile.samples[i],b=profile.samples[i+1],offset=side*(profile.width/2-2);
     const x=(a.point.x-a.tangent.y*offset+b.point.x-b.tangent.y*offset)/2,y=(a.point.y+a.tangent.x*offset+b.point.y+b.tangent.x*offset)/2;
     assert(Math.hypot(rail.x-x,rail.y-y)<1e-6,'solid parapet differs from visible bridge edge');
+    assert(!bridgeRailOpenAt(profile,x,y),'a road entrance is walled off');
+    assert(!c.emergencyPassingGroundClear({...rail,width:48,height:24}),'passing planner ignores a parapet');
   }
   report.bridges.push({id:path.id,segments:rails.length});
 }
