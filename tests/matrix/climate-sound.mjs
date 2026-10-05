@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import {createWeather} from '../../src/simulation/surfaces.js';
 import {daylightAt} from '../../src/simulation/day_cycle.js';
 import {createSoundscape} from '../../src/app/soundscape.js';
+import {installAppAudio} from '../../src/app/audio.js';
 import {characterEyeOpen,characterGeometries,createCharacterBatch} from '../../src/render/three/characters.js';
 import {runtimeCity} from '../helpers/runtime-city.mjs';
 const report={rates:[],pause:false,saved:false,sound:false,detail:false};
@@ -25,6 +26,9 @@ const s=createSoundscape(a,node());s.setLevels(.8,.4);assert.equal(buffers,1);as
 s.update({rain:1,wind:1,waves:1,fire:1,sirens:1,time:1});assert(s.loops.rain.gain.gain.value>.1&&s.loops.wind.gain.gain.value>0);
 for(let i=0;i<300;i++){a.currentTime+=.1;s.play(['pistol','shotgun','reload','step','splash','thunder'][i%6]);assert(s.voices.size<=32);}
 assert.equal(buffers,1);const initial=sources;s.setLevels(0,0);s.play('impact');assert.equal(sources,initial);for(const n of nodes)n.onended?.();assert.equal(s.voices.size,0);s.dispose();report.sound={voicesBounded:32,noiseBuffers:buffers,ambienceSources:5};
+// The first E key also unlocks audio: its successful exit must still sound.
+const events=[],doorCtx={env:{Math,window:{AudioContext:class {constructor(){this.state='running';this.currentTime=0;this.destination={};}createOscillator(){return node();}createGain(){return node();}createBiquadFilter(){return node();}}},localStorage:{getItem(){return null;},setItem(){}},setInterval(){return 1;},clearInterval(){}},roam:{mode:'sedan'},player:{x:0,y:0},state:{keys:{}}};
+installAppAudio(doorCtx);const doorAudio=new doorCtx.SynthAudio();doorAudio.init();doorAudio.sfx={play:id=>events.push(id)};doorCtx.roam.mode='foot';doorAudio.stepScene(1/60);assert(events.includes('door'),'first gesture vehicle exit lost its door sound');
 const triangleCount=Object.values(characterGeometries()).reduce((sum,g)=>sum+g.attributes.position.count/3,0);assert(triangleCount<2600);
 assert(characterEyeOpen({animationTime:.08})<.1&&characterEyeOpen({animationTime:1})===1&&characterEyeOpen({dead:true})<.1);
 const scene=new THREE.Scene(),batch=createCharacterBatch(scene,10),count=scene.children.length;

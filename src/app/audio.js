@@ -52,6 +52,7 @@ ctx.SynthAudio = class SynthAudio {
       filter.connect(this.motorGain);
       this.motorGain.connect(this.masterGain);
       this.motorOsc.start();
+      this.lastMode=ctx.roam?.mode||'sedan';
       if(this.ctx.createBuffer&&this.ctx.createBufferSource){this.sfx=createSoundscape(this.ctx,this.masterGain);this.sfx.setLevels(this.effectsVolume,this.ambienceVolume);}
       this.enabled = true;
       if (this.stationIdx) this.startSynthRadio();
