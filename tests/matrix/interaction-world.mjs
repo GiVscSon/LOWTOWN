@@ -62,7 +62,7 @@ const hit=meleeTarget(c.player,[...c.getCityScenery().contacts.query(-40,-40,40,
 assert.equal(meleeTarget(c.player,[{x:-18,y:0,width:8,height:8}]),null,'punch hit behind the character');
 scene();const crate={type:'crate',x:20,y:0,w:14,h:14,mass:22,intact:true,hp:12,collisionHeight:18};c.breakableProps.push(crate);
 for(let i=0;i<15;i++)c.stepCharacterActions(1/60,{attack:true});assert.equal(crate.intact,false);assert(!c.cityCollisionBodies().includes(crate));
-scene();const fighter={x:22,y:0,width:9,height:9,hp:100,entityType:'pedestrian'};c.pedestrians.push(fighter);
+scene();const fighter={x:22,y:0,width:9,height:9,hp:100,personType:'troublemaker',entityType:'pedestrian'};c.pedestrians.push(fighter);
 for(let i=0;i<70;i++)c.stepCharacterActions(1/60,{attack:true});assert.equal(fighter.hp,86);assert.equal(c.player.hp,92,'provoked fighter must deliver one visible counter strike');assert.equal(fighter.combatTimer,0);
 scene();c.player.jumpRequested=true;c.roam.step({},1/60);assert(c.player.jumpHeight>0,'quick key press lost before physics step');
 c.player.attackRequested=true;c.stepCharacterActions(1/60,{});assert(c.player.attackTime>0);

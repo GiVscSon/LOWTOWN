@@ -32,7 +32,7 @@ run('Object.assign(player,{x:1140,y:1260});');
 const before=run('projectIso(player.x,player.y)');press('ArrowUp');step(10);release('ArrowUp');const after=run('projectIso(player.x,player.y)');
 assert(after.y<before.y-15,'up input must move up on screen');assert(Math.abs(after.x-before.x)<.01,'up input must not move sideways');
 press('KeyE');assert.equal(run('roam.mode'),'sedan');
-const start=run('player.x');press('KeyW');step(90);release('KeyW');assert(run('player.x')>start+60);
+const start=run('player.x');press('KeyW');step(90);release('KeyW');assert(run('player.x')>start+40,'traction-limited acceleration must still respond to keyboard throttle');
 press('KeyD');step(10);release('KeyD');assert(run('player.angle')>0);
 run('roam.resetToSedan(1600,1200,0);');
 elements.get('btnGas').listeners.touchstart({cancelable:true,preventDefault:noop});step(45);elements.get('btnGas').listeners.touchend({cancelable:true,preventDefault:noop});

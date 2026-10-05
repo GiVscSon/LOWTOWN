@@ -1,3 +1,4 @@
+import {assignPeopleTypes} from '../simulation/people_profiles.js';
 import {populateWorldDetails,mobilizeSmallProps} from './details.js';
 import {populateBeaches} from './beaches.js';
 // One shared runtime context owns state; this system has no hidden globals.
@@ -2271,7 +2272,7 @@ ctx.initTopology = function initTopology() {
   populateWorldDetails(ctx);
   populateBeaches(ctx);
   mobilizeSmallProps(ctx);
-  ctx.pedestrians.forEach((person,index)=>{if(!person.beachRoute&&index%23===0)person.weapon=index%2?'pistol':'bat';});
+  assignPeopleTypes(ctx.pedestrians);
 };
 ctx.alignStreetLocations = function alignStreetLocations() {
   if (!ctx.roads.some(r => r.points)) return;

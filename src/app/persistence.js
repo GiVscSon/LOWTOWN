@@ -3,6 +3,7 @@ export function installAppPersistence(ctx){
 const {migrateWorld2Point,nearestStreet,worldPoint}=ctx.dependencies;
 ctx.autoSaveProgress = function autoSaveProgress() {
   if (ctx.driveLab?.running) return;
+  ctx.weather.save();
   const saveData = {
     worldVersion: 3,
     streetLayout: 'organic-v1',

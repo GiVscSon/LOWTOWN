@@ -64,8 +64,9 @@ export function installCharacterActions(ctx){
         b.hitFlash=.18;ctx.effects.burst(hit.x,hit.y,14+(p.jumpHeight||0),person?'dust':prop?'chip':'spark',person?5:10,dx*12,dy*12);ctx.sound.playImpact();
         if(!hit.fixed)applyBodyImpulse(b,dx*4200,dy*4200,hit,person);
         if(person){b.hp=Math.max(0,(b.hp??100)-14);b.provokedTimer=6;b.fleeTimer=4;b.reaction='fleeing';b.activity='recovering';b.activityRemaining=0;b.conversationPartner=null;
-          if(ctx.pedestrians.indexOf(b)%5===0&&b.hp>30){b.combatTimer=.7;b.counterHit=false;b.fleeTimer=0;b.reaction='angry';}
-          if(b.hp<=30){b.stance='down';b.knockdownTimer=1.2;}ctx.raiseWantedFromCrime(1,.7);
+          if(['security','troublemaker'].includes(b.personType)&&b.hp>30){b.combatTimer=.7;b.counterHit=false;b.fleeTimer=0;b.reaction='angry';}
+          if(b.hp<=30){b.stance='down';b.knockdownTimer=1.2;}if(b.hp===0){b.dead=true;b.combatTimer=0;}ctx.raiseWantedFromCrime(1,.7);
+          ctx.reportWeaponIncident?.(b.dead?'killing':'fight',{body:b,x:hit.x,y:hit.y});
         }else if(prop){b.hp=Math.max(0,(b.hp??(b.type==='dumpster'?100:36))-12);if(b.hp<=0)ctx.breakWorldProp(b);
         }else if(!hit.fixed){b.hp=Math.max(0,(b.hp??100)-3);damagePanel(b,-dx,-dy,.1);}
       }
@@ -86,7 +87,7 @@ export function installCharacterActions(ctx){
     const people=new Set([...ctx.pedestrians,...(ctx.cityIncidentDirector?.current()?.actors||[]),...(ctx.roam?.mode==='foot'?[ctx.player]:[])]);
     for(const car of ctx.cityCollisionBodies())if(!people.has(car)&&!isMovableProp(car))stepBodyResponse(car,dt);
     const p=ctx.player;
-    if(p.landed){if(quality!=='off'&&!p.inWater)ctx.effects.burst(p.x,p.y,.5,ctx.weather.wetness>.2?'water':'dust',8);p.landed=false;}
+    if(p.landed){ctx.sound.playEffect('land');if(quality!=='off'&&!p.inWater)ctx.effects.burst(p.x,p.y,.5,ctx.weather.wetness>.2?'water':'dust',8);p.landed=false;}
     if(pulse&&quality!=='off'&&!p.inWater&&ctx.roam?.profile?.kind==='land'){
       const speed=Math.abs(p.speed||0),back=(p.width||48)*.45;
       if(speed<1.5)ctx.effects.burst(p.x-Math.cos(p.angle)*back,p.y-Math.sin(p.angle)*back,5,'steam',1);

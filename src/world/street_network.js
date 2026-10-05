@@ -63,7 +63,7 @@ export function createRoadCircuits(graph){
  return circuits;
 }
 
-export function roadPath(graph,start,finish,{fromSegment=false}={}){
+export function roadPath(graph,start,finish,{fromSegment=false,edgeClear=null}={}){
   if(!graph.length)return [];
   const nearest=p=>graph.reduce((best,n,i)=>Math.hypot(n.x-p.x,n.y-p.y)<Math.hypot(graph[best].x-p.x,graph[best].y-p.y)?i:best,0);
   const organic=graph.organic;
@@ -111,6 +111,7 @@ export function roadPath(graph,start,finish,{fromSegment=false}={}){
       (costs.get(b)+Math.hypot(graph[b].x-graph[to].x,graph[b].y-graph[to].y)));
     const current=queue.shift();if(current===to)break;
     for(const next of graph[current].edges){
+      if(edgeClear&&!edgeClear(graph[current],graph[next]))continue;
       const cost=costs.get(current)+Math.hypot(graph[next].x-graph[current].x,graph[next].y-graph[current].y);
       if(cost>=(costs.get(next)??Infinity))continue;
       costs.set(next,cost);parents.set(next,current);if(!queue.includes(next))queue.push(next);

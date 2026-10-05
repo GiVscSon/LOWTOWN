@@ -1,3 +1,4 @@
+import {createJunctionPriority,approachSignal} from './junction_priority.js';
 // One shared runtime context owns state; this system has no hidden globals.
 export function installSimulationTraffic(ctx){
 const {chassis,contact,corridorContains,nearestStreet,streetWidth}=ctx.dependencies;
@@ -9,6 +10,7 @@ ctx.streetSignal = function streetSignal(axis, now = ctx.qaManualSceneClock ?? (
 };
 ctx.trafficMustStopAtSignal = function trafficMustStopAtSignal(car, paint = ctx.roadPaintGeometry || (ctx.roadPaintGeometry = ctx.buildRoadPaintGeometry())) {
   car.signalGap = Infinity;
+  if(paint.organic){car.signalGap=approachSignal(car,paint,axis=>ctx.streetSignal(axis));return Number.isFinite(car.signalGap);}
   if (car.turn) return false;
   const axis = car.routeManaged ? ctx.env.Math.abs(ctx.env.Math.cos(car.angle)) > ctx.env.Math.abs(ctx.env.Math.sin(car.angle)) ? 'x' : 'y' : car.axis === 'y' ? 'y' : 'x';
   const signal = ctx.streetSignal(axis);
@@ -26,6 +28,21 @@ ctx.trafficMustStopAtSignal = function trafficMustStopAtSignal(car, paint = ctx.
     if (stop) car.signalGap = gap;
     return stop;
   });
+};
+ctx.updateJunctionPriority=(cars,dt)=>{ctx.junctionPriority ||= createJunctionPriority(ctx.roadPaintGeometry||(ctx.roadPaintGeometry=ctx.buildRoadPaintGeometry()));ctx.junctionPriority.update(cars,dt);};
+ctx.planTrafficDetour=(car,blockers,dt)=>{
+  car.detourCooldown=Math.max(0,(car.detourCooldown||0)-dt);
+  if(!car.routeManaged||car.detourRoute||car.detourCooldown)return;
+  const c=Math.cos(car.angle),s=Math.sin(car.angle);
+  const block=blockers.find(b=>b!==car&&(!(ctx.trafficCars.includes(b))||b.burning||b.hp<40)&&Math.abs(b.speed||0)<.2&&
+    (b.x-car.x)*c+(b.y-car.y)*s>25&&(b.x-car.x)*c+(b.y-car.y)*s<150&&Math.abs(-(b.x-car.x)*s+(b.y-car.y)*c)<(car.height||24)/2+15);
+  if(!block)return;
+  car.detourCooldown=8;
+  const finish=car.route.points[((car.routeIndex||0)+2)%car.route.points.length];
+  const radius=(block.height||block.h||24)/2+(car.height||24)/2+8;
+  const edgeClear=(a,b)=>{const dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((block.x-a.x)*dx+(block.y-a.y)*dy)/(dx*dx+dy*dy||1)));return Math.hypot(block.x-a.x-dx*t,block.y-a.y-dy*t)>radius;};
+  const path=ctx.dependencies.roadPath(ctx.roadGraph,car,finish,{fromSegment:true,edgeClear});
+  if(path.length>2){car.detourRoute={points:path,loop:false};car.detourIndex=1;}
 };
 ctx.yieldTrafficToServices = function yieldTrafficToServices(car, dt) {
   if (car.turn) return false;
@@ -47,7 +64,7 @@ ctx.yieldTrafficToServices = function yieldTrafficToServices(car, dt) {
       along = dx * cs + dy * sn;
     return along > 0 && along < ctx.env.Math.max(72, (car.width || 46) + 34) && ctx.env.Math.abs(-dx * sn + dy * cs) < ((car.height || 24) + (unit.height || 24)) / 2 + 12;
   });
-  const turningResponder = units.some(unit => unit.rotationBlocked && ctx.env.Math.hypot(unit.x - car.x, unit.y - car.y) < 160);
+  const turningResponder = units.some(unit => (unit.rotationBlocked || unit.emergencyBlocked) && ctx.env.Math.hypot(unit.x - car.x, unit.y - car.y) < 160);
   if (inJunction && !(car.routeManaged && car.yieldHome) && !heldByResponder && !turningResponder && !ctx.trafficTouchesResponder({
     ...car,
     x: car.x + cs * 8,
@@ -62,7 +79,7 @@ ctx.yieldTrafficToServices = function yieldTrafficToServices(car, dt) {
     if (car.yieldHome && ctx.env.Math.abs(cs * uc + sn * us) < .85 && ctx.env.Math.hypot(dx, dy) < 160) return true;
     // Let crossing traffic clear the junction. Stopping it across the route
     // would build a permanent barrier in front of the responder.
-    if (ctx.env.Math.abs(cs * uc + sn * us) < .85 && !unit.rotationBlocked) return false;
+    if (ctx.env.Math.abs(cs * uc + sn * us) < .85 && !unit.rotationBlocked && !unit.emergencyBlocked) return false;
     const along = dx * uc + dy * us;
     return along > -((car.width || 46) + (unit.width || 48)) / 2 - 18 && along < 200 && ctx.env.Math.abs(-dx * us + dy * uc) < ctx.env.Math.max(62, ((unit.width || 48) + (car.width || 46)) / 2 + 24);
   });
@@ -128,7 +145,7 @@ ctx.yieldTrafficToServices = function yieldTrafficToServices(car, dt) {
   if (!road) return approaching;
   const center = horizontal ? road.y + road.h / 2 : road.x + road.w / 2;
   if (approaching && !car.yieldHome) {
-    const turning = units.find(unit => unit.rotationBlocked && ctx.env.Math.hypot(unit.x - car.x, unit.y - car.y) < 160 && ctx.env.Math.abs(cs * ctx.env.Math.cos(unit.angle) + sn * ctx.env.Math.sin(unit.angle)) < .85);
+    const turning = units.find(unit => (unit.rotationBlocked || unit.emergencyBlocked) && ctx.env.Math.hypot(unit.x - car.x, unit.y - car.y) < 160 && ctx.env.Math.abs(cs * ctx.env.Math.cos(unit.angle) + sn * ctx.env.Math.sin(unit.angle)) < .85);
     car.yieldHome = {
       cross,
       value: car[cross],

@@ -33,6 +33,8 @@ export function installAppInput(ctx) {
     ctx.sound.setPaused(paused);
   };
   ctx.setupInputListeners = function setupInputListeners() {
+    // Browsers require a real gesture; any mouse/touch interaction unlocks radio.
+    ctx.listen(ctx.env.window, 'pointerdown', () => ctx.sound.init(), {passive:true});
     ctx.listen(ctx.env.window, 'keydown', e => {
       if (e.code === 'Escape') {
         e.preventDefault();
@@ -50,6 +52,7 @@ export function installAppInput(ctx) {
       if (ctx.driveLab?.running) return;
       ctx.sound.init();
       if (e.code === 'KeyE' && !e.repeat) ctx.roam?.interact();
+      if (e.code === 'KeyH' && !e.repeat && ctx.roam?.profile?.kind==='land') ctx.sound.playEffect('horn');
       if (e.code === 'KeyF' && !e.repeat) {ctx.state.keys.attack = true;ctx.player.attackRequested=true;}
       if (e.code === 'KeyQ' && !e.repeat) {if(ctx.roam?.mode==='foot')ctx.cycleWeapon();else ctx.roam?.toggleFlight();}
       if (e.code === 'KeyT' && !e.repeat && ctx.roam?.mode==='foot') ctx.reloadWeapon();

@@ -167,7 +167,7 @@ for(const fps of [30,60,120]){
     for(let i=0;i<${fps*8};i++){updatePhysics(1/${fps});if(time60===null&&player.speed>=5)time60=(i+1)/${fps};}
     const straight={x:player.x,y:player.y,speed:player.speed};
     state.keys.up=false;state.keys.down=true;let brakeTime=null;
-    for(let i=0;i<${fps*3};i++){updatePhysics(1/${fps});if(brakeTime===null&&player.speed===0)brakeTime=(i+1)/${fps};}
+    for(let i=0;i<${fps*6};i++){updatePhysics(1/${fps});if(brakeTime===null&&player.speed===0)brakeTime=(i+1)/${fps};}
     const reverse=player.speed;
     state.keys.down=false;state.keys.up=true;state.keys.right=true;
     const startAngle=player.angle;for(let i=0;i<${fps/2};i++)updatePhysics(1/${fps});
@@ -175,9 +175,10 @@ for(const fps of [30,60,120]){
     JSON.stringify({fps:${fps},time60,brakeTime,reverse,straight,turn,centered:Math.abs(player.steeringAngle)<.001});
   }`));
   assert(result.time60>=4&&result.time60<=7,JSON.stringify(result));
-  assert(result.brakeTime>0&&result.brakeTime<1.6,JSON.stringify(result));
+  // Tyre-limited braking must obey the friction bound, then settle and reverse.
+  assert(result.brakeTime>=result.straight.speed*6/9.81-1/fps&&result.brakeTime<4.5,JSON.stringify(result));
   assert(result.reverse<0&&result.reverse>=-1.8,'reverse must stay manoeuvrable');
-  assert(result.centered&&result.turn<.2,'steering must return to center without an abrupt yaw');driving.push(result);
+  assert(result.centered&&Math.abs(result.turn)<.3,'steering must return to center without an abrupt yaw');driving.push(result);
 }
 assert(Math.max(...driving.map(d=>d.straight.x))-Math.min(...driving.map(d=>d.straight.x))<.1,'live controller displacement must be stable at 30/60/120 Hz');
 assert(Math.max(...driving.map(d=>d.time60))-Math.min(...driving.map(d=>d.time60))<.04);

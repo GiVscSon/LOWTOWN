@@ -1,3 +1,4 @@
+import {createWetReflections} from './wet_reflections.js';
 import {createBuildingArchitecture} from './buildings.js';
 import {addStreetDetail,addForecourts} from './street_detail.js';
 import {mountedSign,apartmentGlassMaterial,createStorefronts} from './storefronts.js';
@@ -45,7 +46,9 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
   const environment=createNightEnvironment(renderer);setTransportEnvironment(environment.texture);
   const camera=new THREE.PerspectiveCamera(46,1,2,18000);
   const viewport=createViewportSizer(renderer,camera);
-  scene.add(new THREE.HemisphereLight('#9aaec4','#211912',1.25));
+  const ambient=new THREE.HemisphereLight('#9aaec4','#211912',1.25);scene.add(ambient);
+  const nightSky=new THREE.Color('#07151d'),daySky=new THREE.Color('#829fac'),duskSky=new THREE.Color('#8b6b71'),nightFog=new THREE.Color('#10202a'),dayFog=new THREE.Color('#98aeb2');
+  const nightLight=new THREE.Color('#b7c9db'),dayLight=new THREE.Color('#fff0d0');
   const moon=new THREE.DirectionalLight('#b7c9db',1.8);moon.position.set(-1800,2600,-900);scene.add(moon);
   const fill=new THREE.DirectionalLight('#8aa7bd',.6);fill.position.set(1800,1200,2200);scene.add(fill);
   const staticGroup=new THREE.Group();scene.add(staticGroup);
@@ -215,9 +218,14 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
   const playerMarker=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(markerCanvas),toneMapped:false,depthWrite:false}));
   playerMarker.scale.set(13,13,1);scene.add(playerMarker);
   const headlight=new THREE.SpotLight('#ffdea2',1600,260,.45,.5,1);headlight.target=new THREE.Object3D();scene.add(headlight,headlight.target);
+  const pursuitLight=new THREE.SpotLight('#b6d5ef',1800,650,.48,.65,1);pursuitLight.target=new THREE.Object3D();scene.add(pursuitLight,pursuitLight.target);
+  const searchCone=new THREE.Mesh(new THREE.ConeGeometry(90,180,24,1,true),new THREE.MeshBasicMaterial({color:'#b6d5ef',transparent:true,opacity:.045,depthWrite:false,side:THREE.DoubleSide}));scene.add(searchCone);
+  const wetReflections=createWetReflections(scene,world,surfaceY,software);wetReflections.exclude([shadowGroup,reflectionGroup,actorShadows,lampReflections,playerMarker]);
+  let previousRenderCpu=0;
   const matrix=new THREE.Matrix4(),rotation=new THREE.Quaternion(),axis=new THREE.Vector3(0,1,0),scale=new THREE.Vector3(1,1,1);
   const rainPositions=new Float32Array(240*6),rainGeometry=new THREE.BufferGeometry();rainGeometry.setAttribute('position',new THREE.BufferAttribute(rainPositions,3));
   const rain=new THREE.LineSegments(rainGeometry,new THREE.LineBasicMaterial({color:'#9bb6c6',transparent:true,opacity:.35}));rain.frustumCulled=false;scene.add(rain);
+  wetReflections.exclude([rain,searchCone,...Object.values(worldEffects.batches)]);
   const fireGroup=new THREE.Group();scene.add(fireGroup);
   const flameMaterial=new THREE.MeshBasicMaterial({color:'#ea7738',transparent:true,opacity:.8}),smokeMaterial=new THREE.MeshBasicMaterial({color:'#3b4348',transparent:true,opacity:.28,depthWrite:false});
   const flames=Array.from({length:12},()=>{const mesh=new THREE.Mesh(new THREE.ConeGeometry(7,28,5),flameMaterial);fireGroup.add(mesh);return mesh;});
@@ -299,10 +307,19 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
     const propCount=props.update(intact,(x,y)=>groundRise(x,y)+3.6);
     const collectibles=(frame.parts||[]).filter(part=>!part.found&&visible(part,24));parts.count=Math.min(32,collectibles.length);rotation.setFromAxisAngle(axis,time);
     for(let i=0;i<parts.count;i++){const part=collectibles[i];matrix.compose(new THREE.Vector3(part.x,16+Math.sin(time*2+i)*3,part.y),rotation,scale);parts.setMatrixAt(i,matrix);}parts.instanceMatrix.needsUpdate=true;
+    const air=frame.pursuitAir;
+    pursuitLight.visible=searchCone.visible=!!air&&Math.hypot(air.x-p.x,air.y-p.y)<800;
+    if(air){const target=air.searchTarget||p,start=new THREE.Vector3(air.x,air.altitude,air.y),finish=new THREE.Vector3(target.x,surfaceY(target.x,target.y),target.y),beam=new THREE.Vector3().subVectors(start,finish);pursuitLight.position.copy(start);pursuitLight.target.position.copy(finish);searchCone.position.copy(start).add(finish).multiplyScalar(.5);searchCone.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),beam.clone().normalize());searchCone.scale.y=beam.length()/180;}
     headlight.visible=!foot&&altitude<12;headlight.position.set(p.x+Math.cos(heading)*23,12+playerRise,p.y+Math.sin(heading)*23);headlight.target.position.set(p.x+Math.cos(heading)*130,surfaceY(p.x+Math.cos(heading)*130,p.y+Math.sin(heading)*130),p.y+Math.sin(heading)*130);
     const weather=frame.weather||{},amount=weather.rain||0;setTransportEnvironment(environment.texture,graphics.reflections?.65:0);scene.fog.density=.000095+(weather.fog||0)*.0004;motorMaterial.roughness=.72-.32*(weather.wetness||0);waterMaterial.roughness=.44+amount*.12;
-    for(const pair of materialPairs)for(const material of [pair.simple,pair.detailed])if(material.map===surfaceTexture('asphalt'))material.roughness=.9-.44*(weather.wetness||0);moon.intensity=1.8+(weather.flash||0)*5;
-    reflectionMaterial.opacity=.08+.8*(weather.wetness||0);
+    const daylight=weather.daylight||0,lamps=weather.lamps??1,twilight=weather.twilight||0;
+    scene.background.copy(nightSky).lerp(daySky,daylight).lerp(duskSky,twilight*.32);scene.fog.color.copy(nightFog).lerp(dayFog,daylight);
+    ambient.intensity=1.25+daylight*.65;ambient.color.copy(nightLight).lerp(dayLight,daylight);
+    moon.color.copy(nightLight).lerp(dayLight,daylight);moon.intensity=(1.8+daylight*.9)*(1-amount*.28)+(weather.flash||0)*5;
+    if(daylight>.01)moon.position.set(Math.cos((weather.hour-6)*Math.PI/12)*2800,800+Math.max(0,weather.solar||0)*2800,-900);else moon.position.set(-1800,2600,-900);
+    fill.intensity=.6+daylight*.3;glowMaterial.opacity=.36*lamps;
+    for(const pair of materialPairs)for(const material of [pair.simple,pair.detailed])if(material.map===surfaceTexture('asphalt'))material.roughness=.9-.44*(weather.wetness||0);
+    reflectionMaterial.opacity=(.08+.8*(weather.wetness||0))*lamps;
     for(const pair of materialPairs)for(const material of [pair.simple,pair.detailed])if(material.userData.shader?.uniforms.rippleTime)material.userData.shader.uniforms.rippleTime.value=time;
     for(const pair of materialPairs)for(const material of [pair.simple,pair.detailed])if(material.userData.wind){material.userData.wind.time.value=time;material.userData.wind.strength.value=weather.wind||0;}
     rain.visible=graphics.rain&&amount>.03;if(rain.visible){
@@ -315,17 +332,20 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
       smoke.forEach((mesh,i)=>{const rise=(time*18+i*17)%180;mesh.position.set(Math.sin(i*2.3)*16+rise*.17,30+rise,Math.cos(i*2.3)*16);mesh.scale.setScalar(1+rise*.012);});
     }
     const visibleEffects=worldEffects.update(frame.effects,camera,(x,y)=>groundRise(x,y)+3.6,visible,graphics.effects);
-    if(!contextLost)renderer.render(scene,camera);frames++;globalThis.__lowtownLastFrame=performance.now();
+    const wetReflectionStats=wetReflections.update(p,weather,graphics,previousRenderCpu);
+    if(!contextLost)renderer.render(scene,camera);previousRenderCpu=performance.now()-now;frames++;globalThis.__lowtownLastFrame=performance.now();
     globalThis.__lowtownThreeStats={frames,vehicles:(frame.vehicles||[]).length+(foot?0:1),visibleVehicles,pedestrians:allPeople.length,visiblePedestrians:people.length,objects:scene.children.length,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,contextLost,renderQuality:ratio/Math.min(globalThis.devicePixelRatio||1,1.5),software:!!software,lowCostMaterials,
       graphics:{...graphics},resolution:{ratio,width:canvas.width,height:canvas.height,resizes:viewport.resizes},renderCpuMs:performance.now()-now,
       streetDetail:{...streetDetail,shopWindows:storefrontDetail.windows},
       visualDetail:{environment:true,trees:trees.count,canopyTriangles:trees.canopyTriangles,architecture:{...architecture.stats},props:propCount,effects:visibleEffects},
       streetFurniture:{lights:(world.lights||[]).length,props:(world.props||[]).length,signals:furniture.signals,visibleSignals},
       bridges:{spans:bridgeProfiles.length,arches:bridgeArches,piers:bridgePiers},
+      wetReflections:wetReflectionStats,pursuitSearchLight:pursuitLight.visible,peopleTypes:Object.fromEntries([...new Set(allPeople.map(p=>p.personType||'player'))].map(type=>[type,allPeople.filter(p=>(p.personType||'player')===type).length])),
       characterActions:{...characters.actions},
+      climate:{hour:weather.hour??22,daylight,lamps,kind:weather.kind,rain:amount},
       camera:{preset:cameraPreset,x:camera.position.x,y:camera.position.y,z:camera.position.z,distance:Math.hypot(camera.position.x-p.x,camera.position.z-p.y),fov:camera.fov},player:{x:p.x,y:p.y,altitude,groundElevation:playerRise,jumpHeight:p.jumpHeight||0,attackTime:p.attackTime||0,inWater:!!p.inWater,waterTime:p.waterTime||0,animation:foot?characterPose(p).action:p.visualTransition?'enter-vehicle':'driving',visualY:foot?characterBaseHeight(p,playerRise+3.6):actors.get(p)?.group.position.y}};
   }
-  function dispose(){const geometries=new Set(),materials=new Set();scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
+  function dispose(){wetReflections.dispose();const geometries=new Set(),materials=new Set();scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
     for(const geometry of geometries)geometry.dispose();for(const material of materials){for(const key of ['map','normalMap','roughnessMap'])material[key]?.dispose();material.userData.cabinTexture?.dispose();material.dispose();}setTransportEnvironment(null,0);environment.dispose();renderer.dispose();}
   return {render,dispose,scene,camera,renderer,bridgeProfiles,bridgeSurface,get cameraPreset(){return cameraPreset;},get graphics(){return {...graphics};},
     setGraphics(patch){

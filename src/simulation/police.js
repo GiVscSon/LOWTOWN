@@ -1,3 +1,4 @@
+import {pursuitTarget,tryPit,updatePursuitAir,pursuitAirSees,setRoadblock} from './pursuit_tactics.js';
 // One shared runtime context owns state; this system has no hidden globals.
 export function installSimulationPolice(ctx){
 const {onRoadSurface,roadPath}=ctx.dependencies;
@@ -115,6 +116,7 @@ ctx.spawnWantedPoliceUnit = function spawnWantedPoliceUnit(role) {
   return true;
 };
 ctx.returnWantedPoliceToBase = function returnWantedPoliceToBase(unit) {
+  setRoadblock(ctx,unit,false);
   if (!ctx.policeFootprintOnRoad(unit)) return;
   const kinds = unit.role === 'nationalGuard' ? ['guardBase'] : ['police'];
   const bases = ctx.serviceBases.filter(base => kinds.includes(base.kind)).sort((a, b) => ctx.env.Math.hypot(a.origin.x - unit.x, a.origin.y - unit.y) - ctx.env.Math.hypot(b.origin.x - unit.x, b.origin.y - unit.y));
@@ -132,6 +134,7 @@ ctx.returnWantedPoliceToBase = function returnWantedPoliceToBase(unit) {
 ctx.releaseWantedPolice = function releaseWantedPolice() {
   for (const unit of ctx.policeCars) ctx.returnWantedPoliceToBase(unit);
   ctx.policeCars.length = 0;
+  ctx.pursuitAirUnit=null;ctx.state.pursuitLastKnown=null;
 };
 ctx.reconcilePoliceRoster = function reconcilePoliceRoster(profile) {
   const desired = [['patrol', profile.patrolCount], ['tactical', profile.tacticalCount], ['nationalGuard', profile.guardCount]];
@@ -173,6 +176,7 @@ ctx.updatePoliceAI = function updatePoliceAI(dt) {
     }
     return;
   }
+  updatePursuitAir(ctx,dt);
   const response = ctx.wantedResponseProfile(ctx.state.wanted);
   ctx.reconcilePoliceRoster(response);
   let anyCopSees = false;
@@ -192,7 +196,8 @@ ctx.updatePoliceAI = function updatePoliceAI(dt) {
     }
     cop.routeTimer = (cop.routeTimer || 0) - dt;
     if (cop.routeTimer <= 0 && !cop.emergencyManeuver || !cop.route?.length) {
-      cop.route = roadPath(ctx.roadGraph, cop, ctx.player, {
+      const objective=pursuitTarget(ctx,cop,i);
+      cop.route = roadPath(ctx.roadGraph, cop, objective, {
         fromSegment: true
       });
       cop.routeTimer = 2;
@@ -201,14 +206,16 @@ ctx.updatePoliceAI = function updatePoliceAI(dt) {
     const standoff = ((cop.width || 48) + (ctx.roam?.mode === 'foot' ? 16 : ctx.player.width || 48)) / 2 + 26;
     const targetMoving = ctx.roam?.mode === 'foot' ? (ctx.player.gait || 0) > .1 : ctx.env.Math.abs(ctx.player.speed || 0) > 1;
     const atLastNode = cop.route.length === 1 && ctx.env.Math.hypot(cop.route[0].x - cop.x, cop.route[0].y - cop.y) < 22;
-    const holding = !targetMoving && (initialDistance < standoff || atLastNode);
+    const holding = (cop.tactic==='roadblock'&&atLastNode) || !targetMoving && (initialDistance < standoff || atLastNode);
     if (holding) {
-      cop.status = 'containing';
+      cop.status = cop.tactic==='roadblock'?'roadblock':'containing';
       cop.speed = 0;
       cop.emergencyManeuver = null;
       cop.emergencyBlocked = false;
+      setRoadblock(ctx,cop,cop.tactic==='roadblock');
       if (initialDistance < standoff && (ctx.roam?.altitude || 0) < 12 && ctx.state.invulnTimer === 0) canDetain = true;
     } else {
+      setRoadblock(ctx,cop,false);
       cop.status = 'enroute';
       ctx.tryPlanEmergencyPassing(cop, dt);
       if (cop.emergencyManeuver) {
@@ -244,6 +251,7 @@ ctx.updatePoliceAI = function updatePoliceAI(dt) {
         }
       }
     }
+    tryPit(ctx,cop,dt);
     const distance = ctx.env.Math.hypot(ctx.player.x - cop.x, ctx.player.y - cop.y);
     if (distance < 450) {
       anyCopSees = true;
@@ -270,6 +278,8 @@ ctx.updatePoliceAI = function updatePoliceAI(dt) {
     ctx.respawnPlayer('задержание');
     return;
   }
+  if(pursuitAirSees(ctx))anyCopSees=true;
+  if(anyCopSees)ctx.state.pursuitLastKnown={x:ctx.player.x,y:ctx.player.y};
   const backupStillResponding = ctx.state.wanted >= 4 && ctx.policeCars.some(unit => unit.role && unit.role !== 'patrol' && !unit.hasMadeContact);
   if (anyCopSees || backupStillResponding) {
     ctx.state.evading = false;

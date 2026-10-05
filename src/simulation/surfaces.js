@@ -1,4 +1,5 @@
 import {onStreetCollection} from '../world/street_corridors.js';
+import {createDayCycle} from './day_cycle.js';
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 const inside=(x,y,rect,pad=0)=>x>=rect.x-pad&&x<=rect.x+rect.w+pad&&y>=rect.y-pad&&y<=rect.y+rect.h+pad;
 const finite=(value,fallback=0)=>Number.isFinite(Number(value))?Number(value):fallback;
@@ -95,6 +96,7 @@ export function surfaceMovement(surface,vehicle={}){
     acceleration:clamp(base.acceleration+adjustment*.25,.3,1.15),
     steering:clamp(base.steering+adjustment*.16,.45,1.12),
     slipRetention:clamp(base.slip+(1-capability)*demand*.16,.12,.72),
+    tyreGrip:resolveSurface(surface).grip,
     coast:base.coast
   };
 }
@@ -117,12 +119,20 @@ export const WEATHER_PRESETS=Object.freeze({
   storm:{label:'Гроза',rain:1,fog:.3,wind:1},
   fog:{label:'Туман',rain:.08,fog:.7,wind:.12}
 });
-export function createWeather(){
-  const weather={kind:'clear',time:0,remaining:150,rain:0,fog:0,wind:.16,wetness:0,gust:0,flash:0};
+export function createWeather(storage){
+  const clock=createDayCycle(storage);
+  let saved={};try{saved=JSON.parse(storage?.getItem('lowtown_world_cycle'))||{};}catch{}
+  const weather={kind:WEATHER_PRESETS[saved.kind]?saved.kind:'clear',mode:['auto',...Object.keys(WEATHER_PRESETS)].includes(saved.weatherMode)?saved.weatherMode:'auto',time:0,remaining:150,rain:0,fog:0,wind:.16,wetness:0,gust:0,flash:0,clock,...clock.step(0)};
+  if(weather.mode!=='auto')weather.kind=weather.mode;
+  weather.save=()=>{try{storage?.setItem('lowtown_world_cycle',JSON.stringify({timeMode:clock.mode,hour:clock.hour,cycleMinutes:clock.minutes,weatherMode:weather.mode,kind:weather.kind}));}catch{}};
+  weather.setTimeMode=mode=>{clock.setMode(mode);Object.assign(weather,clock.step(0));weather.save();};
+  weather.setCycleMinutes=minutes=>{clock.setMinutes(minutes);weather.save();};
+  weather.setMode=mode=>{if(mode!=='auto'&&!WEATHER_PRESETS[mode])return;weather.mode=mode;if(mode!=='auto')weather.set(mode);else weather.remaining=150;weather.save();};
   weather.set=kind=>{if(!WEATHER_PRESETS[kind])throw new Error('Unknown weather');weather.kind=kind;weather.remaining=150;};
   weather.next=()=>{const kinds=Object.keys(WEATHER_PRESETS);weather.set(kinds[(kinds.indexOf(weather.kind)+1)%kinds.length]);};
   weather.step=dt=>{
-    dt=clamp(finite(dt),0,.1);weather.time+=dt;weather.remaining-=dt;if(weather.remaining<=0)weather.next();
+    dt=clamp(finite(dt),0,.1);weather.time+=dt;Object.assign(weather,clock.step(dt));
+    if(weather.mode==='auto'){weather.remaining-=dt;if(weather.remaining<=1e-6)weather.next();}
     const target=WEATHER_PRESETS[weather.kind],mix=1-Math.exp(-dt*.45);
     for(const key of ['rain','fog','wind'])weather[key]+=(target[key]-weather[key])*mix;
     weather.wetness+=(weather.rain-weather.wetness)*(1-Math.exp(-dt*(weather.rain>weather.wetness?.16:.025)));
@@ -135,6 +145,6 @@ export function createWeather(){
 }
 export function weatherMovement(response,weather){
   const wet=clamp(weather.wetness||0,0,1);
-  return {...response,slipRetention:Math.min(.72,response.slipRetention+wet*.13),braking:1-wet*.23,
+  return {...response,tyreGrip:(response.tyreGrip??1)*(1-wet*.32),slipRetention:Math.min(.72,response.slipRetention+wet*.13),braking:1-wet*.23,
     acceleration:response.acceleration*(1-wet*.04)};
 }

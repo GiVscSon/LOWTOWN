@@ -1,6 +1,6 @@
 {
   "name": "lowtown",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -62,7 +62,9 @@
     "test:interaction-matrix": "node tests/matrix/interaction-world.mjs",
     "test:interaction-browser": "node tests/matrix/interaction-browser.mjs",
     "test:coastal-browser": "node tests/matrix/coastal-browser.mjs",
-    "package:release": "python3 tools/package_release.py"
+    "package:release": "python3 tools/package_release.py",
+    "test:living-city-upgrade": "node tests/matrix/living-city-upgrade.mjs",
+    "test:living-city-upgrade-browser": "node tests/matrix/living-city-upgrade-browser.mjs"
   },
   "dependencies": {
     "@sentry/browser": "^10.25.0",

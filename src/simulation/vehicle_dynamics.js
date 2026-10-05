@@ -1,3 +1,4 @@
+import {stepTyreForces} from './tyre_forces.js';
 export const projectIso = (x, y) => ({ x: (x - y) * Math.sqrt(3) / 2, y: (x + y) / 2 });
 export const angleDifference = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
@@ -11,8 +12,13 @@ export function velocityForHeading(car, retention = 0.18) {
 export function routeInput(car, target) {
   const distance = Math.hypot(target.x - car.x, target.y - car.y);
   const error = angleDifference(Math.atan2(target.y - car.y, target.x - car.x), car.angle);
-  const desired = Math.abs(error) > 0.35 ? .8 : Math.max(.8,Math.min(4.8,distance/60));
-  return { up: car.speed < desired, down: car.speed > desired + 0.3,
+  // Slow before the waypoint using available tyre braking distance. The old
+  // distance/60 ramp only braked after a turn became unavoidable.
+  const braking=Math.max(1,Math.min(6,(car.tyres?.mu||1)*6));
+  const arrival=.4,remaining=Math.max(0,distance-40);
+  const approach=Math.sqrt((arrival*6)**2+2*braking*remaining/10)/6;
+  const desired = Math.abs(error) > 0.35 ? arrival : Math.max(arrival,Math.min(4.8,approach));
+  return { up: car.speed < desired-.05, down: car.speed > desired + 0.1,
     left: error < -0.025, right: error > 0.025, handbrake: false, nitro: false };
 }
 
@@ -37,11 +43,7 @@ export function stepLandVehicle(car, keys, dt, profile={}, surface={}) {
     }else car.reverseDelay=0;
     const drag=(.002+speed*speed*.000045)*(surface.coast ? (1-surface.coast)/.035:1)+(keys.handbrake?.07:0);
     speed=Math.sign(speed)*Math.max(0,Math.abs(speed)-drag*frame);
-    car.speed=speed;
-    const wheelbase=Math.max(22,(profile.width||car.width||48)*.7);
-    car.angle+=speed/wheelbase*Math.tan(car.steeringAngle)*(surface.steering??1)*frame;
-    const retention=Math.pow(surface.slipRetention??.18,frame);
-    Object.assign(car,velocityForHeading(car,retention));
+    stepTyreForces(car,speed,car.steeringAngle*(surface.steering??1),step,profile,surface,keys.handbrake);
     car.x+=car.vx*frame;car.y+=car.vy*frame;
   }
   return car;

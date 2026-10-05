@@ -1,3 +1,4 @@
+import {peopleProfile} from './people_profiles.js';
 const INCIDENTS = Object.freeze({
   robbery: { title: 'ОГРАБЛЕНИЕ', mark: '$', dangerRadius: 150, audienceRadius: 470, interest: 0.62, duration: 17 },
   fight: { title: 'ДРАКА', mark: '!', dangerRadius: 145, audienceRadius: 390, interest: 0.55, duration: 14 },
@@ -114,6 +115,8 @@ export function updateCrowdReactions(people, incident, dt = 0) {
 
   for (let index = 0; index < people.length; index++) {
     const person = people[index];
+    if(person.dead){person.reaction='calm';continue;}
+    const profile=peopleProfile(person);
     person.reaction = 'calm';
     person.lookAt = null;
     const hazardous=incident&&!(incident.kind==='fire'&&incident.fireSuppressed)&&
@@ -123,7 +126,7 @@ export function updateCrowdReactions(people, incident, dt = 0) {
     if (incident) {
       const dx = person.x - incident.x, dy = person.y - incident.y;
       const distance = Math.hypot(dx, dy);
-      const isInDanger = hazardous&&distance <= incident.dangerRadius;
+      const isInDanger = hazardous&&distance <= incident.dangerRadius*profile.fear;
       const panicNearby = hazardous&&!isInDanger && danger.some(entry =>
         Math.hypot(person.x - entry.person.x, person.y - entry.person.y) < 82);
 
@@ -140,7 +143,7 @@ export function updateCrowdReactions(people, incident, dt = 0) {
         person.eventFleeTimer = Math.max(0, person.eventFleeTimer - step);
         fleeing++;
       } else if (distance <= incident.audienceRadius &&
-        reactionRoll(person, index, incident.id) < incident.interest) {
+        reactionRoll(person, index, incident.id) < incident.interest/Math.max(.7,profile.fear)) {
         person.reaction = 'curious';
         person.lookAt = { x: incident.x, y: incident.y };
         curious++;
@@ -156,7 +159,7 @@ export function updateCrowdReactions(people, incident, dt = 0) {
   if (incident) {
     incident.witnessCount = witnesses;
     if (witnesses > 0) {
-      incident.reportTimer = Math.max(0, (incident.reportTimer ?? 1.2) - step);
+      incident.reportTimer = Math.max(0, (incident.reportTimer ?? Math.min(...people.filter(p=>!p.dead&&Math.hypot(p.x-incident.x,p.y-incident.y)<incident.audienceRadius).map(p=>peopleProfile(p).report),1.2)) - step);
       if (incident.reportTimer === 0) incident.reported = true;
     } else if (!incident.reported) {
       incident.reportTimer = 1.2;

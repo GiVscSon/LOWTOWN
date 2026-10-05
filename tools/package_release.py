@@ -44,7 +44,7 @@ with zipfile.ZipFile(game, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as archiv
             archive.write(file, file.relative_to(dist))
     archive.writestr('start.py', launcher)
     archive.writestr('START.bat', '@echo off\r\ncd /d "%~dp0"\r\npy -3 start.py\r\nif errorlevel 1 pause\r\n')
-    archive.writestr('README-RU.md', (root / 'docs/RELEASE_1.0.0.md').read_bytes())
+    archive.writestr('README-RU.md', (root / f'docs/RELEASE_{version}.md').read_bytes())
     archive.write(root / 'ASSET_SOURCES.md', 'ASSET_SOURCES.md')
     archive.writestr('build-info.json', json.dumps(manifest, indent=2)+'\n')
 source.write_bytes(git('archive', '--format=zip', '--prefix=LOWTOWN/', head))

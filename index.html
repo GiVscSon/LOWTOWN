@@ -266,6 +266,7 @@
               <option value="simple">Лёгкое</option><option value="detailed">Подробное</option>
             </select></label>
           </div>
+          <label>Мокрые отражения<select data-graphics="reflectionQuality" id="menuReflectionQuality"><option value="auto">Авто</option><option value="low">Лёгкие блики</option><option value="high">Планарные отражения</option></select></label>
           <label>Эффекты мира<select data-graphics="effects" id="menuEffects">
             <option value="high">Все эффекты</option><option value="medium">Умеренно</option><option value="off">Выключены</option>
           </select></label>
@@ -275,6 +276,15 @@
             <label><input type="checkbox" data-graphics="rain">Дождь в кадре</label>
           </div>
           <p>«Быстродействие» уменьшает эффекты и дальность обзора. Чёткость выбирается отдельно и сохраняется. Чем выше разрешение, тем больше нагрузка.</p>
+        </fieldset>
+        <fieldset class="menu-setting">
+          <legend>Время и погода</legend>
+          <label for="menuTimeMode">Время суток</label>
+          <select id="menuTimeMode"><option value="cycle">День и ночь автоматически</option><option value="day">Всегда день</option><option value="night">Всегда ночь</option></select>
+          <label for="menuDayLength">Продолжительность суток</label>
+          <select id="menuDayLength"><option value="10">10 минут</option><option value="20">20 минут</option><option value="30">30 минут</option></select>
+          <label for="menuWeatherMode">Погода</label>
+          <select id="menuWeatherMode"><option value="auto">Автоматическая смена</option><option value="clear">Ясно</option><option value="haze">Дымка</option><option value="rain">Дождь</option><option value="storm">Гроза</option><option value="fog">Туман</option></select>
         </fieldset>
         <div class="menu-setting">
           <label class="menu-volume-label" for="menuVolume">Звуки и радио <output id="menuVolumeValue" for="menuVolume">100%</output></label>
@@ -286,6 +296,10 @@
             <option value="2">Noir Electro</option>
             <option value="3">Synth Rock</option>
           </select>
+          <label for="menuEffectsVolume">Звуки действий <output id="menuEffectsVolumeValue">80%</output></label>
+          <input id="menuEffectsVolume" type="range" min="0" max="100" step="5" value="80">
+          <label for="menuAmbienceVolume">Звуки окружения <output id="menuAmbienceVolumeValue">45%</output></label>
+          <input id="menuAmbienceVolume" type="range" min="0" max="100" step="5" value="45">
           <p>Настройки сохраняются автоматически.</p>
         </div>
       </div>
@@ -297,6 +311,7 @@
           <div><dt>Удар пешком</dt><dd><kbd>F</kbd></dd></div>
           <div><dt>Ручной тормоз в машине</dt><dd><kbd>Пробел</kbd></dd></div>
           <div><dt>Нитро</dt><dd><kbd>Shift</kbd></dd></div>
+          <div><dt>Сигнал в машине</dt><dd><kbd>H</kbd></dd></div>
           <div><dt>Взлёт / снижение</dt><dd><kbd>Q</kbd></dd></div>
           <div><dt>Карта / гараж / радио</dt><dd><kbd>M</kbd><kbd>G</kbd><kbd>R</kbd></dd></div>
           <div><dt>Меню и пауза</dt><dd><kbd>Esc</kbd></dd></div>

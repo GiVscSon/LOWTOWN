@@ -130,7 +130,7 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
     resetActions();
     personHp=player.hp??100;player.personHp=personHp;
     mode=car.type in VEHICLES?car.type:'sedan'; const profile=VEHICLES[mode];
-    Object.assign(player,{entityType:'vehicle',x:car.x,y:car.y,angle:car.angle,width:profile.width,height:profile.height,mass:profile.mass||1500,bodyColor:car.color||profile.color,hp:car.hp??100,damage:car.damage?{...car.damage}:undefined,doorSide,doorElapsed:0,doorActionAt:performance.now()/1000,speed:0,vx:0,vy:0,steeringAngle:0,reverseDelay:0});
+    Object.assign(player,{entityType:'vehicle',x:car.x,y:car.y,angle:car.angle,width:profile.width,height:profile.height,mass:profile.mass||1500,bodyColor:car.color||profile.color,hp:car.hp??100,damage:car.damage?{...car.damage}:undefined,doorSide,doorElapsed:0,doorActionAt:performance.now()/1000,speed:0,vx:0,vy:0,steeringAngle:0,yawRate:0,lateralAcceleration:0,tyres:undefined,reverseDelay:0});
     player.visualTransition=transition;
     const list=fleet.includes(car)?fleet:parked; list.splice(list.indexOf(car),1);
     notify(profile.name+(profile.kind==='air'?' · кнопка «Высота» / Q — взлёт и посадка':''));
@@ -156,14 +156,14 @@ export function createFreeRoam(player, parked, buildings, trees, solid, notify=(
     resetActions();
     mode='sedan';altitude=0;fly=false;landingWarned=false;
     const profile=VEHICLES.sedan;
-    Object.assign(player,{entityType:'vehicle',x,y,angle,width:profile.width,height:profile.height,mass:profile.mass||1500,bodyColor:profile.color,damage:undefined,doorActionAt:undefined,speed:0,vx:0,vy:0,contactVx:0,contactVy:0,stance:null,knockdownTimer:0,rpm:0,gear:'D1',steeringAngle:0,reverseDelay:0});
+    Object.assign(player,{entityType:'vehicle',x,y,angle,width:profile.width,height:profile.height,mass:profile.mass||1500,bodyColor:profile.color,damage:undefined,doorActionAt:undefined,speed:0,vx:0,vy:0,contactVx:0,contactVy:0,stance:null,knockdownTimer:0,rpm:0,gear:'D1',steeringAngle:0,yawRate:0,lateralAcceleration:0,tyres:undefined,reverseDelay:0});
   }
   function resetToFoot(x=player.x,y=player.y,angle=0){
     resetActions();
     mode='foot';altitude=0;fly=false;landingWarned=false;
     lastFootGround=null;
     Object.assign(player,{entityType:'pedestrian',x,y,angle,width:9,height:9,mass:70,
-      speed:0,vx:0,vy:0,contactVx:0,contactVy:0,stance:null,knockdownTimer:0,rpm:0,gear:'ПЕШКОМ',walkPhase:0,steeringAngle:0,reverseDelay:0});
+      speed:0,vx:0,vy:0,contactVx:0,contactVy:0,stance:null,knockdownTimer:0,rpm:0,gear:'ПЕШКОМ',walkPhase:0,steeringAngle:0,yawRate:0,lateralAcceleration:0,tyres:undefined,reverseDelay:0});
     recoverFootSupport();
   }
   function step(keys,dt) {
