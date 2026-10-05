@@ -48,6 +48,8 @@ jobs:
       - run: npm run build
       - name: Runtime, terrain, contact and graphics matrix
         run: npm run test:quality-matrix
+      - name: Day cycle, weather, bounded sound effects and face detail
+        run: node tests/matrix/climate-sound.mjs
       - name: Populated city and safe emergency return after bridge contacts
         run: npm run test:movement-stability
       - name: Residents, beaches and swimming routes
@@ -67,6 +69,8 @@ jobs:
         run: npm run test:coastal-browser
       - name: People types, audible radio, wet reflections and pursuit beam
         run: npm run test:living-city-upgrade-browser
+      - name: Day and night, sound effects, pause and saved mobile settings
+        run: node tests/matrix/climate-sound-browser.mjs
       - name: Refined transport and building gallery
         run: npm run test:refined-transport-browser
       - name: Three.js live rendering and PWA offline restart

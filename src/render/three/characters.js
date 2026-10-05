@@ -14,6 +14,11 @@ function combine(parts){
 }
 const box=(w,h,d)=>new THREE.BoxGeometry(w,h,d);
 const capsule=(r,length)=>new THREE.CapsuleGeometry(r,length,3,8);
+export function characterEyeOpen(person){
+  if(person.dead||person.stance==='down')return .08;
+  const phase=((person.animationTime||0)+(person.personId||0)*.731)%4.7;
+  return phase<.16?Math.max(.06,Math.abs(phase-.08)/.08):1;
+}
 let geometries;
 export function characterGeometries(){
   if(geometries)return geometries;
@@ -31,6 +36,8 @@ export function characterGeometries(){
       ,[box(.7,.25,1.25),'#b7b3a1',2.6,15,-2.1]
       ,[box(.7,.25,1.25),'#b7b3a1',2.6,15,2.1]
       ,...[12.3,14,15.7].map(y=>[new THREE.SphereGeometry(.17,6,4),'#d1cabb',2.55,y,.25])
+      ,...[-1,1].flatMap(side=>[[box(.12,.18,1.5),'#a0a09a',2.55,12.1,side*1.6],[box(.15,1.3,.16),'#575e63',2.58,13.3,side*1.9]])
+      ,[box(.14,.3,1.15),'#9a9584',2.65,11.2,0]
     ]),
     head:combine([
       [new THREE.SphereGeometry(2.25,14,8),'#ffffff',0,20.8,0,[.88,1.12,.86]],
@@ -48,7 +55,9 @@ export function characterGeometries(){
         [new THREE.SphereGeometry(.17,6,4),'#333f41',2.035,21.23,side*.85,[.45,.9,1]],
         [box(.12,.17,.62),'#47372d',1.84,21.67,side*.85],
         [new THREE.SphereGeometry(.13,6,4),'#614c41',2.4,20.24,side*.28,[.4,.5,1]],
-        [box(.08,.08,.16),'#f4efdf',2.08,21.3,side*.88]
+        [box(.08,.08,.16),'#f4efdf',2.08,21.3,side*.88],
+        [box(.08,.065,.48),'#a1816b',1.95,20.75,side*.88],
+        [box(.08,.08,.3),'#947562',1.9,21.52,side*1.25]
       ]),
       [box(.12,.16,1),'#866453',1.97,19.8,0],
       [box(.12,.035,.7),'#4d3931',2.05,19.83,0],
@@ -62,6 +71,8 @@ export function characterGeometries(){
     forearm:combine([[capsule(1,2.2),'#ffffff',0,-1.75,0],[new THREE.CylinderGeometry(1.06,1.06,.4,10),'#dad5c8',0,-3.25,0]]),
     hand:combine([[new THREE.SphereGeometry(.85,8,5),'#ffffff',0,-3.85,0,[.8,1.1,1]],
       ...[-.55,-.18,.18,.55].map(z=>[new THREE.CapsuleGeometry(.18,.65,2,5),'#ffffff',.06,-4.75,z]),
+      ...[-.55,-.18,.18,.55].map(z=>[box(.11,.25,.16),'#d9c9b7',.24,-5.08,z]),
+      [box(.25,.55,.65),'#3d464a',.7,-3.3,0],[box(.12,.36,.45),'#c4c8bf',.88,-3.3,0],
       [new THREE.CapsuleGeometry(.25,.45,2,5).rotateZ(-.6),'#dfcfc1',.7,-3.95,0]])
   };
   return geometries;
@@ -74,8 +85,20 @@ export function characterBaseHeight(person,surface=0,pose=characterPose(person))
 }
 export function createCharacterBatch(scene,capacity=512,material=new THREE.MeshLambertMaterial({vertexColors:true})){
   const batches={};
+  const faceMaterial=material.clone();
+  faceMaterial.onBeforeCompile=shader=>{
+    shader.vertexShader='attribute float eyeOpen; attribute float eyeMask;\n'+shader.vertexShader;
+    shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\ntransformed.y=mix(transformed.y,mix(21.22,transformed.y,eyeOpen),eyeMask);');
+  };
+  faceMaterial.customProgramCacheKey=()=> 'lowtown-face-blink-v1';
   for(const [name,geometry] of Object.entries(characterGeometries())){
-    const mesh=new THREE.InstancedMesh(geometry,material,capacity*(['head','torso','hair','face'].includes(name)?1:2));
+    const actual=name==='face'?geometry.clone():geometry;
+    if(name==='face'){
+      const positions=actual.attributes.position,mask=new Float32Array(positions.count);
+      for(let i=0;i<mask.length;i++)mask[i]=positions.getY(i)>20.85&&positions.getY(i)<21.55&&positions.getX(i)>1.72&&Math.abs(positions.getZ(i))>.5?1:0;
+      actual.setAttribute('eyeMask',new THREE.BufferAttribute(mask,1));actual.setAttribute('eyeOpen',new THREE.InstancedBufferAttribute(new Float32Array(capacity).fill(1),1));
+    }
+    const mesh=new THREE.InstancedMesh(actual,name==='face'?faceMaterial:material,capacity*(['head','torso','hair','face'].includes(name)?1:2));
     mesh.frustumCulled=false;mesh.count=0;scene.add(mesh);batches[name]=mesh;
   }
   const held={};
@@ -136,7 +159,9 @@ export function createCharacterBatch(scene,capacity=512,material=new THREE.MeshL
         const mesh=accessories[type],index=equipped[type]++;mesh.setMatrixAt(index,root);mesh.setColorAt(index,color.set(type==='ponytail'?(p.hair||'#302720'):'#ffffff'));
       }
       put('torso',i,Math.sin(pose.torsoPitch)*10,10*(1-Math.cos(pose.torsoPitch)),0,pose.torsoPitch,p.shirt||'#99906d',pose.torsoYaw);
+      size.set(p.faceWidth||1,1,1);
       for(const [name,paint] of [['head',p.skin||'#c8a582'],['hair',p.hair||'#302b28'],['face',null]])put(name,i,Math.sin(pose.headPitch)*18.4,18.4*(1-Math.cos(pose.headPitch)),0,pose.headPitch,paint,pose.headYaw);
+      size.set(1,1,1);batches.face.geometry.attributes.eyeOpen.setX(i,characterEyeOpen(p));
       for(const side of [-1,1]){
         const limb=side>0?1:0,index=i*2+limb,swing=pose.legs[limb].upper;
         put('thigh',index,0,11.2,side*1.65,swing,p.pants||'#364454');
@@ -162,6 +187,7 @@ export function createCharacterBatch(scene,capacity=512,material=new THREE.MeshL
       mesh.count=count*(['head','torso','hair','face'].includes(name)?1:2);mesh.instanceMatrix.needsUpdate=true;
       if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;
     }
+    batches.face.geometry.attributes.eyeOpen.needsUpdate=true;
     return count;
   }
   return {update,batches,held,personal,accessories,get actions(){return actions;}};

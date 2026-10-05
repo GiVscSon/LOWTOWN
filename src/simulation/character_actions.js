@@ -87,7 +87,7 @@ export function installCharacterActions(ctx){
     const people=new Set([...ctx.pedestrians,...(ctx.cityIncidentDirector?.current()?.actors||[]),...(ctx.roam?.mode==='foot'?[ctx.player]:[])]);
     for(const car of ctx.cityCollisionBodies())if(!people.has(car)&&!isMovableProp(car))stepBodyResponse(car,dt);
     const p=ctx.player;
-    if(p.landed){if(quality!=='off'&&!p.inWater)ctx.effects.burst(p.x,p.y,.5,ctx.weather.wetness>.2?'water':'dust',8);p.landed=false;}
+    if(p.landed){ctx.sound.playEffect('land');if(quality!=='off'&&!p.inWater)ctx.effects.burst(p.x,p.y,.5,ctx.weather.wetness>.2?'water':'dust',8);p.landed=false;}
     if(pulse&&quality!=='off'&&!p.inWater&&ctx.roam?.profile?.kind==='land'){
       const speed=Math.abs(p.speed||0),back=(p.width||48)*.45;
       if(speed<1.5)ctx.effects.burst(p.x-Math.cos(p.angle)*back,p.y-Math.sin(p.angle)*back,5,'steam',1);

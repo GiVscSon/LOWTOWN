@@ -58,6 +58,6 @@ export function createGameRuntime({environment={},dependencies={}}={}){
  return {context:ctx,get state(){return ctx.state;},get world(){return {islands:ctx.allIslands,roads:ctx.roads,bridges:ctx.bridges,buildings:ctx.buildings};},
   start(){if(started||lifetime.stopped)return;started=true;if(env.document.readyState==='loading')ctx.listen(env.window,'DOMContentLoaded',()=>{if(!lifetime.stopped)ctx.boot();},{once:true});else ctx.boot();},
   step(dt){if(!lifetime.stopped)ctx.updatePhysics(dt);},render(){if(!lifetime.stopped)ctx.renderWorld();},
-  stop(){if(lifetime.stopped)return;ctx.gameMenu?.close();ctx.clearGameInput();ctx.sound.setPaused(true);lifetime.dispose();ctx.sound.ctx?.close?.();ctx.driveLab?.dispose();ctx.roamControls?.remove();ctx.threeRenderer?.dispose();}
+  stop(){if(lifetime.stopped)return;ctx.gameMenu?.close();ctx.clearGameInput();ctx.sound.setPaused(true);lifetime.dispose();ctx.sound.sfx?.dispose();ctx.sound.ctx?.close?.();ctx.driveLab?.dispose();ctx.roamControls?.remove();ctx.threeRenderer?.dispose();}
  };
 }

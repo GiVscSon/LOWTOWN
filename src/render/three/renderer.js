@@ -46,7 +46,9 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
   const environment=createNightEnvironment(renderer);setTransportEnvironment(environment.texture);
   const camera=new THREE.PerspectiveCamera(46,1,2,18000);
   const viewport=createViewportSizer(renderer,camera);
-  scene.add(new THREE.HemisphereLight('#9aaec4','#211912',1.25));
+  const ambient=new THREE.HemisphereLight('#9aaec4','#211912',1.25);scene.add(ambient);
+  const nightSky=new THREE.Color('#07151d'),daySky=new THREE.Color('#829fac'),duskSky=new THREE.Color('#8b6b71'),nightFog=new THREE.Color('#10202a'),dayFog=new THREE.Color('#98aeb2');
+  const nightLight=new THREE.Color('#b7c9db'),dayLight=new THREE.Color('#fff0d0');
   const moon=new THREE.DirectionalLight('#b7c9db',1.8);moon.position.set(-1800,2600,-900);scene.add(moon);
   const fill=new THREE.DirectionalLight('#8aa7bd',.6);fill.position.set(1800,1200,2200);scene.add(fill);
   const staticGroup=new THREE.Group();scene.add(staticGroup);
@@ -310,8 +312,14 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
     if(air){const target=air.searchTarget||p,start=new THREE.Vector3(air.x,air.altitude,air.y),finish=new THREE.Vector3(target.x,surfaceY(target.x,target.y),target.y),beam=new THREE.Vector3().subVectors(start,finish);pursuitLight.position.copy(start);pursuitLight.target.position.copy(finish);searchCone.position.copy(start).add(finish).multiplyScalar(.5);searchCone.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),beam.clone().normalize());searchCone.scale.y=beam.length()/180;}
     headlight.visible=!foot&&altitude<12;headlight.position.set(p.x+Math.cos(heading)*23,12+playerRise,p.y+Math.sin(heading)*23);headlight.target.position.set(p.x+Math.cos(heading)*130,surfaceY(p.x+Math.cos(heading)*130,p.y+Math.sin(heading)*130),p.y+Math.sin(heading)*130);
     const weather=frame.weather||{},amount=weather.rain||0;setTransportEnvironment(environment.texture,graphics.reflections?.65:0);scene.fog.density=.000095+(weather.fog||0)*.0004;motorMaterial.roughness=.72-.32*(weather.wetness||0);waterMaterial.roughness=.44+amount*.12;
-    for(const pair of materialPairs)for(const material of [pair.simple,pair.detailed])if(material.map===surfaceTexture('asphalt'))material.roughness=.9-.44*(weather.wetness||0);moon.intensity=1.8+(weather.flash||0)*5;
-    reflectionMaterial.opacity=.08+.8*(weather.wetness||0);
+    const daylight=weather.daylight||0,lamps=weather.lamps??1,twilight=weather.twilight||0;
+    scene.background.copy(nightSky).lerp(daySky,daylight).lerp(duskSky,twilight*.32);scene.fog.color.copy(nightFog).lerp(dayFog,daylight);
+    ambient.intensity=1.25+daylight*.65;ambient.color.copy(nightLight).lerp(dayLight,daylight);
+    moon.color.copy(nightLight).lerp(dayLight,daylight);moon.intensity=(1.8+daylight*.9)*(1-amount*.28)+(weather.flash||0)*5;
+    if(daylight>.01)moon.position.set(Math.cos((weather.hour-6)*Math.PI/12)*2800,800+Math.max(0,weather.solar||0)*2800,-900);else moon.position.set(-1800,2600,-900);
+    fill.intensity=.6+daylight*.3;glowMaterial.opacity=.36*lamps;
+    for(const pair of materialPairs)for(const material of [pair.simple,pair.detailed])if(material.map===surfaceTexture('asphalt'))material.roughness=.9-.44*(weather.wetness||0);
+    reflectionMaterial.opacity=(.08+.8*(weather.wetness||0))*lamps;
     for(const pair of materialPairs)for(const material of [pair.simple,pair.detailed])if(material.userData.shader?.uniforms.rippleTime)material.userData.shader.uniforms.rippleTime.value=time;
     for(const pair of materialPairs)for(const material of [pair.simple,pair.detailed])if(material.userData.wind){material.userData.wind.time.value=time;material.userData.wind.strength.value=weather.wind||0;}
     rain.visible=graphics.rain&&amount>.03;if(rain.visible){
@@ -334,6 +342,7 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
       bridges:{spans:bridgeProfiles.length,arches:bridgeArches,piers:bridgePiers},
       wetReflections:wetReflectionStats,pursuitSearchLight:pursuitLight.visible,peopleTypes:Object.fromEntries([...new Set(allPeople.map(p=>p.personType||'player'))].map(type=>[type,allPeople.filter(p=>(p.personType||'player')===type).length])),
       characterActions:{...characters.actions},
+      climate:{hour:weather.hour??22,daylight,lamps,kind:weather.kind,rain:amount},
       camera:{preset:cameraPreset,x:camera.position.x,y:camera.position.y,z:camera.position.z,distance:Math.hypot(camera.position.x-p.x,camera.position.z-p.y),fov:camera.fov},player:{x:p.x,y:p.y,altitude,groundElevation:playerRise,jumpHeight:p.jumpHeight||0,attackTime:p.attackTime||0,inWater:!!p.inWater,waterTime:p.waterTime||0,animation:foot?characterPose(p).action:p.visualTransition?'enter-vehicle':'driving',visualY:foot?characterBaseHeight(p,playerRise+3.6):actors.get(p)?.group.position.y}};
   }
   function dispose(){wetReflections.dispose();const geometries=new Set(),materials=new Set();scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});

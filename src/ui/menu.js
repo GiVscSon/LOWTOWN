@@ -1,5 +1,5 @@
 
-export function createGameMenu({listen=(target,...args)=>target?.addEventListener(...args),onPause,save,getContext,getCamera,setCamera,getAudio,setVolume,setStation,openMap,openGarage,returnToStart,canTravel=()=>true,getGraphics=()=>null,setGraphics=()=>{}}) {
+export function createGameMenu({listen=(target,...args)=>target?.addEventListener(...args),onPause,save,getContext,getCamera,setCamera,getAudio,setVolume,setStation,setEffectsVolume=()=>{},setAmbienceVolume=()=>{},getClimate=()=>null,setClimate=()=>{},openMap,openGarage,returnToStart,canTravel=()=>true,getGraphics=()=>null,setGraphics=()=>{}}) {
   const root=document.getElementById('gameMenu'),trigger=document.getElementById('btnMenu');
   if(!root||!trigger)return null;
   let currentView='main',previousFocus=null;
@@ -19,6 +19,10 @@ export function createGameMenu({listen=(target,...args)=>target?.addEventListene
     root.querySelector('#menuVolume').value=percent;
     root.querySelector('#menuVolumeValue').textContent=percent+'%';
     root.querySelector('#menuRadio').value=String(audio.station);
+    for(const [id,key] of [['menuEffectsVolume','effectsVolume'],['menuAmbienceVolume','ambienceVolume']]){
+      const input=root.querySelector('#'+id);if(input){input.value=Math.round((audio[key]??1)*100);root.querySelector('#'+id+'Value').textContent=input.value+'%';}
+    }
+    const climate=getClimate();if(climate){root.querySelector('#menuTimeMode').value=climate.timeMode;root.querySelector('#menuDayLength').value=climate.cycleMinutes;root.querySelector('#menuWeatherMode').value=climate.weatherMode;}
     for(const id of ['menuMap','menuGarage','menuRestart']){
       const button=root.querySelector('#'+id);button.disabled=!canTravel();button.title=button.disabled?'Доступно после освобождения':'';
     }
@@ -57,6 +61,9 @@ export function createGameMenu({listen=(target,...args)=>target?.addEventListene
   }));
   listen(root.querySelector('#menuVolume'),'input',event=>{setVolume(Number(event.target.value)/100);refresh();});
   listen(root.querySelector('#menuRadio'),'change',event=>{setStation(Number(event.target.value));refresh();});
+  listen(root.querySelector('#menuEffectsVolume'),'input',event=>{setEffectsVolume(Number(event.target.value)/100);refresh();});
+  listen(root.querySelector('#menuAmbienceVolume'),'input',event=>{setAmbienceVolume(Number(event.target.value)/100);refresh();});
+  for(const [id,key] of [['menuTimeMode','timeMode'],['menuDayLength','cycleMinutes'],['menuWeatherMode','weatherMode']])listen(root.querySelector('#'+id),'change',event=>{setClimate({[key]:key==='cycleMinutes'?Number(event.target.value):event.target.value});refresh();});
   listen(root.querySelector('#menuMap'),'click',()=>{close();openMap();});
   listen(root.querySelector('#menuGarage'),'click',()=>{close();openGarage();});
   listen(root.querySelector('#menuRestart'),'click',()=>{returnToStart();close();});

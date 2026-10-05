@@ -21,6 +21,7 @@ export function assignPeopleTypes(people){
     if(p.accessory==='beard'&&p.gender==='woman')p.accessory='cap';
     p.hair=p.personType==='elderly'?'#a7a19b':index%7===0?'#9c9690':index%4===0?'#71553c':'#302720';
     p.visualScale=p.personType==='elderly'?.93:p.personType==='jogger'?1.03:1;
+    p.faceWidth=.93+(index%5)*.035;
     if(profile.weapon&&!p.beachRoute)p.weapon ||= p.personType==='troublemaker'&&index%3===0?'pistol':profile.weapon;
     if(p.dailyStops)for(const stop of p.dailyStops)if(!['swimming','beachWalk','sunbathing'].includes(stop.kind))stop.activity=profile.activity;
     if(p.personType==='security'){p.shirt='#3b4954';p.pants='#28323c';}

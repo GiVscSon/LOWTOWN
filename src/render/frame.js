@@ -86,7 +86,8 @@ ctx.renderWorld = function renderWorld() {
         fog: ctx.weather?.fog || 0,
         wetness: ctx.weather?.wetness || 0,
         wind: ctx.weather?.gust || 0,
-        flash: ctx.weather?.flash || 0
+        flash: ctx.weather?.flash || 0,
+        hour:ctx.weather.hour,solar:ctx.weather.solar,daylight:ctx.weather.daylight,lamps:ctx.weather.lamps,twilight:ctx.weather.twilight
       }
     });
     ctx.renderHud();

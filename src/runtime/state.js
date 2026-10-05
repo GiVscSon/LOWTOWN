@@ -142,7 +142,7 @@ ctx.state = {
     nitro: false
   }
 };
-ctx.weather = createWeather();
+ctx.weather = createWeather(ctx.env.localStorage);
 ctx.player = {
   entityType: 'vehicle',
   x: 1200,

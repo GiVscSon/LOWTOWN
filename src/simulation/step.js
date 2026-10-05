@@ -11,13 +11,13 @@ ctx.updateStuntVehicle = function updateStuntVehicle() {
 };
 ctx.updatePhysics = function updatePhysics(dt) {
   if (ctx.state.isMenuOpen) return;
-  ctx.weather.step(dt);
   ctx.state.deathFlash = ctx.env.Math.max(0, ctx.state.deathFlash - dt * 1.15);
   if (ctx.state.isMapOpen || ctx.state.isGarageOpen) {
     ctx.player.speed *= 0.88;
     return;
   }
   if (ctx.state.invulnTimer > 0) ctx.state.invulnTimer--;
+  ctx.weather.step(dt);
   const inCustody = ctx.state.custodyTimer > 0;
   if (inCustody) {
     ctx.state.custodyTimer = ctx.env.Math.max(0, ctx.state.custodyTimer - dt);
@@ -199,6 +199,7 @@ ctx.updatePhysics = function updatePhysics(dt) {
   if (!ctx.roam?.special) ctx.player.gear = ctx.player.speed < -0.1 ? 'R' : speedKmh < 30 ? 'D1' : speedKmh < 60 ? 'D2' : speedKmh < 95 ? 'D3' : speedKmh < 130 ? 'D4' : 'D5';
   ctx.player.rpm = ctx.env.Math.min(1.0, speedKmh % 35 / 35 + 0.2);
   ctx.sound.update(ctx.player.rpm, ctx.player.speed);
+  ctx.sound.stepScene(dt);
   const distEl = ctx.env.document.getElementById('hudDistrict');
   if (distEl) {
     const district = ctx.districtAt(ctx.player.x, ctx.player.y) || ctx.islets.find(i => pointInCoast(ctx.player.x, ctx.player.y, i));

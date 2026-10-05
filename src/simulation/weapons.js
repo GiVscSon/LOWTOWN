@@ -37,7 +37,7 @@ export function installWeapons(ctx){
   ctx.burningBodies=new Set();
   ctx.selectWeapon=id=>{if(!WEAPONS[id])return;ctx.player.weapon=id;ctx.player.weaponDrawRemaining=.28;ctx.player.shotRemaining=0;ctx.player.meleeRecoveryRemaining=0;ctx.player.reloadRemaining=0;ctx.player.attackTime=0;ctx.player.attackRequested=false;ctx.showToast(WEAPONS[id].name+' · F — применить · T — перезарядить');};
   ctx.cycleWeapon=()=>ctx.selectWeapon(WEAPON_IDS[(WEAPON_IDS.indexOf(ctx.player.weapon||'fists')+1)%WEAPON_IDS.length]);
-  ctx.reloadWeapon=()=>{const p=ctx.player,w=WEAPONS[p.weapon];if(w?.capacity&&!p.reloadRemaining){p.reloadDuration=w.reload;p.reloadRemaining=w.reload;p.attackRequested=false;}};
+  ctx.reloadWeapon=()=>{const p=ctx.player,w=WEAPONS[p.weapon];if(w?.capacity&&!p.reloadRemaining){p.reloadDuration=w.reload;p.reloadRemaining=w.reload;p.attackRequested=false;ctx.sound.playEffect('reload');}};
   const incident=(kind,hit)=>{
     const active=ctx.cityIncidentDirector.current();
     if(active?.kind===kind&&Math.hypot(active.x-hit.x,active.y-hit.y)<300){active.timer=Math.max(active.timer,18);if(hit.body?.dead){active.fatal=true;active.title='УБИЙСТВО';}return active;}
@@ -73,7 +73,7 @@ export function installWeapons(ctx){
       const hit=meleeTarget(shooter,[...ctx.getCityScenery().contacts.query(shooter.x-60,shooter.y-60,shooter.x+60,shooter.y+60),...ctx.cityCollisionBodies()],people,w.range);
       if(hit){hit.person=people.has(hit.body);damage(shooter,hit,w,angle);ctx.sound.playImpact();}return;
     }
-    ctx.sound.playImpact();ctx.effects.burst(shooter.x+Math.cos(angle)*10,shooter.y+Math.sin(angle)*10,15,'spark',3);
+    ctx.sound.playWeapon(id,shooter);ctx.effects.burst(shooter.x+Math.cos(angle)*10,shooter.y+Math.sin(angle)*10,15,'spark',3);
     for(const witness of ctx.pedestrians)if(witness!==shooter&&!witness.dead&&Math.hypot(witness.x-shooter.x,witness.y-shooter.y)<420){
       const d=Math.hypot(witness.x-shooter.x,witness.y-shooter.y)||1;
       witness.eventFleeTimer=Math.max(witness.eventFleeTimer||0,3);witness.eventFleeX=(witness.x-shooter.x)/d;witness.eventFleeY=(witness.y-shooter.y)/d;witness.wasFleeing=true;

@@ -71,6 +71,7 @@ export function installAppBootstrap(ctx) {
     } else if (cameraButton) cameraButton.style.display = 'none';
     ctx.listen(ctx.env.document.getElementById('btnWeather'), 'click', () => {
       ctx.weather.next();
+      if(ctx.weather.mode!=='auto')ctx.weather.setMode(ctx.weather.kind);
       ctx.showToast('Погода: ' + WEATHER_PRESETS[ctx.weather.kind].label);
     });
     ctx.driveLab = createDriveLab({listen:ctx.listen,
@@ -107,7 +108,7 @@ export function installAppBootstrap(ctx) {
       },
       getAudio: () => ({
         volume: ctx.sound.volume,
-        station: ctx.sound.stationIdx
+        station: ctx.sound.stationIdx,effectsVolume:ctx.sound.effectsVolume,ambienceVolume:ctx.sound.ambienceVolume
       }),
       setVolume(volume) {
         ctx.sound.init();
@@ -116,6 +117,15 @@ export function installAppBootstrap(ctx) {
       setStation(station) {
         ctx.sound.init();
         ctx.sound.setStation(station);
+      },
+      setEffectsVolume(value){ctx.sound.init();ctx.sound.setEffectsVolume(value);},
+      setAmbienceVolume(value){ctx.sound.init();ctx.sound.setAmbienceVolume(value);},
+      getClimate:()=>({timeMode:ctx.weather.clock.mode,cycleMinutes:ctx.weather.clock.minutes,weatherMode:ctx.weather.mode}),
+      setClimate(patch){
+        if(patch.timeMode)ctx.weather.setTimeMode(patch.timeMode);
+        if(patch.cycleMinutes)ctx.weather.setCycleMinutes(patch.cycleMinutes);
+        if(patch.weatherMode)ctx.weather.setMode(patch.weatherMode);
+        ctx.renderWorld();
       },
       openMap: ctx.toggleMap,
       openGarage: ctx.toggleGarage,
@@ -139,6 +149,8 @@ export function installAppBootstrap(ctx) {
     // The published game never exposes this control surface.
     if (['127.0.0.1', 'localhost'].includes(ctx.env.window.location?.hostname) && ctx.env.window.location.search.includes('cityQA=1')) {
       ctx.env.window.__lowtownCityQA = {
+        climateState:()=>({hour:ctx.weather.hour,daylight:ctx.weather.daylight,kind:ctx.weather.kind,timeMode:ctx.weather.clock.mode,weatherMode:ctx.weather.mode,time:ctx.weather.time}),
+        soundState:()=>({voices:ctx.sound.sfx?.voices.size||0,effectsVolume:ctx.sound.effectsVolume,ambienceVolume:ctx.sound.ambienceVolume,loops:Object.fromEntries(Object.entries(ctx.sound.sfx?.loops||{}).map(([key,v])=>[key,v.gain.gain.value]))}),
         menuState: () => ({
           paused: ctx.isGamePaused(),
           view: ctx.gameMenu?.isOpen ? 'menu' : ctx.state.isMapOpen ? 'map' : ctx.state.isGarageOpen ? 'garage' : 'game',
