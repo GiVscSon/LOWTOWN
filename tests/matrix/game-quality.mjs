@@ -1,4 +1,5 @@
 import './simulation-clock.mjs';
+import './crowd-performance.mjs';
 import './night-detail.mjs';
 import './frame-watchdog.mjs';
 import './visual-polish.mjs';

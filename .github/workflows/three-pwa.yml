@@ -63,6 +63,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Full graphics, weather, settings and mobile matrix
         run: npm run test:quality-browser
+      - name: Automatic graphics, manual maximum, saved settings and offline touch controls
+        run: node tests/matrix/crowd-performance-browser.mjs
       - name: Jump, melee, movable props, particles and touch controls
         run: npm run test:interaction-browser
       - name: Coastal swimming, weapon reactions and touch controls
@@ -141,5 +143,14 @@ jobs:
         with:
           name: lowtown-living-city-upgrade
           path: artifacts/living-city-1.1/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload crowd performance browser matrix
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lowtown-crowd-performance
+          path: artifacts/crowd-performance/
           if-no-files-found: ignore
           retention-days: 14

@@ -1,3 +1,4 @@
+import {createNeighbourhood} from './neighbourhood.js';
 // One shared runtime context owns state; this system has no hidden globals.
 export function installSimulationPedestrians(ctx){
 const {nextWalkingGoal,onRoadSurface}=ctx.dependencies;
@@ -12,6 +13,7 @@ ctx.pedestrianCarBlocked = function pedestrianCarBlocked(x, y, c) {
 };
 ctx.isPedestrianBlocked = function isPedestrianBlocked(x, y, allowWater=false) {
   if (ctx.isPedestrianSceneryBlocked(x, y,0,allowWater)) return true;
+  if(ctx.pedestrianVehicleIndex)return ctx.pedestrianVehicleIndex.some(x,y,ctx.pedestrianVehicleReach,c=>ctx.pedestrianCarBlocked(x,y,c));
   return ctx.parkedCars.some(c => ctx.pedestrianCarBlocked(x, y, c)) || (ctx.roam?.fleet || []).some(c => c.kind !== 'water' && ctx.pedestrianCarBlocked(x, y, c)) || ctx.trafficCars.some(c => ctx.pedestrianCarBlocked(x, y, c)) || ctx.policeCars.some(c => ctx.pedestrianCarBlocked(x, y, c)) || ctx.incidentPoliceCars.some(c => ctx.pedestrianCarBlocked(x, y, c)) || ctx.incidentResponseVehicles.some(c => ctx.pedestrianCarBlocked(x, y, c)) || ctx.roam?.mode !== 'foot' && !(ctx.roam?.altitude > 12) && ctx.pedestrianCarBlocked(x, y, ctx.player);
 };
 ctx.movePedestrian = function movePedestrian(p, dx, dy) {
@@ -117,6 +119,12 @@ ctx.updatePedestrians = function updatePedestrians(dt) {
   const frame = ctx.env.Math.min(dt, .05) * 60;
   ctx.pedestrianSceneryIndex = ctx.getCityScenery().pedestrians;
   const cars = [...ctx.trafficCars, ...ctx.policeCars, ...ctx.incidentPoliceCars, ...ctx.incidentResponseVehicles, ...(ctx.roam?.mode !== 'foot' && !(ctx.roam?.altitude > 12) ? [ctx.player] : [])];
+  const vehicles=[...ctx.parkedCars,...(ctx.roam?.fleet||[]).filter(c=>c.kind!=='water'),...cars];
+  ctx.pedestrianVehicleIndex=createNeighbourhood(vehicles);
+  ctx.pedestrianVehicleReach=Math.max(0,...vehicles.map(c=>((c.width||48)+(c.height||24))/2+7));
+  // Preserve the original first-match order; the extra 16 units include
+  // people that have already moved during this sequential update.
+  const threats=createNeighbourhood(cars),neighbors=createNeighbourhood(ctx.pedestrians);
   ctx.pedestrians.forEach((p, index) => {
     if (p.homeY === undefined) {
       p.homeY = p.y;
@@ -186,7 +194,7 @@ ctx.updatePedestrians = function updatePedestrians(dt) {
       }
     }
     if (!panicking && !p.pause && !p.activityRemaining && p.socialCooldown === 0) {
-      const other = ctx.pedestrians.find(o => o !== p && o.districtId === p.districtId && o.reaction === 'calm' && !o.pause && !o.activityRemaining && o.socialCooldown < 20 && ctx.env.Math.hypot(o.x - p.x, o.y - p.y) > 18 && ctx.env.Math.hypot(o.x - p.x, o.y - p.y) < 42);
+      const other = neighbors.find(p.x,p.y,58,o => o !== p && o.districtId === p.districtId && o.reaction === 'calm' && !o.pause && !o.activityRemaining && o.socialCooldown < 20 && ctx.env.Math.hypot(o.x - p.x, o.y - p.y) > 18 && ctx.env.Math.hypot(o.x - p.x, o.y - p.y) < 42);
       p.socialCooldown = 24 + index % 13;
       if (other) for (const person of [p, other]) {
         person.activity = 'talking';
@@ -205,7 +213,7 @@ ctx.updatePedestrians = function updatePedestrians(dt) {
       } else p.activity = null;
     } else if (p.reaction !== 'calm') p.activity = null;
     // React to the approach of traffic, rather than shoving a person on contact.
-    const threat = cars.find(c => ctx.env.Math.abs(c.x - p.x) < 90 && ctx.env.Math.abs(c.y - p.y) < 90 && ctx.env.Math.abs(c.speed || 0) > 1.5 && ctx.env.Math.hypot(c.x - p.x, c.y - p.y) < 90 && ctx.env.Math.abs(-(p.x - c.x) * ctx.env.Math.sin(c.angle) + (p.y - c.y) * ctx.env.Math.cos(c.angle)) < (c.height || 24) / 2 + 15 && ((p.x - c.x) * ctx.env.Math.cos(c.angle) + (p.y - c.y) * ctx.env.Math.sin(c.angle)) * (c.isTraffic ? ctx.env.Math.abs(c.speed || 0) : c.speed || 0) > 0);
+    const threat = threats.find(p.x,p.y,90,c => ctx.env.Math.abs(c.x - p.x) < 90 && ctx.env.Math.abs(c.y - p.y) < 90 && ctx.env.Math.abs(c.speed || 0) > 1.5 && ctx.env.Math.hypot(c.x - p.x, c.y - p.y) < 90 && ctx.env.Math.abs(-(p.x - c.x) * ctx.env.Math.sin(c.angle) + (p.y - c.y) * ctx.env.Math.cos(c.angle)) < (c.height || 24) / 2 + 15 && ((p.x - c.x) * ctx.env.Math.cos(c.angle) + (p.y - c.y) * ctx.env.Math.sin(c.angle)) * (c.isTraffic ? ctx.env.Math.abs(c.speed || 0) : c.speed || 0) > 0);
     if (threat) {
       const distance = ctx.env.Math.hypot(p.x - threat.x, p.y - threat.y) || 1;
       p.fleeX = (p.x - threat.x) / distance;
@@ -275,7 +283,7 @@ ctx.updatePedestrians = function updatePedestrians(dt) {
         const speed = (p.walkSpeed ?? .42 + index % 5 * .045) * frame * curiosity;
         dx = (p.goal.x - p.x) / distance * speed;
         dy = (p.goal.y - p.y) / distance * speed;
-        const neighbor = ctx.pedestrians.find(o => o !== p && ctx.env.Math.abs(o.x - p.x) < 15 && ctx.env.Math.abs(o.y - p.y) < 15 && ctx.env.Math.hypot(o.x - p.x, o.y - p.y) < 15);
+        const neighbor = neighbors.find(p.x,p.y,31,o => o !== p && ctx.env.Math.abs(o.x - p.x) < 15 && ctx.env.Math.abs(o.y - p.y) < 15 && ctx.env.Math.hypot(o.x - p.x, o.y - p.y) < 15);
         if (neighbor) {
           const d = ctx.env.Math.hypot(p.x - neighbor.x, p.y - neighbor.y) || 1;
           dx += (p.x - neighbor.x) / d * .3 * frame;
@@ -304,5 +312,6 @@ ctx.updatePedestrians = function updatePedestrians(dt) {
     p.gait = ctx.env.Math.min(1, p.movedDistance / ctx.env.Math.max(.01, frame * .42));
     if (p.gait === 0) p.walkPhase = 0;
   });
+  ctx.pedestrianVehicleIndex=null;
 };
 }
