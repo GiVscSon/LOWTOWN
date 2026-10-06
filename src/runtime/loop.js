@@ -1,5 +1,5 @@
-// Simulation owns a fixed clock. A slow GPU or a render FPS cap must not
-// slow traffic, controls, weather or aircraft climbing.
+// Simulation integrates fixed steps independently of the presentation clock.
+// Sustained overload has a bounded backlog so input stays responsive.
 export function installRuntimeLoop(ctx){
   function fail(error){
     ctx.simulationFailed=true;

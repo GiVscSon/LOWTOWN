@@ -80,7 +80,9 @@ async function turnRight() {
 try {
   await waitForPreview();
   browser = await chromium.launch({ headless: true,executablePath:process.env.LOWTOWN_CHROMIUM||undefined });
-  page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1 });
+  // Exercise native flight controls at a practical software-WebGL viewport.
+  // The frozen survey below separately captures the full-resolution city.
+  page = await browser.newPage({ viewport: { width: 960, height: 640 }, deviceScaleFactor: 1 });
   page.on('pageerror', error => errors.push(`pageerror: ${error.message}`));
   page.on('console', message => {
     if (message.type() === 'error') errors.push(`console: ${message.text()}`);
@@ -152,6 +154,12 @@ try {
   // Controls above run on the real clock. Survey captures keep a single full
   // quality frame instead of submitting continuous 11 MP work to software GL.
   await page.evaluate(()=>window.__lowtownCityQA.advanceScene(0));
+  await page.locator('#btnMenu').click();
+  await page.locator('[data-menu-page=settings]').click();
+  await page.locator('#menuAdaptive').uncheck();
+  await page.locator('#menuGraphicsPreset').selectOption('high');
+  await page.locator('#menuResolution').selectOption('1.5');
+  await page.locator('#menuClose').click();
   await page.setViewportSize({width:2800,height:1800});
   const districts=await page.evaluate(()=>window.__lowtownCityQA.districts());
   assert.equal(districts.length,16);
@@ -159,6 +167,8 @@ try {
   for(const district of districts){
     const position=await page.evaluate(id=>window.__lowtownCityQA.viewDistrict(id),district.id);
     assert.equal(position.mode,'helicopter');assert(position.altitude>=180);
+    const resolution=await page.evaluate(()=>window.__lowtownThreeStats.resolution);
+    assert.equal(resolution.ratio,1.5);assert.equal(resolution.width,4200);assert.equal(resolution.height,2700);
     await screenshot(`district-${district.id}`);
     survey.push(position);
   }
