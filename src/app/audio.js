@@ -44,7 +44,7 @@ ctx.SynthAudio = class SynthAudio {
       this.radioGain.connect(this.masterGain);
       this.motorOsc.type = 'sawtooth';
       this.motorOsc.frequency.setValueAtTime(45, this.ctx.currentTime);
-      this.motorGain.gain.setValueAtTime(ctx.roam?.mode==='foot'||ctx.player.inWater?0:.035*this.effectsVolume, this.ctx.currentTime);
+      this.motorGain.gain.setValueAtTime(ctx.roam?.mode==='foot'||ctx.player?.inWater?0:.035*this.effectsVolume, this.ctx.currentTime);
       const filter = this.ctx.createBiquadFilter();
       filter.type = 'lowpass';
       filter.frequency.setValueAtTime(380, this.ctx.currentTime);
@@ -76,7 +76,7 @@ ctx.SynthAudio = class SynthAudio {
     this.effectsVolume=ctx.env.Math.max(0,ctx.env.Math.min(1,value));this.sfx?.setLevels(this.effectsVolume,this.ambienceVolume);
     // The engine shares the effects control and must mute without waiting for
     // another physics step, including a paused or overloaded driving scene.
-    if(this.ctx)setAudioLevel(this.motorGain?.gain,ctx.roam?.mode==='foot'||ctx.player.inWater?0:.035*this.effectsVolume,this.ctx.currentTime,.05);
+    if(this.ctx)setAudioLevel(this.motorGain?.gain,ctx.roam?.mode==='foot'||ctx.player?.inWater?0:.035*this.effectsVolume,this.ctx.currentTime,.05);
     this.saveSettings();
   }}
   setAmbienceVolume(value){if(Number.isFinite(value)){this.ambienceVolume=ctx.env.Math.max(0,ctx.env.Math.min(1,value));this.sfx?.setLevels(this.effectsVolume,this.ambienceVolume);this.saveSettings();}}
