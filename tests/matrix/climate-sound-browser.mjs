@@ -17,6 +17,10 @@ try{
   await page.locator('#menuTimeMode').selectOption('night');assert.equal(await page.evaluate(()=>window.__lowtownThreeStats.climate.daylight),0);
   await page.locator('#menuDayLength').selectOption('10');await page.locator('#menuWeatherMode').selectOption('rain');await page.locator('#menuRadio').selectOption('0');
   await page.locator('#menuAmbienceVolume').evaluate(input=>{input.value='0';input.dispatchEvent(new Event('input',{bubbles:true}));});
+  await page.locator('#menuEffectsVolume').evaluate(input=>{input.value='0';input.dispatchEvent(new Event('input',{bubbles:true}));});
+  await page.waitForFunction(()=>[0,3,4].every(index=>window.__audioGains[index].gain.value===0),null,{timeout:1000,polling:20});
+  assert.deepEqual(await page.evaluate(()=>[0,3,4].map(index=>window.__audioGains[index].gain.value)),[0,0,0],'zero levels must mute the engine, effects and ambience before another simulation tick');
+  await page.locator('#menuEffectsVolume').evaluate(input=>{input.value='80';input.dispatchEvent(new Event('input',{bubbles:true}));});
   await page.evaluate(()=>{const a=window.__audioProbe;window.__effectsAnalyser=a.createAnalyser();window.__masterAnalyser=a.createAnalyser();window.__audioGains[3].connect(window.__effectsAnalyser);window.__audioGains[2].connect(window.__masterAnalyser);});
   const rms=name=>page.evaluate(async name=>{let peak=0;for(let i=0;i<20;i++){const a=window[name],b=new Float32Array(a.fftSize);a.getFloatTimeDomainData(b);peak=Math.max(peak,Math.sqrt(b.reduce((s,v)=>s+v*v,0)/b.length));await new Promise(r=>setTimeout(r,15));}return peak;},name);
   const paused=await page.evaluate(()=>window.__lowtownCityQA.climateState());await page.evaluate(()=>window.__lowtownCityQA.advanceScene(1));assert.deepEqual(await page.evaluate(()=>window.__lowtownCityQA.climateState()),paused);
@@ -36,7 +40,10 @@ try{
   if(device.hasTouch)await page.locator('#btnReload').tap();else await page.keyboard.press('KeyT');await page.evaluate(()=>window.__lowtownCityQA.advanceScene(.02));await page.waitForTimeout(350);assert(await page.evaluate(()=>window.__effectsEnergy)>.001,'reload sound is silent');
   for(let i=0;i<8;i++)await page.evaluate(()=>window.__lowtownCityQA.advanceScene(.5));const state=await page.evaluate(()=>window.__lowtownCityQA.soundState());assert(state.voices<=32&&state.loops.rain>.01);
   await page.locator('#btnMenu').click({noWaitAfter:true});await page.locator('[data-menu-page=settings]').click({noWaitAfter:true});await page.waitForTimeout(350);assert(await rms('__masterAnalyser')<.0001,'pause leaked sound');
-  await page.locator('#menuEffectsVolume').evaluate(input=>{input.value='0';input.dispatchEvent(new Event('input',{bubbles:true}));});await page.locator('#menuClose').click({noWaitAfter:true});await page.waitForTimeout(250);
+  await page.locator('#menuEffectsVolume').evaluate(input=>{input.value='0';input.dispatchEvent(new Event('input',{bubbles:true}));});
+  await page.waitForFunction(()=>[0,3,4].every(index=>window.__audioGains[index].gain.value===0),null,{timeout:1000,polling:20});
+  await page.locator('#menuClose').click({noWaitAfter:true});await page.waitForTimeout(250);
+  assert.deepEqual(await page.evaluate(()=>[0,3,4].map(index=>window.__audioGains[index].gain.value)),[0,0,0]);
   if(device.hasTouch)await page.locator('#btnNitro').tap();else await page.keyboard.press('KeyF');await page.evaluate(()=>window.__lowtownCityQA.advanceScene(.03));assert(await rms('__masterAnalyser')<.0001,'effects volume zero leaked sound');
   await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__lowtownThreeStats?.frames>3);await page.locator('#btnMenu').click({noWaitAfter:true});await page.locator('[data-menu-page=settings]').click({noWaitAfter:true});
   assert.equal(await page.locator('#menuTimeMode').inputValue(),'night');assert.equal(await page.locator('#menuDayLength').inputValue(),'10');assert.equal(await page.locator('#menuWeatherMode').inputValue(),'rain');assert.equal(await page.locator('#menuEffectsVolume').inputValue(),'0');assert.equal(await page.locator('#menuAmbienceVolume').inputValue(),'0');
