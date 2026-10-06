@@ -1,5 +1,5 @@
-// Simulation owns a fixed clock. A slow GPU or a render FPS cap must not
-// slow traffic, controls, weather or aircraft climbing.
+// Simulation integrates fixed steps independently of the presentation clock.
+// Sustained overload has a bounded backlog so input stays responsive.
 export function installRuntimeLoop(ctx){
   function fail(error){
     ctx.simulationFailed=true;
@@ -9,18 +9,30 @@ export function installRuntimeLoop(ctx){
   ctx.advanceSimulation=function advanceSimulation(now){
     if(ctx.qaManualSceneClock!==null||ctx.simulationFailed)return;
     // Retain delayed ticks instead of making the world run in slow motion.
-    // Bound a suspended process to five seconds and work to one second per
-    // callback; any remaining backlog continues on the next timer tick.
+    // Bound a suspended process to five seconds. A wall-time budget below
+    // splits expensive catch-up work into separate event-loop tasks.
     const dt=Math.max(0,Math.min(5,(now-ctx.lastSimulationTime)/1000));
     ctx.lastSimulationTime=now;
     if(ctx.isGamePaused()||ctx.env.document.hidden){ctx.accumulator=0;return;}
     ctx.accumulator=Math.min(5,ctx.accumulator+dt);
-    const start=ctx.perfEnabled?ctx.env.performance.now():0;
+    const start=ctx.env.performance.now();
     try{
       let steps=0;
       while(ctx.accumulator+1e-9>=1/60&&steps++<60){
         ctx.driveLab?.beforeStep();ctx.updatePhysics(1/60);ctx.driveLab?.afterStep();
         ctx.accumulator=Math.max(0,ctx.accumulator-1/60);
+        // Yield to input/audio/rendering instead of doing up to a second of
+        // physics in one task after a slow frame. Cheap steps still catch up
+        // normally; sustained overload cannot build several seconds of debt.
+        if(ctx.env.performance.now()-start>=8&&ctx.accumulator>=1/60){
+          ctx.accumulator=Math.min(ctx.accumulator,.25);break;
+        }
+      }
+      if(ctx.accumulator>=1/60&&ctx.simulationCatchupTimer===undefined&&ctx.env.setTimeout){
+        ctx.simulationCatchupTimer=ctx.env.setTimeout(()=>{
+          ctx.simulationCatchupTimer=undefined;
+          ctx.advanceSimulation(ctx.env.performance.now());
+        },0);
       }
       if(ctx.perfEnabled)ctx.pushPerfSample(ctx.perfSamples.logic,ctx.env.performance.now()-start);
     }catch(error){fail(error);}

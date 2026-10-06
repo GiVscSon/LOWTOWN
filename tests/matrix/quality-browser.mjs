@@ -9,6 +9,9 @@ try{
  browser=await chromium.launch({headless:true,executablePath:process.env.LOWTOWN_CHROMIUM||undefined});
  for(const device of [{name:'desktop',viewport:{width:1280,height:800},deviceScaleFactor:1},{name:'mobile',viewport:{width:390,height:844},deviceScaleFactor:2}]){
   const context=await browser.newContext(device),page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+  // This suite deliberately measures the explicit maximum-quality mode.
+  // Automatic defaults are checked by the crowd-performance browser suite.
+  await page.addInitScript(()=>{if(!localStorage.getItem('lowtown_graphics_settings_v1'))localStorage.setItem('lowtown_graphics_settings_v1',JSON.stringify({preset:'high',resolution:1.5,fps:60,adaptive:false,reflectionQuality:'auto',distance:'far',reflections:true,shadows:true,rain:true,lighting:'detailed',effects:'high'}));});
   await page.goto(origin+'?cityQA=1',{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__lowtownThreeStats?.frames>=5,null,{timeout:60000});
   const initial=await page.evaluate(()=>window.__lowtownThreeStats);assert.equal(initial.graphics.lighting,'detailed');assert.equal(initial.resolution.ratio,1.5);assert.equal(initial.lowCostMaterials,false);
   assert.equal(initial.resolution.width,Math.floor(device.viewport.width*1.5));assert(initial.streetFurniture.lights>=100);assert(initial.streetFurniture.signals>0);

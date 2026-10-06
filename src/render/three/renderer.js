@@ -7,7 +7,7 @@ import {createTransportVisual,updateTransportVisual,setTransportLighting,setTran
 import {createBoxBatch,ribbonGeometry,addTiledGeometry} from './geometry.js';
 import {createCharacterBatch,characterBaseHeight} from './characters.js';
 import {characterPose,presentedCharacters} from '../shared/character_pose.js';
-import {loadGraphics,changeGraphics,createViewportSizer} from './graphics_settings.js';
+import {loadGraphics,changeGraphics,createViewportSizer,createAdaptiveResolution} from './graphics_settings.js';
 import {BEACH_WIDTH} from '../../world/coastline.js';
 import {addStreetFurniture} from './street_furniture.js';
 import {nearestStreet,streetWidth,onStreetCollection} from '../../world/street_corridors.js';
@@ -34,6 +34,7 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
   const gl=renderer.getContext(),debug=gl.getExtension('WEBGL_debug_renderer_info');
   const software=debug&&/swiftshader|llvmpipe|software/i.test(String(gl.getParameter(debug.UNMASKED_RENDERER_WEBGL)));
   let graphics=loadGraphics(),lowCostMaterials=graphics.lighting==='simple'&&!forceFullMaterials;
+  const adaptiveResolution=createAdaptiveResolution(!!software);
   const materialPairs=[];
   const pairedMaterial=factory=>{
     const pair={simple:factory(true),detailed:factory(false)};materialPairs.push(pair);return pair[lowCostMaterials?'simple':'detailed'];
@@ -235,6 +236,7 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
   staticGroup.traverse(object=>{
     if(!object.isMesh||!object.frustumCulled)return;
     object.matrixAutoUpdate=false;
+    object.matrixWorldAutoUpdate=false;
     if(object.isInstancedMesh){object.computeBoundingSphere();staticBounds.push({object,sphere:object.boundingSphere.clone().applyMatrix4(object.matrixWorld)});}
     else {object.geometry.computeBoundingSphere();staticBounds.push({object,sphere:object.geometry.boundingSphere.clone().applyMatrix4(object.matrixWorld)});}
   });
@@ -243,7 +245,8 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
   canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();contextLost=true;});canvas.addEventListener('webglcontextrestored',()=>{contextLost=false;cameraReady=false;});
   function render(frame){
     const now=performance.now(),elapsed=Math.max(0,now-lastTime),dt=Math.min(.1,elapsed/1000),time=frame.animationTime??now/1000;lastTime=now;
-    const width=Math.max(1,canvas.clientWidth||innerWidth),height=Math.max(1,canvas.clientHeight||innerHeight),ratio=graphics.resolution;
+    adaptiveResolution.sample(elapsed,graphics,!!globalThis.__lowtownRenderPaused);
+    const width=Math.max(1,canvas.clientWidth||innerWidth),height=Math.max(1,canvas.clientHeight||innerHeight),ratio=adaptiveResolution.ratio(graphics);
     viewport.update(width,height,ratio);
     const p=frame.player,altitude=Math.max(0,frame.altitude||0),foot=frame.mode==='foot',live=new Set();
     const heading=p.angle||0,cameraHeading=foot?-Math.PI*.75:heading,mobile=width<700,framing=cameraFraming(cameraPreset,foot,mobile);
@@ -335,7 +338,7 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
     const wetReflectionStats=wetReflections.update(p,weather,graphics,previousRenderCpu);
     if(!contextLost)renderer.render(scene,camera);previousRenderCpu=performance.now()-now;frames++;globalThis.__lowtownLastFrame=performance.now();
     globalThis.__lowtownThreeStats={frames,vehicles:(frame.vehicles||[]).length+(foot?0:1),visibleVehicles,pedestrians:allPeople.length,visiblePedestrians:people.length,objects:scene.children.length,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,contextLost,renderQuality:ratio/Math.min(globalThis.devicePixelRatio||1,1.5),software:!!software,lowCostMaterials,
-      graphics:{...graphics},resolution:{ratio,width:canvas.width,height:canvas.height,resizes:viewport.resizes},renderCpuMs:performance.now()-now,
+      graphics:{...graphics},resolution:{ratio,requested:graphics.resolution,adaptive:graphics.adaptive,width:canvas.width,height:canvas.height,resizes:viewport.resizes},renderCpuMs:performance.now()-now,
       streetDetail:{...streetDetail,shopWindows:storefrontDetail.windows},
       visualDetail:{environment:true,trees:trees.count,canopyTriangles:trees.canopyTriangles,architecture:{...architecture.stats},props:propCount,effects:visibleEffects},
       streetFurniture:{lights:(world.lights||[]).length,props:(world.props||[]).length,signals:furniture.signals,visibleSignals},
@@ -349,6 +352,7 @@ export function createLowtownThreeRenderer({canvas,world,forceFullMaterials=fals
     for(const geometry of geometries)geometry.dispose();for(const material of materials){for(const key of ['map','normalMap','roughnessMap'])material[key]?.dispose();material.userData.cabinTexture?.dispose();material.dispose();}setTransportEnvironment(null,0);environment.dispose();renderer.dispose();}
   return {render,dispose,scene,camera,renderer,bridgeProfiles,bridgeSurface,get cameraPreset(){return cameraPreset;},get graphics(){return {...graphics};},
     setGraphics(patch){
+      adaptiveResolution.reset();
       graphics=changeGraphics(graphics,patch);lowCostMaterials=graphics.lighting==='simple'&&!forceFullMaterials;
       const replacements=new Map();for(const pair of materialPairs){const selected=pair[lowCostMaterials?'simple':'detailed'];replacements.set(pair.simple,selected);replacements.set(pair.detailed,selected);}
       scene.traverse(object=>{if(replacements.has(object.material))object.material=replacements.get(object.material);});

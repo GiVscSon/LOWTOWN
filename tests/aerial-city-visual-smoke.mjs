@@ -80,7 +80,9 @@ async function turnRight() {
 try {
   await waitForPreview();
   browser = await chromium.launch({ headless: true,executablePath:process.env.LOWTOWN_CHROMIUM||undefined });
-  page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1 });
+  // Exercise native flight controls at a practical software-WebGL viewport.
+  // The frozen survey below separately captures the full-resolution city.
+  page = await browser.newPage({ viewport: { width: 960, height: 640 }, deviceScaleFactor: 1 });
   page.on('pageerror', error => errors.push(`pageerror: ${error.message}`));
   page.on('console', message => {
     if (message.type() === 'error') errors.push(`console: ${message.text()}`);
@@ -126,8 +128,33 @@ try {
   await page.waitForFunction(() => /\d+ м/.test(document.querySelector('#hudGear')?.textContent || ''), null, { timeout: 30000 });
   await page.keyboard.press('q');
   await hold('w');
-  await page.waitForFunction(()=>Number.parseInt(document.querySelector('#hudGear')?.textContent||'',10)>=205,null,{timeout:20000});
-  await page.waitForTimeout(300);
+  const takeoffStart = await page.evaluate(() => ({
+    scene: window.__lowtownCityQA.snapshot(),
+    frames: window.__lowtownThreeStats.frames,
+    wallTime: performance.now()
+  }));
+  assert.equal(takeoffStart.scene.player.mode, 'helicopter');
+  assert(takeoffStart.scene.player.keys.up, 'native throttle input was not received');
+  // Software WebGL may lag wall time under the runtime's bounded backlog.
+  // Require the same 205 m height and 69 m/s simulated climb, with a finite
+  // wall watchdog for a stalled browser rather than a hardware-speed oracle.
+  const takeoffHandle = await page.waitForFunction(() => {
+    const scene = window.__lowtownCityQA.snapshot();
+    return scene.player.altitude >= 205 && {
+      scene, frames: window.__lowtownThreeStats.frames, wallTime: performance.now()
+    };
+  }, null, { timeout: 60000, polling: 100 });
+  const takeoffEnd = await takeoffHandle.jsonValue();
+  await takeoffHandle.dispose();
+  const climbSeconds = takeoffEnd.scene.weather.time - takeoffStart.scene.weather.time;
+  const expectedAltitude = Math.min(220, takeoffStart.scene.player.altitude + 69 * climbSeconds);
+  assert(climbSeconds > 0 && climbSeconds <= 3.25,
+    `takeoff exceeded its simulation-time budget: ${climbSeconds}s`);
+  assert(Math.abs(takeoffEnd.scene.player.altitude - expectedAltitude) < 1e-6,
+    `helicopter climb differs from 69 m/s: ${JSON.stringify(takeoffEnd.scene.player)}`);
+  assert(takeoffEnd.frames > takeoffStart.frames, 'rendering stopped during native takeoff');
+  await page.waitForFunction(() => Number.parseInt(document.querySelector('#hudGear')?.textContent || '', 10) >= 205,
+    null, { timeout: 10000, polling: 100 });
   await release('w');
   const airHeight = await page.locator('#hudGear').textContent();
   assert(Number.parseInt(airHeight, 10) >= 180, `helicopter did not reach useful aerial height: ${airHeight}`);
@@ -152,6 +179,12 @@ try {
   // Controls above run on the real clock. Survey captures keep a single full
   // quality frame instead of submitting continuous 11 MP work to software GL.
   await page.evaluate(()=>window.__lowtownCityQA.advanceScene(0));
+  await page.locator('#btnMenu').click();
+  await page.locator('[data-menu-page=settings]').click();
+  await page.locator('#menuAdaptive').uncheck();
+  await page.locator('#menuGraphicsPreset').selectOption('high');
+  await page.locator('#menuResolution').selectOption('1.5');
+  await page.locator('#menuClose').click();
   await page.setViewportSize({width:2800,height:1800});
   const districts=await page.evaluate(()=>window.__lowtownCityQA.districts());
   assert.equal(districts.length,16);
@@ -159,6 +192,8 @@ try {
   for(const district of districts){
     const position=await page.evaluate(id=>window.__lowtownCityQA.viewDistrict(id),district.id);
     assert.equal(position.mode,'helicopter');assert(position.altitude>=180);
+    const resolution=await page.evaluate(()=>window.__lowtownThreeStats.resolution);
+    assert.equal(resolution.ratio,1.5);assert.equal(resolution.width,4200);assert.equal(resolution.height,2700);
     await screenshot(`district-${district.id}`);
     survey.push(position);
   }
@@ -181,6 +216,13 @@ try {
     url,
     vehicle: 'helicopter',
     flightAltitude: airHeight.trim(),
+    takeoff: {
+      simulationSeconds: climbSeconds,
+      wallSeconds: (takeoffEnd.wallTime - takeoffStart.wallTime) / 1000,
+      startAltitude: takeoffStart.scene.player.altitude,
+      endAltitude: takeoffEnd.scene.player.altitude,
+      renderedFrames: takeoffEnd.frames - takeoffStart.frames
+    },
     camera: { ground: groundCamera, aerial: aerialCamera },
     screenshots: shots,
     survey,

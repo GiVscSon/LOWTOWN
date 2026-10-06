@@ -20,6 +20,8 @@ export function contact(a, b) {
   return { ...normal, depth };
 }
 const mass = body => Math.max(1, Number(body.mass) || 1500);
+const settledBodies=new WeakMap();
+const motionStates=new WeakMap();
 const velocity = body => ({x:Number.isFinite(body.vx)?body.vx:Math.cos(body.angle||0)*(body.speed||0),
   y:Number.isFinite(body.vy)?body.vy:Math.sin(body.angle||0)*(body.speed||0)});
 function setVelocity(body,x,y) {
@@ -84,10 +86,14 @@ export function captureMotion(bodies){
 export function solveVehicleMotion(bodies,starts,dt,{buildings=[],trees=[],props=[],people=new Set(),passive=new Set(),
   player=null,canOccupy=()=>true,onImpact=()=>{},isEnabled=()=>true,sceneryIndex=null}={}){
   const frame=Math.max(.0001,Math.min(dt,.1)*60),states=[];
+  sceneryIndex ||= createSceneryIndex(buildings,trees,props);
   let steps=1;
   const shape=s=>s.person?{x:s.body.x,y:s.body.y,angle:0,length:9,breadth:9}:chassis(s.body);
   for(const body of bodies){
-    const end={x:body.x,y:body.y,angle:body.angle||0};let start=starts.get(body)||end;
+    let state=motionStates.get(body);
+    if(!state){state={end:{},endVelocity:{}};motionStates.set(body,state);}
+    const end=state.end;end.x=body.x;end.y=body.y;end.angle=body.angle||0;
+    let start=starts.get(body)||end;
     if(Math.hypot(end.x-start.x,end.y-start.y)>512)start=end; // custody/respawn is a relocation, never a swept crash
     const person=people.has(body),parked=passive.has(body),angle=person?0:Math.atan2(Math.sin(end.angle-start.angle),Math.cos(end.angle-start.angle))+(parked?(body.angularVelocity||0)*dt:0);
     let vx=(end.x-start.x)/frame,vy=(end.y-start.y)/frame;
@@ -95,21 +101,31 @@ export function solveVehicleMotion(bodies,starts,dt,{buildings=[],trees=[],props
     else if(body!==player){vx+=body.contactVx||0;vy+=body.contactVy||0;}
     const radius=person?6:Math.hypot(chassis(body).length,chassis(body).breadth)/2;
     steps=Math.max(steps,Math.ceil((Math.hypot(vx,vy)*frame+Math.abs(angle)*radius)/2));
-    states.push({body,start,end,endVelocity:velocity(body),person,parked,vx,vy,engineX:parked?0:(end.x-start.x)/frame,engineY:parked?0:(end.y-start.y)/frame,angle,radius});
+    const settled=settledBodies.get(body),sleeping=(parked||person)&&!body.jumpHeight&&Math.abs(vx)+Math.abs(vy)+Math.abs(angle)<1e-6&&settled?.scenery===sceneryIndex&&settled?.x===start.x&&settled?.y===start.y&&settled?.angle===start.angle&&settled?.jumpHeight===(body.jumpHeight||0)&&end.x===start.x&&end.y===start.y;
+    state.endVelocity.x=Number.isFinite(body.vx)?body.vx:Math.cos(body.angle||0)*(body.speed||0);
+    state.endVelocity.y=Number.isFinite(body.vy)?body.vy:Math.sin(body.angle||0)*(body.speed||0);
+    Object.assign(state,{body,start,person,parked,vx,vy,engineX:parked?0:(end.x-start.x)/frame,engineY:parked?0:(end.y-start.y)/frame,angle,radius,sleeping});states.push(state);
   }
   steps=Math.min(256,steps);const slice=frame/steps,maxRadius=Math.max(0,...states.map(s=>s.radius));
-  sceneryIndex ||= createSceneryIndex(buildings,trees,props);
-  for(const s of states){
-    Object.assign(s.body,s.start);
+  function wake(s){
+    s.sleeping=false;
     const travel=Math.hypot(s.vx,s.vy)*frame+s.radius+4;
-    s.scenery=sceneryIndex.query(s.start.x-travel,s.start.y-travel,s.start.x+travel,s.start.y+travel).map(p=>({body:p,person:false,vx:0,vy:0,radius:p.radius}));
+    const left=s.start.x-travel,top=s.start.y-travel,right=s.start.x+travel,bottom=s.start.y+travel,box=s.sceneryBox;
+    if(s.sceneryIndex===sceneryIndex&&box&&left>=box.left&&top>=box.top&&right<=box.right&&bottom<=box.bottom)return;
+    s.sceneryBox={left:left-16,top:top-16,right:right+16,bottom:bottom+16};s.sceneryIndex=sceneryIndex;
+    s.scenery=sceneryIndex.query(left-16,top-16,right+16,bottom+16).map(p=>({body:p,person:false,vx:0,vy:0,radius:p.radius}));
   }
+  for(const s of states){Object.assign(s.body,s.start);if(!s.sleeping)wake(s);}
   const reported=new Map();
   function collide(a,b,fixed=false){
+    if(a.sleeping&&b.sleeping)return false;
     if(!isEnabled(a.body)||!isEnabled(b.body.source||b.body))return false;
     if(Math.abs(a.body.x-b.body.x)>a.radius+b.radius||Math.abs(a.body.y-b.body.y)>a.radius+b.radius)return false;
     if((a.body.jumpHeight||0)>=(b.person?23:bodyHeight(b.body))||(!fixed&&(b.body.jumpHeight||0)>=(a.person?23:bodyHeight(a.body))))return false;
     const hit=contact(shape(a),shape(b));if(!hit)return false;
+    // Resting props and parked cars stay in the broad phase and wake on the
+    // first actual contact, retaining their mass and ability to be pushed.
+    if(a.sleeping)wake(a);if(!fixed&&b.sleeping)wake(b);
     const closing=Math.max(0,-((a.vx-b.vx)*hit.x+(a.vy-b.vy)*hit.y));
     const target=b.body.source||b.body;
     let touched=reported.get(a.body);if(!touched)reported.set(a.body,touched=new Set());
@@ -124,9 +140,10 @@ export function solveVehicleMotion(bodies,starts,dt,{buildings=[],trees=[],props
     let shareA=invA/total,shareB=invB/total;
     const depth=hit.depth+.025;
     const permitted=(s,x,y)=>canOccupy(s.body,{...s.body,x,y},s.person);
-    if(!permitted(a,a.body.x+hit.x*depth*shareA,a.body.y+hit.y*depth*shareA)){shareA=0;shareB=fixed?0:1;}
+    const originalShareA=shareA,permittedA=permitted(a,a.body.x+hit.x*depth*shareA,a.body.y+hit.y*depth*shareA);
+    if(!permittedA){shareA=0;shareB=fixed?0:1;}
     if(!fixed&&!permitted(b,b.body.x-hit.x*depth*shareB,b.body.y-hit.y*depth*shareB)){shareB=0;shareA=1;}
-    const movedA=shareA&&permitted(a,a.body.x+hit.x*depth*shareA,a.body.y+hit.y*depth*shareA);
+    const movedA=shareA&&(shareA===originalShareA?permittedA:permitted(a,a.body.x+hit.x*depth*shareA,a.body.y+hit.y*depth*shareA));
     if(movedA){
       a.body.x+=hit.x*depth*shareA;a.body.y+=hit.y*depth*shareA;
     }
@@ -144,10 +161,11 @@ export function solveVehicleMotion(bodies,starts,dt,{buildings=[],trees=[],props
   }
   for(let step=0;step<steps;step++){
     for(const s of states){
+      if(s.sleeping)continue;
       const pose={x:s.body.x,y:s.body.y,angle:s.body.angle};
       const coast=s.parked&&dt>0?(1-Math.exp(-3*dt))/(3*dt):1;
       s.body.x+=s.vx*slice*coast;s.body.y+=s.vy*slice*coast;s.body.angle=s.start.angle+s.angle*(step+1)/steps;
-      if((s.person||s.parked&&Math.hypot(s.vx,s.vy)>.001||Math.abs(s.vx-s.engineX)+Math.abs(s.vy-s.engineY)>.01)&&!canOccupy(s.body,s.body,s.person)){Object.assign(s.body,pose);s.vx=s.vy=0;}
+      if((s.body.x!==pose.x||s.body.y!==pose.y)&&(s.person||s.parked&&Math.hypot(s.vx,s.vy)>.001||Math.abs(s.vx-s.engineX)+Math.abs(s.vy-s.engineY)>.01)&&!canOccupy(s.body,s.body,s.person)){Object.assign(s.body,pose);s.vx=s.vy=0;}
     }
     for(let pass=0;pass<32;pass++){
       let touched=false;
@@ -157,15 +175,18 @@ export function solveVehicleMotion(bodies,starts,dt,{buildings=[],trees=[],props
         let cell=cells.get(key);if(!cell)cells.set(key,cell=[]);cell.push(index);});
       for(let i=0;i<states.length;i++){
         const a=states[i],cx=Math.floor(a.body.x/cellSize),cy=Math.floor(a.body.y/cellSize);
+        if(a.sleeping)continue;
         const reach=Math.max(1,Math.ceil((a.radius+maxRadius)/cellSize));
         for(let x=cx-reach;x<=cx+reach;x++)for(let y=cy-reach;y<=cy+reach;y++)
-          for(const j of cells.get(`${x},${y}`)||[])if(j>i)touched=collide(a,states[j])||touched;
-        for(const b of a.scenery)touched=collide(a,b,true)||touched;
+          for(const j of cells.get(`${x},${y}`)||[])if(j>i||j!==i&&states[j].sleeping)touched=collide(a,states[j])||touched;
+        for(const b of a.scenery||[])touched=collide(a,b,true)||touched;
       }
       if(!touched)break;
     }
   }
   for(const s of states){
+    if(s.parked||s.person){let settled=settledBodies.get(s.body);if(!settled){settled={};settledBodies.set(s.body,settled);}Object.assign(settled,{x:s.body.x,y:s.body.y,angle:s.body.angle,jumpHeight:s.body.jumpHeight||0,scenery:sceneryIndex});}
+    if(s.sleeping)continue;
     if(s.person){s.body.angle=s.end.angle;s.body.contactVx=s.vx-s.engineX;s.body.contactVy=s.vy-s.engineY;}
     else{
       setVelocity(s.body,s.body===player?s.endVelocity.x+s.vx-s.engineX:s.vx,s.body===player?s.endVelocity.y+s.vy-s.engineY:s.vy);
@@ -175,5 +196,6 @@ export function solveVehicleMotion(bodies,starts,dt,{buildings=[],trees=[],props
     if(s.parked)setVelocity(s.body,s.vx*decay,s.vy*decay);
     else if(s.body!==player){s.body.contactVx*=decay;s.body.contactVy*=decay;if(Math.hypot(s.body.contactVx,s.body.contactVy)<.01)s.body.contactVx=s.body.contactVy=0;}
   }
-  return {bodies:bodies.length,activeBodies:states.length,sleepingBodies:bodies.length-states.length,steps};
+  const sleepingBodies=states.filter(s=>s.sleeping).length;
+  return {bodies:bodies.length,activeBodies:states.length-sleepingBodies,sleepingBodies,steps};
 }

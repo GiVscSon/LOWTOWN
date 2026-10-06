@@ -1,4 +1,9 @@
 // Fixed ambience sources, one reusable noise buffer, bounded short event voices.
+export function setAudioLevel(parameter,value,time,decay=.03){
+  if(!parameter)return;
+  if(value===0){parameter.cancelScheduledValues?.(0);parameter.value=0;parameter.setValueAtTime(0,time);}
+  else parameter.setTargetAtTime(value,time,decay);
+}
 export function createSoundscape(a,master){
   const effects=a.createGain(),ambient=a.createGain();effects.connect(master);ambient.connect(master);
   const buffer=a.createBuffer(1,a.sampleRate*2,a.sampleRate),data=buffer.getChannelData(0);let seed=8917;
@@ -34,7 +39,7 @@ export function createSoundscape(a,master){
     voice(p,level);if(p.noise&&p.tone)voice({...p,noise:0},level*.7);
     if(id==='reload')voice(p,level,.28);return true;
   }
-  return {effects,ambient,loops,voices,play,setLevels(sfx,environment){effects.gain.setTargetAtTime(sfx,a.currentTime,.03);ambient.gain.setTargetAtTime(environment,a.currentTime,.03);},
+  return {effects,ambient,loops,voices,play,setLevels(sfx,environment){setAudioLevel(effects.gain,sfx,a.currentTime);setAudioLevel(ambient.gain,environment,a.currentTime);},
     update({rain=0,wind=0,waves=0,fire=0,sirens=0,time=0}){
       for(const [id,level] of Object.entries({rain:rain*.13,wind:wind*.055,waves:waves*(.06+.025*Math.sin(time*1.4)),fire:fire*(.09+.02*Math.sin(time*17))}))loops[id].gain.gain.setTargetAtTime(level,a.currentTime,.2);
       sirenGain.gain.setTargetAtTime(sirens*.055,a.currentTime,.15);siren.frequency.setTargetAtTime(720+220*Math.sin(time*5),a.currentTime,.025);

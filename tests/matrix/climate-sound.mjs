@@ -29,6 +29,12 @@ assert.equal(buffers,1);const initial=sources;s.setLevels(0,0);s.play('impact');
 // The first E key also unlocks audio: its successful exit must still sound.
 const events=[],doorCtx={env:{Math,window:{AudioContext:class {constructor(){this.state='running';this.currentTime=0;this.destination={};}createOscillator(){return node();}createGain(){return node();}createBiquadFilter(){return node();}}},localStorage:{getItem(){return null;},setItem(){}},setInterval(){return 1;},clearInterval(){}},roam:{mode:'sedan'},player:{x:0,y:0},state:{keys:{}}};
 installAppAudio(doorCtx);const doorAudio=new doorCtx.SynthAudio();doorAudio.init();doorAudio.sfx={play:id=>events.push(id)};doorCtx.roam.mode='foot';doorAudio.stepScene(1/60);assert(events.includes('door'),'first gesture vehicle exit lost its door sound');
+doorCtx.roam.mode='sedan';doorAudio.sfx={setLevels(){}};assert(doorAudio.motorGain.gain.value>0);
+doorAudio.setEffectsVolume(0);assert.equal(doorAudio.motorGain.gain.value,0,'muting effects must stop the engine before another physics tick');
+doorAudio.setEffectsVolume(.6);assert(doorAudio.motorGain.gain.value>0,'unmuting a driving engine lost sound');
+doorCtx.roam.mode='foot';doorAudio.setEffectsVolume(.6);assert.equal(doorAudio.motorGain.gain.value,0,'changing effects while walking started the engine');
+const mutedAudio=new doorCtx.SynthAudio();mutedAudio.effectsVolume=0;doorCtx.roam.mode='sedan';mutedAudio.init();assert.equal(mutedAudio.motorGain.gain.value,0,'a saved zero effects volume started an engine');
+doorAudio.setVolume(0);doorAudio.setPaused(false);assert.equal(doorAudio.masterGain.gain.value,0,'resuming a zero-volume scene restored master audio');
 const triangleCount=Object.values(characterGeometries()).reduce((sum,g)=>sum+g.attributes.position.count/3,0);assert(triangleCount<2600);
 assert(characterEyeOpen({animationTime:.08})<.1&&characterEyeOpen({animationTime:1})===1&&characterEyeOpen({dead:true})<.1);
 const scene=new THREE.Scene(),batch=createCharacterBatch(scene,10),count=scene.children.length;

@@ -24,6 +24,12 @@ export function projectStreet(x,y,segment){
   const px=a[0]+dx*t,py=a[1]+dy*t;
   return {x:px,y:py,t,distance:Math.hypot(x-px,y-py),angle:Math.atan2(dy,dx),road:segment.road};
 }
+function segmentContains(x,y,segment,pad){
+  const radius=segment.width/2+pad;if(radius<0)return false;
+  const {a,dx,dy,length2}=segment,t=Math.max(0,Math.min(1,((x-a[0])*dx+(y-a[1])*dy)/length2));
+  const px=x-a[0]-dx*t,py=y-a[1]-dy*t;
+  return px*px+py*py<=radius*radius;
+}
 export function nearestStreet(x,y,roads){
   let best=null;
   for(const road of roads)for(const segment of corridorSegments(road)){
@@ -34,7 +40,7 @@ export function nearestStreet(x,y,roads){
 export function corridorContains(x,y,road,pad=0){
   if(x<road.x-pad||x>road.x+road.w+pad||y<road.y-pad||y>road.y+road.h+pad)return false;
   if(!road.points)return true;
-  return corridorSegments(road).some(segment=>projectStreet(x,y,segment).distance<=segment.width/2+pad);
+  return corridorSegments(road).some(segment=>segmentContains(x,y,segment,pad));
 }
 export function corridorIndex(roads){
   const cached=collections.get(roads);if(cached?.length===roads.length&&cached.first===roads[0]&&cached.last===roads.at(-1))return cached;
@@ -53,7 +59,7 @@ export function onStreetCollection(x,y,roads,pad=0,exclude=null){
   for(const segment of corridorIndex(roads).at(x,y)){
     if(segment.road===exclude)continue;
     if(!segment.road.points){if(corridorContains(x,y,segment.road,pad))return true;}
-    else if(projectStreet(x,y,segment).distance<=segment.width/2+pad)return true;
+    else if(segmentContains(x,y,segment,pad))return true;
   }
   return false;
 }

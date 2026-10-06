@@ -1,4 +1,4 @@
-import {createSoundscape} from './soundscape.js';
+import {createSoundscape,setAudioLevel} from './soundscape.js';
 // One shared runtime context owns state; this system has no hidden globals.
 export function installAppAudio(ctx){
 ctx.SynthAudio = class SynthAudio {
@@ -44,7 +44,7 @@ ctx.SynthAudio = class SynthAudio {
       this.radioGain.connect(this.masterGain);
       this.motorOsc.type = 'sawtooth';
       this.motorOsc.frequency.setValueAtTime(45, this.ctx.currentTime);
-      this.motorGain.gain.setValueAtTime(0.035, this.ctx.currentTime);
+      this.motorGain.gain.setValueAtTime(ctx.roam?.mode==='foot'||ctx.player?.inWater?0:.035*this.effectsVolume, this.ctx.currentTime);
       const filter = this.ctx.createBiquadFilter();
       filter.type = 'lowpass';
       filter.frequency.setValueAtTime(380, this.ctx.currentTime);
@@ -72,7 +72,13 @@ ctx.SynthAudio = class SynthAudio {
     this.saveSettings();
     this.setPaused(this.paused);
   }
-  setEffectsVolume(value){if(Number.isFinite(value)){this.effectsVolume=ctx.env.Math.max(0,ctx.env.Math.min(1,value));this.sfx?.setLevels(this.effectsVolume,this.ambienceVolume);this.saveSettings();}}
+  setEffectsVolume(value){if(Number.isFinite(value)){
+    this.effectsVolume=ctx.env.Math.max(0,ctx.env.Math.min(1,value));this.sfx?.setLevels(this.effectsVolume,this.ambienceVolume);
+    // The engine shares the effects control and must mute without waiting for
+    // another physics step, including a paused or overloaded driving scene.
+    if(this.ctx)setAudioLevel(this.motorGain?.gain,ctx.roam?.mode==='foot'||ctx.player?.inWater?0:.035*this.effectsVolume,this.ctx.currentTime,.05);
+    this.saveSettings();
+  }}
   setAmbienceVolume(value){if(Number.isFinite(value)){this.ambienceVolume=ctx.env.Math.max(0,ctx.env.Math.min(1,value));this.sfx?.setLevels(this.effectsVolume,this.ambienceVolume);this.saveSettings();}}
   playEffect(id,source){if(this.paused||!this.volume)return;const distance=source?ctx.env.Math.hypot(source.x-ctx.player.x,source.y-ctx.player.y):0;this.sfx?.play(id,1/(1+(distance/160)**2));}
   playWeapon(id,source){this.playEffect(id,source);}
@@ -95,7 +101,9 @@ ctx.SynthAudio = class SynthAudio {
   }
   setPaused(paused) {
     this.paused = Boolean(paused);
-    this.masterGain?.gain.setTargetAtTime(this.paused ? 0 : this.volume, this.ctx.currentTime, .03);
+    if(!this.masterGain)return;
+    if(this.volume===0)setAudioLevel(this.masterGain.gain,0,this.ctx.currentTime);
+    else this.masterGain.gain.setTargetAtTime(this.paused ? 0 : this.volume, this.ctx.currentTime, .03);
   }
   update(rpmRatio, speed) {
     if (!this.enabled || !this.ctx) return;

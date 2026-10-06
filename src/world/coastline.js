@@ -1,6 +1,7 @@
 export const BEACH_WIDTH = 108;
 const cache = new WeakMap();
 const boundsCache = new WeakMap();
+const coastRows = new WeakMap();
 function coastBounds(island){
   if(!boundsCache.has(island)){
     const points=coastPoints(island);
@@ -110,9 +111,22 @@ export function coastPoints(island) {
 export function pointInCoast(x,y,island) {
   const bounds=coastBounds(island);
   if(x<bounds.left||x>bounds.right||y<bounds.top||y>bounds.bottom)return false;
-  const points=coastPoints(island); let inside=false;
-  for(let i=0,j=points.length-1;i<points.length;j=i++) {
-    const [ax,ay]=points[i], [bx,by]=points[j];
+  const points=coastPoints(island);let rows=coastRows.get(island);
+  if(!rows){
+    rows=new Map();
+    for(let i=0,j=points.length-1;i<points.length;j=i++){
+      const a=points[i],b=points[j];if(a[1]===b[1])continue;
+      const edge=[...a,...b];
+      for(let row=Math.floor(Math.min(a[1],b[1])/64);row<=Math.floor(Math.max(a[1],b[1])/64);row++){
+        let bucket=rows.get(row);if(!bucket)rows.set(row,bucket=[]);bucket.push(edge);
+      }
+    }
+    coastRows.set(island,rows);
+  }
+  // Exact ray parity, restricted to edges crossing this horizontal band.
+  // The rendered coastline and boundary comparisons remain the same.
+  let inside=false;
+  for(const [ax,ay,bx,by] of rows.get(Math.floor(y/64))||[]) {
     if((ay>y)!==(by>y) && x<(bx-ax)*(y-ay)/(by-ay)+ax) inside=!inside;
   }
   return inside;
