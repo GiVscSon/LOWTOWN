@@ -427,6 +427,7 @@ export function installAppBootstrap(ctx) {
         snapshot: () => ({
           stationExitPath: ctx.serviceBases.find(b => b.kind === 'police')?.building.exitPath,
           weather: {
+            time: ctx.weather.time,
             kind: ctx.weather.kind,
             rain: ctx.weather.rain,
             fog: ctx.weather.fog,
@@ -440,6 +441,7 @@ export function installAppBootstrap(ctx) {
             speed: ctx.player.speed,
             hp: ctx.player.hp,
             mode: ctx.roam.mode,
+            altitude: ctx.roam.altitude,
             custodyTimer: ctx.state.custodyTimer,
             station: ctx.state.custodyStation,
             keys: {

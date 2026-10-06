@@ -128,8 +128,33 @@ try {
   await page.waitForFunction(() => /\d+ м/.test(document.querySelector('#hudGear')?.textContent || ''), null, { timeout: 30000 });
   await page.keyboard.press('q');
   await hold('w');
-  await page.waitForFunction(()=>Number.parseInt(document.querySelector('#hudGear')?.textContent||'',10)>=205,null,{timeout:20000});
-  await page.waitForTimeout(300);
+  const takeoffStart = await page.evaluate(() => ({
+    scene: window.__lowtownCityQA.snapshot(),
+    frames: window.__lowtownThreeStats.frames,
+    wallTime: performance.now()
+  }));
+  assert.equal(takeoffStart.scene.player.mode, 'helicopter');
+  assert(takeoffStart.scene.player.keys.up, 'native throttle input was not received');
+  // Software WebGL may lag wall time under the runtime's bounded backlog.
+  // Require the same 205 m height and 69 m/s simulated climb, with a finite
+  // wall watchdog for a stalled browser rather than a hardware-speed oracle.
+  const takeoffHandle = await page.waitForFunction(() => {
+    const scene = window.__lowtownCityQA.snapshot();
+    return scene.player.altitude >= 205 && {
+      scene, frames: window.__lowtownThreeStats.frames, wallTime: performance.now()
+    };
+  }, null, { timeout: 60000, polling: 100 });
+  const takeoffEnd = await takeoffHandle.jsonValue();
+  await takeoffHandle.dispose();
+  const climbSeconds = takeoffEnd.scene.weather.time - takeoffStart.scene.weather.time;
+  const expectedAltitude = Math.min(220, takeoffStart.scene.player.altitude + 69 * climbSeconds);
+  assert(climbSeconds > 0 && climbSeconds <= 3.25,
+    `takeoff exceeded its simulation-time budget: ${climbSeconds}s`);
+  assert(Math.abs(takeoffEnd.scene.player.altitude - expectedAltitude) < 1e-6,
+    `helicopter climb differs from 69 m/s: ${JSON.stringify(takeoffEnd.scene.player)}`);
+  assert(takeoffEnd.frames > takeoffStart.frames, 'rendering stopped during native takeoff');
+  await page.waitForFunction(() => Number.parseInt(document.querySelector('#hudGear')?.textContent || '', 10) >= 205,
+    null, { timeout: 10000, polling: 100 });
   await release('w');
   const airHeight = await page.locator('#hudGear').textContent();
   assert(Number.parseInt(airHeight, 10) >= 180, `helicopter did not reach useful aerial height: ${airHeight}`);
@@ -191,6 +216,13 @@ try {
     url,
     vehicle: 'helicopter',
     flightAltitude: airHeight.trim(),
+    takeoff: {
+      simulationSeconds: climbSeconds,
+      wallSeconds: (takeoffEnd.wallTime - takeoffStart.wallTime) / 1000,
+      startAltitude: takeoffStart.scene.player.altitude,
+      endAltitude: takeoffEnd.scene.player.altitude,
+      renderedFrames: takeoffEnd.frames - takeoffStart.frames
+    },
     camera: { ground: groundCamera, aerial: aerialCamera },
     screenshots: shots,
     survey,
