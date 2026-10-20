@@ -169,7 +169,7 @@ jobs:
         run: node tests/road-topology-smoke.mjs
       - name: Test vehicle road collision
         run: node tests/vehicle-road-collision-smoke.mjs
-      - name: Test mobile arrow controls
+      - name: Test mobile controls and accessibility
         run: node tests/mobile-controls-v2-contract.mjs
       - name: Test semantic city routing
         run: node tests/city-semantics-smoke.mjs
